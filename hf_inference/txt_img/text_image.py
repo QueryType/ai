@@ -36,13 +36,13 @@ iface = gr.Interface(
     inputs=[
         gr.Textbox(label="Model", value=model),
         gr.Textbox(label="Prompt", lines=5, value="Astronaut floating in space"),
-        gr.Slider(1, 10, step=0.1, label="Guidance Scale", value=3.5),
+        gr.Slider(0, 10, step=0.1, label="Guidance Scale", value=0),
         gr.Slider(256, 2048, step=32, label="Width", value=768),
         gr.Slider(256, 2048, step=32, label="Height", value=1024),
         gr.Slider(1, 100, step=1, label="Number of Inference Steps", value=4),
         gr.Number(label="Seed", value=0)
     ],
-    outputs=gr.Image(type="pil"),
+    outputs=gr.Image(type="pil", format="png"),
     title="Text to Image Generation",
     description="Generate images from text prompts using the HF Inference API",
 )
