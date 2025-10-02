@@ -1,0 +1,173 @@
+# Dual Agent Chat
+
+A lightweight, configuration-driven system for running conversations between two AI agents.
+
+## Key Features
+
+- **Single Message List**: Efficient memory usage with role and system prompt switching
+- **Configuration-Driven**: All settings in `app.json` for easy scenario management
+- **Markdown-Based Setup**: World info and character cards in simple markdown files
+- **OpenAI-Compatible**: Works with any OpenAI-compatible API endpoint
+- **Interactive Interruption**: Press SPACE during generation to manually enter messages
+- **Conversation Continuation**: Resume and extend existing conversations
+
+## How It Works
+
+1. **World Info** (`.md`): Describes the setting, context, and rules of the world
+2. **Character Cards** (`.md`): Defines each agent's personality, background, and behavior
+3. **Message List**: Single list where roles (`user`/`assistant`) alternate each turn
+4. **System Prompt**: Dynamically constructed as `world_info + active_character_card`
+
+### The Magic: Role Switching
+
+Instead of maintaining two separate message lists (which doubles memory), we:
+1. Switch the `system` prompt to include the current speaker's character card
+2. Flip all `user` ↔ `assistant` roles in the message history
+3. This makes the current speaker always the "assistant" responding to the conversation
+
+## Project Structure
+
+```
+dual-agent-chat/
+├── README.md
+├── TODO.md
+├── requirements.txt
+├── app.json                    # Main configuration
+├── main.py                     # Main application
+├── config_loader.py            # Configuration handling
+├── message_manager.py          # Message list & role switching
+├── llm_client.py              # LLM API interaction
+├── scenarios/                  # Scenario configurations
+│   ├── example/
+│   │   ├── app.json
+│   │   ├── world.md
+│   │   ├── character_a.md
+│   │   └── character_b.md
+└── conversations/              # Saved conversation logs
+```
+
+## Configuration (app.json)
+
+```json
+{
+  "scenario_name": "Example Scenario",
+  "world_info_file": "scenarios/example/world.md",
+  "character_a_file": "scenarios/example/character_a.md",
+  "character_b_file": "scenarios/example/character_b.md",
+  "character_a_name": "Alice",
+  "character_b_name": "Bob",
+  "starting_character": "a",
+  "llm_config": {
+    "api_base_url": "http://localhost:1234/v1",
+    "api_key": "not-needed",
+    "model": "local-model",
+    "temperature": 0.8,
+    "max_tokens": 200,
+    "top_p": 0.95
+  },
+  "conversation_config": {
+    "max_turns": 10,
+    "save_conversation": true,
+    "output_dir": "conversations"
+  }
+}
+```
+
+## Quick Start
+
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Run with default configuration
+python main.py
+
+# Run with custom configuration
+python main.py scenarios/debate/debate_config.json
+
+# Continue an existing conversation
+python main.py --continue conversations/my_chat.json --add-turns 5
+
+# Run with interactive interruption (press SPACE to take control)
+python main.py --interrupt-timeout 10
+
+# Start entirely in interactive mode
+python main.py --interactive
+```
+
+See [USAGE.md](USAGE.md) for detailed instructions.
+
+## Example Scenarios
+
+### Fantasy Tavern (Default)
+Two travelers meet in a medieval tavern—a merchant storyteller and a herbalist healer engage in friendly conversation.
+
+```bash
+python main.py  # Uses app.json
+```
+
+### Philosophical Debate
+University students debate whether AI can achieve true consciousness.
+
+```bash
+python main.py scenarios/debate/debate_config.json
+```
+
+## Advanced Features
+
+### ⌨️ **Interactive Interruption** (NEW!)
+Take control during automatic generation by pressing SPACE:
+```bash
+python main.py --interrupt-timeout 10  # 10 second window to press SPACE
+```
+- Press SPACE during "thinking" phase to manually enter messages
+- Type `auto` to resume automatic generation
+- Configurable timeout (default: 5 seconds)
+- See [docs/INTERACTIVE_MODE.md](docs/INTERACTIVE_MODE.md) for details
+
+### 🔄 **Conversation Continuation**
+Continue existing conversations by adding more turns:
+```bash
+python main.py --continue conversations/my_chat.json --add-turns 5
+```
+- Original conversation preserved (never modified)
+- State fully restored (message history, roles)
+- New turns appended to new file
+- See [CONTINUING_CONVERSATIONS.md](CONTINUING_CONVERSATIONS.md) for details
+
+## Key Features Explained
+
+### Memory-Efficient Design
+Instead of maintaining two separate message histories (one for each agent), we use a single message list and dynamically switch:
+- **System prompt**: Changes to include the active speaker's character card
+- **Roles**: All messages flip between `user` and `assistant` when switching speakers
+
+This approach:
+- ✅ Halves memory usage
+- ✅ Maintains conversation context perfectly
+- ✅ Keeps each agent's perspective consistent
+
+### Example: Role Switching
+
+```
+Turn 1 (Eldric speaks):
+  system: [World + Eldric's card]
+  assistant: "Hello there!"
+
+Turn 2 (Mira speaks):
+  system: [World + Mira's card]  ← Changed!
+  user: "Hello there!"            ← Role switched!
+  assistant: "Greetings to you."
+
+Turn 3 (Eldric speaks):
+  system: [World + Eldric's card]  ← Changed back!
+  assistant: "Hello there!"         ← Role switched back!
+  user: "Greetings to you."        ← Role switched!
+  assistant: "Nice evening..."
+```
+
+## Development Progress
+
+**Status**: ✅ Core functionality complete and tested!
+
+See [TODO.md](TODO.md) for development roadmap and [USAGE.md](USAGE.md) for detailed usage instructions.
