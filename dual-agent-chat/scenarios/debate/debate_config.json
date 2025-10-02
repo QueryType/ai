@@ -1,0 +1,25 @@
+{
+  "scenario_name": "AI Consciousness Debate",
+  "world_info_file": "scenarios/debate/world.md",
+  "character_a_file": "scenarios/debate/character_a.md",
+  "character_b_file": "scenarios/debate/character_b.md",
+  "character_a_name": "Alex",
+  "character_b_name": "Sam",
+  "starting_character": "a",
+  "llm_config": {
+    "api_base_url": "http://localhost:1234/v1",
+    "api_key": "not-needed",
+    "model": "local-model",
+    "temperature": 0.7,
+    "max_tokens": 250,
+    "top_p": 0.95,
+    "frequency_penalty": 0.0,
+    "presence_penalty": 0.0
+  },
+  "conversation_config": {
+    "max_turns": 8,
+    "save_conversation": true,
+    "output_dir": "conversations",
+    "initial_message": "I'd like to begin by arguing that consciousness is fundamentally a matter of information processing. If we accept that premise, then there's no reason in principle why an artificial system couldn't achieve genuine consciousness."
+  }
+}

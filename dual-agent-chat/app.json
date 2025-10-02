@@ -1,0 +1,26 @@
+{
+  "scenario_name": "Fantasy Tavern Conversation",
+  "world_info_file": "scenarios/fantasy_tavern/world.md",
+  "character_a_file": "scenarios/fantasy_tavern/character_a.md",
+  "character_b_file": "scenarios/fantasy_tavern/character_b.md",
+  "character_a_name": "Eldric",
+  "character_b_name": "Mira",
+  "starting_character": "a",
+  "llm_config": {
+    "api_base_url": "http://10.0.0.4:7890/v1",
+    "api_key": "not-needed",
+    "model": "cydonia-redux-22b-v1",
+    "temperature": 0.8,
+    "max_tokens": 500,
+    "top_p": 0.95,
+    "frequency_penalty": 0.0,
+    "presence_penalty": 0.0
+  },
+  "conversation_config": {
+    "max_turns": 10,
+    "save_conversation": true,
+    "output_dir": "conversations",
+    "initial_message": "Hello there, friend. What brings you to this tavern tonight?",
+    "interrupt_timeout": 5
+  }
+}

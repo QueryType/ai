@@ -1,0 +1,10 @@
+# Dual Agent Chat Requirements
+
+# Core dependencies
+requests>=2.31.0
+
+# Optional: for better JSON handling
+# python-json-logger>=2.0.0
+
+# Optional: for rich console output
+# rich>=13.0.0
