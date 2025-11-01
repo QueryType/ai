@@ -1,0 +1,1008 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-time Webcam & Screen Capture Vision Model</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .config-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input[type="text"], textarea, select {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-family: inherit;
+        }
+        textarea {
+            min-height: 80px;
+            resize: vertical;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .stop-btn {
+            background-color: #f44336;
+        }
+        .stop-btn:hover {
+            background-color: #da190b;
+        }
+        #videoContainer {
+            display: flex;
+            gap: 20px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        #video {
+            width: 100%;
+            max-width: 640px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+        }
+        #response {
+            flex: 1;
+            min-width: 300px;
+            padding: 20px;
+            background-color: #ffffff;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            min-height: 200px;
+            position: relative;
+            overflow-y: auto;
+            max-height: 600px;
+            line-height: 1.6;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        /* Markdown styling for response area */
+        #response h1, #response h2, #response h3 {
+            margin-top: 1em;
+            margin-bottom: 0.5em;
+            color: #333;
+        }
+        
+        #response h1 { font-size: 1.8em; border-bottom: 2px solid #4CAF50; padding-bottom: 5px; }
+        #response h2 { font-size: 1.5em; border-bottom: 1px solid #ddd; padding-bottom: 3px; }
+        #response h3 { font-size: 1.3em; }
+        
+        #response p {
+            margin: 0.8em 0;
+            color: #444;
+        }
+        
+        #response ul, #response ol {
+            margin: 0.8em 0;
+            padding-left: 2em;
+        }
+        
+        #response li {
+            margin: 0.3em 0;
+            color: #444;
+        }
+        
+        #response code {
+            background-color: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            color: #d63384;
+        }
+        
+        #response pre {
+            background-color: #f4f4f4;
+            padding: 12px;
+            border-radius: 5px;
+            overflow-x: auto;
+            border-left: 3px solid #4CAF50;
+        }
+        
+        #response pre code {
+            background-color: transparent;
+            padding: 0;
+            color: #333;
+        }
+        
+        #response blockquote {
+            border-left: 4px solid #4CAF50;
+            margin: 1em 0;
+            padding: 0.5em 1em;
+            background-color: #f9f9f9;
+            color: #666;
+        }
+        
+        #response strong {
+            color: #333;
+            font-weight: 600;
+        }
+        
+        #response em {
+            color: #555;
+        }
+        
+        #response .timestamp {
+            display: inline-block;
+            background: #4CAF50;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            margin-bottom: 10px;
+            font-family: 'Courier New', monospace;
+        }
+        
+        #response .latency {
+            display: inline-block;
+            background: #2196F3;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            margin-left: 5px;
+            margin-bottom: 10px;
+            font-family: 'Courier New', monospace;
+        }
+        
+        #response hr {
+            border: none;
+            border-top: 2px solid #ddd;
+            margin: 1.5em 0;
+        }
+        #response.processing {
+            border-color: #4CAF50;
+            box-shadow: 0 0 10px rgba(76, 175, 80, 0.3);
+        }
+        #response.processing::before {
+            content: '🔄 Processing...';
+            position: absolute;
+            top: -30px;
+            right: 0;
+            background: #4CAF50;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-family: 'Segoe UI', sans-serif;
+        }
+        .status {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .status.info {
+            background-color: #e3f2fd;
+            color: #1976d2;
+        }
+        .status.success {
+            background-color: #e8f5e9;
+            color: #388e3c;
+        }
+        .status.error {
+            background-color: #ffebee;
+            color: #c62828;
+        }
+        .model-presets {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+        .model-preset-btn {
+            background-color: #2196F3;
+            padding: 8px 15px;
+            font-size: 14px;
+        }
+        .model-preset-btn:hover {
+            background-color: #1976D2;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎥 Real-time Webcam & Screen Capture</h1>
+        
+        <div class="config-section">
+            <label for="sourceType">Input Source:</label>
+            <select id="sourceType" onchange="updateSourceInfo()">
+                <option value="camera">📷 Webcam</option>
+                <option value="screen">🖥️ Screen Capture</option>
+            </select>
+            <small id="sourceInfo" style="color: #666; display: block; margin-top: 5px; margin-bottom: 15px;">
+                Capture video from your webcam
+            </small>
+            
+            <label for="baseUrl">API Base URL:</label>
+            <input type="text" id="baseUrl" value="http://localhost:8080/v1" placeholder="http://localhost:8080/v1">
+            
+            <label for="modelName">Model Name:</label>
+            <div class="model-presets">
+                <button class="model-preset-btn" onclick="setModel('qwen2-vl-2b')">Qwen2-VL-2B</button>
+                <button class="model-preset-btn" onclick="setModel('qwen2-vl-7b')">Qwen2-VL-7B</button>
+                <button class="model-preset-btn" onclick="setModel('smolvlm')">SmolVLM</button>
+                <button class="model-preset-btn" onclick="setModel('llava')">LLaVA</button>
+            </div>
+            <input type="text" id="modelName" value="qwen2-vl-2b" placeholder="Model name (from llama.cpp server)">
+            <small style="color: #666; display: block; margin-top: -8px; margin-bottom: 10px;">
+                💡 For llama.cpp, the model name can be anything - it uses the loaded GGUF file
+            </small>
+            
+            <label for="instruction">Instruction/Prompt:</label>
+            <div class="model-presets">
+                <button class="model-preset-btn" onclick="setInstruction('basic')">Basic Description</button>
+                <button class="model-preset-btn" onclick="setInstruction('changes')">Detect Changes</button>
+                <button class="model-preset-btn" onclick="setInstruction('activity')">Activity Monitor</button>
+                <button class="model-preset-btn" onclick="setInstruction('objects')">Object Detection</button>
+            </div>
+            <textarea id="instruction" placeholder="What do you see in this image?">Briefly describe what you see in this image. Be concise and direct.</textarea>
+            
+            <label for="interval">Request Interval:</label>
+            <select id="interval">
+                <option value="500">500ms (2 FPS)</option>
+                <option value="1000">1000ms (1 FPS)</option>
+                <option value="2000" selected>2000ms (0.5 FPS) - Recommended</option>
+                <option value="3000">3000ms (0.33 FPS)</option>
+                <option value="5000">5000ms (0.2 FPS)</option>
+                <option value="10000">10000ms (0.1 FPS)</option>
+                <option value="15000">15000ms (Every 15s)</option>
+                <option value="30000">30000ms (Every 30s)</option>
+            </select>
+            <small style="color: #666; display: block; margin-top: -8px; margin-bottom: 10px;">
+                💡 If inference is slow, frames will be skipped automatically to stay current
+            </small>
+
+            <label>
+                <input type="checkbox" id="autoAdjust" checked>
+                Auto-adjust interval based on inference time
+            </label>
+
+            <label for="apiKey">API Key (optional):</label>
+            <input type="text" id="apiKey" placeholder="sk-...">
+
+            <hr style="margin: 20px 0; border: none; border-top: 1px solid #ddd;">
+
+            <label>
+                <input type="checkbox" id="enableLogging">
+                📝 Enable Logging - Save all inferences for later analysis
+            </label>
+
+            <div id="loggingOptions" style="display: none; margin-top: 10px; padding: 10px; background: #f0f8ff; border-radius: 5px;">
+                <label for="logFormat">Log Format:</label>
+                <select id="logFormat">
+                    <option value="json">JSON (structured data)</option>
+                    <option value="csv">CSV (spreadsheet compatible)</option>
+                    <option value="txt">TXT (human readable)</option>
+                </select>
+
+                <label>
+                    <input type="checkbox" id="saveImages">
+                    Save captured images with logs (⚠️ Uses RAM)
+                </label>
+
+                <label for="maxLogs">Max logs to keep in memory:</label>
+                <select id="maxLogs">
+                    <option value="10">10 logs</option>
+                    <option value="25">25 logs</option>
+                    <option value="50" selected>50 logs</option>
+                    <option value="100">100 logs</option>
+                    <option value="200">200 logs</option>
+                    <option value="0">Unlimited (⚠️ RAM risk)</option>
+                </select>
+                <small style="color: #666; display: block; margin-top: -8px; margin-bottom: 10px;">
+                    💡 Auto-downloads old logs when limit is reached
+                </small>
+
+                <label>
+                    <input type="checkbox" id="autoDownload" checked>
+                    Auto-download logs when memory limit reached
+                </label>
+
+                <label>
+                    <input type="checkbox" id="streamMode">
+                    💾 Stream mode - Save each inference immediately (no RAM buildup)
+                </label>
+                <small style="color: #666; display: block; margin-top: -8px; margin-bottom: 10px;">
+                    ⚡ Best for long sessions - creates timestamped files
+                </small>
+
+                <div style="margin-top: 10px;">
+                    <button class="model-preset-btn" onclick="downloadLogs()" style="background: #ff9800;">
+                        💾 Download Logs
+                    </button>
+                    <button class="model-preset-btn" onclick="downloadImages()" style="background: #9c27b0;">
+                        🖼️ Download Images
+                    </button>
+                    <button class="model-preset-btn" onclick="clearLogs()" style="background: #f44336;">
+                        🗑️ Clear Logs
+                    </button>
+                    <span id="logCount" style="margin-left: 10px; font-weight: bold; color: #2196F3;">0 logs</span>
+                </div>
+            </div>
+        </div>
+        </div>
+
+        <div style="text-align: center;">
+            <button id="startBtn" onclick="start()">▶️ Start</button>
+            <button id="stopBtn" class="stop-btn" onclick="stop()" disabled>⏹️ Stop</button>
+        </div>
+
+        <div id="status"></div>
+
+        <div id="videoContainer">
+            <video id="video" autoplay playsinline></video>
+            <div id="response">Response will appear here...</div>
+        </div>
+    </div>
+
+    <script>
+        let stream = null;
+        let intervalId = null;
+        let isRunning = false;
+        let isProcessing = false;
+        let skippedFrames = 0;
+        let processedFrames = 0;
+        let totalLatency = 0;
+        let logs = []; // Store all inference logs
+
+        function setModel(modelName) {
+            document.getElementById('modelName').value = modelName;
+        }
+
+        function setInstruction(type) {
+            const instructionField = document.getElementById('instruction');
+            switch(type) {
+                case 'basic':
+                    instructionField.value = 'Briefly describe what you see in this image. Be concise and direct.';
+                    break;
+                case 'changes':
+                    instructionField.value = 'Briefly note any movements, changes, or activities. Keep it short and focus on what is happening now.';
+                    break;
+                case 'activity':
+                    instructionField.value = 'Briefly describe any human activity or movements. Keep the response short and to the point.';
+                    break;
+                case 'objects':
+                    instructionField.value = 'List the main objects, people, and activities visible. Be brief and use bullet points if possible.';
+                    break;
+            }
+        }
+
+        function updateSourceInfo() {
+            const sourceType = document.getElementById('sourceType').value;
+            const sourceInfo = document.getElementById('sourceInfo');
+            
+            if (sourceType === 'camera') {
+                sourceInfo.textContent = 'Capture video from your webcam';
+            } else {
+                sourceInfo.textContent = 'Capture your screen - you\'ll be able to choose which screen/window to share';
+            }
+        }
+
+        // Toggle logging options visibility
+        document.getElementById('enableLogging').addEventListener('change', (e) => {
+            document.getElementById('loggingOptions').style.display = e.target.checked ? 'block' : 'none';
+        });
+
+        // Update log count display
+        function updateLogCount() {
+            const maxLogs = parseInt(document.getElementById('maxLogs').value);
+            const limitText = maxLogs > 0 ? ` / ${maxLogs}` : '';
+            
+            // Estimate memory usage
+            const estimatedSize = logs.reduce((total, log) => {
+                let size = JSON.stringify(log).length;
+                if (log.imageData) {
+                    size += log.imageData.length; // Base64 image size
+                }
+                return total + size;
+            }, 0);
+            
+            const memoryMB = (estimatedSize / 1024 / 1024).toFixed(2);
+            const memoryText = estimatedSize > 0 ? ` (${memoryMB} MB)` : '';
+            
+            document.getElementById('logCount').textContent = `${logs.length}${limitText} logs${memoryText}`;
+        }
+
+        // Add a log entry
+        function addLog(sourceType, instruction, response, latency, imageData = null) {
+            const logEntry = {
+                timestamp: new Date().toISOString(),
+                timestampLocal: new Date().toLocaleString(),
+                sourceType: sourceType === 'camera' ? 'Webcam' : 'Screen Capture',
+                instruction: instruction,
+                response: response,
+                latencyMs: latency,
+                latencySeconds: (latency / 1000).toFixed(2),
+                frameNumber: logs.length + 1
+            };
+
+            if (imageData && document.getElementById('saveImages').checked) {
+                logEntry.imageData = imageData;
+            }
+
+            // Stream mode - save immediately and don't keep in memory
+            if (document.getElementById('streamMode').checked) {
+                downloadSingleLog(logEntry);
+                // Don't add to logs array in stream mode
+                console.log(`Streamed frame ${logEntry.frameNumber} to download`);
+                return;
+            }
+
+            logs.push(logEntry);
+            updateLogCount();
+
+            // Check memory limit and auto-download if needed
+            const maxLogs = parseInt(document.getElementById('maxLogs').value);
+            if (maxLogs > 0 && logs.length >= maxLogs) {
+                if (document.getElementById('autoDownload').checked) {
+                    console.log(`Memory limit reached (${maxLogs} logs), auto-downloading...`);
+                    downloadLogs();
+                    
+                    // Clear logs after download to free memory
+                    logs = [];
+                    updateLogCount();
+                    showStatus(`💾 Auto-saved ${maxLogs} logs to free memory`, 'success');
+                } else {
+                    showStatus(`⚠️ Memory limit reached (${maxLogs} logs). Download logs to continue.`, 'error');
+                }
+            }
+        }
+
+        // Download a single log entry immediately (for stream mode)
+        function downloadSingleLog(logEntry) {
+            const format = document.getElementById('logFormat').value;
+            const timestamp = logEntry.timestamp.replace(/[:.]/g, '-');
+            let content, filename, mimeType;
+
+            switch (format) {
+                case 'json':
+                    content = JSON.stringify(logEntry, null, 2);
+                    filename = `frame-${logEntry.frameNumber}-${timestamp}.json`;
+                    mimeType = 'application/json';
+                    break;
+
+                case 'csv':
+                    const headers = 'Frame,Timestamp,Source Type,Latency (s),Instruction,Response';
+                    const row = [
+                        logEntry.frameNumber,
+                        logEntry.timestampLocal,
+                        logEntry.sourceType,
+                        logEntry.latencySeconds,
+                        `"${logEntry.instruction.replace(/"/g, '""')}"`,
+                        `"${logEntry.response.replace(/"/g, '""')}"`
+                    ].join(',');
+                    content = headers + '\n' + row;
+                    filename = `frame-${logEntry.frameNumber}-${timestamp}.csv`;
+                    mimeType = 'text/csv';
+                    break;
+
+                case 'txt':
+                    content = `
+═══════════════════════════════════════════════════════════
+Frame #${logEntry.frameNumber}
+═══════════════════════════════════════════════════════════
+Timestamp:    ${logEntry.timestampLocal}
+Source:       ${logEntry.sourceType}
+Latency:      ${logEntry.latencySeconds}s
+Instruction:  ${logEntry.instruction}
+
+Response:
+${logEntry.response}
+`;
+                    filename = `frame-${logEntry.frameNumber}-${timestamp}.txt`;
+                    mimeType = 'text/plain';
+                    break;
+            }
+
+            // Create and trigger download silently
+            const blob = new Blob([content], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+
+            // Also download image if enabled
+            if (logEntry.imageData) {
+                const imgA = document.createElement('a');
+                imgA.href = logEntry.imageData;
+                imgA.download = `frame-${logEntry.frameNumber}-${timestamp}.jpg`;
+                imgA.click();
+            }
+        }
+
+        // Download logs in selected format
+        function downloadLogs() {
+            if (logs.length === 0) {
+                alert('No logs to download. Start capturing and enable logging first.');
+                return;
+            }
+
+            const format = document.getElementById('logFormat').value;
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            let content, filename, mimeType;
+
+            switch (format) {
+                case 'json':
+                    content = JSON.stringify(logs, null, 2);
+                    filename = `vision-logs-${timestamp}.json`;
+                    mimeType = 'application/json';
+                    break;
+
+                case 'csv':
+                    const headers = ['Frame', 'Timestamp', 'Source Type', 'Latency (s)', 'Instruction', 'Response'];
+                    const rows = logs.map(log => [
+                        log.frameNumber,
+                        log.timestampLocal,
+                        log.sourceType,
+                        log.latencySeconds,
+                        `"${log.instruction.replace(/"/g, '""')}"`,
+                        `"${log.response.replace(/"/g, '""')}"`
+                    ]);
+                    content = [headers, ...rows].map(row => row.join(',')).join('\n');
+                    filename = `vision-logs-${timestamp}.csv`;
+                    mimeType = 'text/csv';
+                    break;
+
+                case 'txt':
+                    content = logs.map((log, i) => `
+═══════════════════════════════════════════════════════════
+Frame #${log.frameNumber}
+═══════════════════════════════════════════════════════════
+Timestamp:    ${log.timestampLocal}
+Source:       ${log.sourceType}
+Latency:      ${log.latencySeconds}s
+Instruction:  ${log.instruction}
+
+Response:
+${log.response}
+
+`).join('\n');
+                    filename = `vision-logs-${timestamp}.txt`;
+                    mimeType = 'text/plain';
+                    break;
+            }
+
+            // Create and trigger download
+            const blob = new Blob([content], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+
+            showStatus(`✅ Downloaded ${logs.length} logs as ${format.toUpperCase()}`, 'success');
+        }
+
+        // Download images separately
+        function downloadImages() {
+            if (logs.length === 0 || !logs.some(log => log.imageData)) {
+                alert('No images to download.');
+                return;
+            }
+
+            logs.forEach((log, index) => {
+                if (log.imageData) {
+                    const a = document.createElement('a');
+                    a.href = log.imageData;
+                    a.download = `frame-${log.frameNumber}-${log.timestamp.replace(/[:.]/g, '-')}.jpg`;
+                    a.click();
+                }
+            });
+
+            showStatus(`✅ Downloaded ${logs.filter(l => l.imageData).length} images`, 'success');
+        }
+
+        // Clear all logs
+        function clearLogs() {
+            if (logs.length === 0) {
+                alert('No logs to clear.');
+                return;
+            }
+
+            if (confirm(`Are you sure you want to clear ${logs.length} log entries? This cannot be undone.`)) {
+                logs = [];
+                updateLogCount();
+                showStatus('🗑️ Logs cleared', 'info');
+            }
+        }
+
+        function showStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            statusDiv.className = `status ${type}`;
+            statusDiv.textContent = message;
+        }
+
+        async function start() {
+            // Prevent multiple starts
+            if (isRunning) {
+                console.log('Already running, ignoring start request');
+                return;
+            }
+
+            const video = document.getElementById('video');
+            const baseUrl = document.getElementById('baseUrl').value.trim();
+            const modelName = document.getElementById('modelName').value.trim();
+            const instruction = document.getElementById('instruction').value.trim();
+            const interval = parseInt(document.getElementById('interval').value);
+            const apiKey = document.getElementById('apiKey').value.trim();
+            const sourceType = document.getElementById('sourceType').value;
+
+            // Validation
+            if (!baseUrl || !modelName) {
+                showStatus('❌ Please fill in API Base URL and Model Name', 'error');
+                return;
+            }
+
+            if (!instruction) {
+                showStatus('❌ Please provide an instruction/prompt', 'error');
+                return;
+            }
+
+            try {
+                // Request media access based on source type
+                if (sourceType === 'camera') {
+                    showStatus('📷 Requesting camera access...', 'info');
+                    stream = await navigator.mediaDevices.getUserMedia({ 
+                        video: { 
+                            width: { ideal: 1280 },
+                            height: { ideal: 720 }
+                        } 
+                    });
+                } else {
+                    showStatus('🖥️ Requesting screen capture access...', 'info');
+                    stream = await navigator.mediaDevices.getDisplayMedia({ 
+                        video: { 
+                            width: { ideal: 1920 },
+                            height: { ideal: 1080 },
+                            frameRate: { ideal: 30 }
+                        },
+                        audio: false
+                    });
+                }
+                
+                // Monitor for track ending (e.g., user clicks "Stop Sharing" in screen capture)
+                stream.getTracks().forEach(track => {
+                    track.addEventListener('ended', () => {
+                        if (isRunning) {
+                            const sourceEmoji = sourceType === 'camera' ? '📷' : '🖥️';
+                            showStatus(`${sourceEmoji} ${sourceType === 'camera' ? 'Camera' : 'Screen sharing'} stopped by user`, 'info');
+                            stop();
+                        }
+                    });
+                });
+                
+                video.srcObject = stream;
+                
+                const sourceEmoji = sourceType === 'camera' ? '📷' : '🖥️';
+                showStatus(`✅ ${sourceEmoji} Capture started! Sending frames to model...`, 'success');
+                
+                // Disable start button, enable stop button
+                document.getElementById('startBtn').disabled = true;
+                document.getElementById('stopBtn').disabled = false;
+                document.getElementById('sourceType').disabled = true; // Prevent changing source while running
+                isRunning = true;
+                isProcessing = false;
+                skippedFrames = 0;
+                processedFrames = 0;
+                totalLatency = 0;
+
+                // Wait for video to be ready before starting
+                video.onloadedmetadata = () => {
+                    console.log('Video ready, waiting for video to stabilize...');
+                    showStatus('⏳ Video ready, stabilizing... Starting in 1.5s', 'info');
+                    
+                    // Wait for video to fully stabilize before sending first frame
+                    setTimeout(() => {
+                        console.log('Starting frame capture...');
+                        showStatus('✅ Starting frame capture...', 'success');
+                        
+                        // Start sending frames
+                        intervalId = setInterval(() => sendFrame(baseUrl, modelName, instruction, apiKey), interval);
+                        
+                        // Send first frame
+                        sendFrame(baseUrl, modelName, instruction, apiKey);
+                    }, 1500); // Increased delay to 1.5 seconds for video stabilization
+                };
+                
+            } catch (err) {
+                showStatus(`❌ Error: ${err.message}`, 'error');
+                console.error('Error accessing media:', err);
+                
+                // Provide helpful error messages
+                if (err.name === 'NotAllowedError') {
+                    showStatus('❌ Permission denied. Please allow access and try again.', 'error');
+                } else if (err.name === 'NotFoundError') {
+                    showStatus('❌ No camera found. Please connect a camera.', 'error');
+                }
+            }
+        }
+
+        function stop() {
+            if (!isRunning && !stream) {
+                console.log('Not running, nothing to stop');
+                return;
+            }
+
+            // Store stats before resetting
+            const finalProcessedFrames = processedFrames;
+            const finalSkippedFrames = skippedFrames;
+            const finalTotalLatency = totalLatency;
+
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
+            
+            if (intervalId) {
+                clearInterval(intervalId);
+                intervalId = null;
+            }
+
+            isRunning = false;
+            isProcessing = false;
+            
+            // Remove processing indicator
+            document.getElementById('response').classList.remove('processing');
+            
+            // Re-enable controls
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+            document.getElementById('sourceType').disabled = false;
+            
+            // Clear video
+            const video = document.getElementById('video');
+            if (video.srcObject) {
+                video.srcObject = null;
+            }
+            
+            // Reset counters
+            skippedFrames = 0;
+            processedFrames = 0;
+            totalLatency = 0;
+            
+            // Show final stats
+            if (finalProcessedFrames > 0) {
+                const avgLatency = (finalTotalLatency / finalProcessedFrames / 1000).toFixed(2);
+                const totalFrames = finalProcessedFrames + finalSkippedFrames;
+                const skipRate = totalFrames > 0 ? ((finalSkippedFrames / totalFrames) * 100).toFixed(1) : '0.0';
+                showStatus(`⏹️ Stopped - Processed: ${finalProcessedFrames} | Skipped: ${finalSkippedFrames} (${skipRate}%) | Avg latency: ${avgLatency}s`, 'info');
+            } else {
+                showStatus('⏹️ Stopped', 'info');
+            }
+        }
+
+        async function sendFrame(baseUrl, modelName, instruction, apiKey) {
+            if (!isRunning) return;
+
+            // Skip frame if still processing previous one
+            if (isProcessing) {
+                skippedFrames++;
+                console.log(`⏭️ Skipping frame - still processing previous frame (skipped: ${skippedFrames})`);
+                showStatus(`🔄 Processing... (Skipped: ${skippedFrames}, Processed: ${processedFrames})`, 'info');
+                return;
+            }
+
+            isProcessing = true;
+            const frameStartTime = Date.now();
+            
+            // Add visual feedback for processing state
+            document.getElementById('response').classList.add('processing');
+
+            const video = document.getElementById('video');
+            
+            // Ensure video has valid dimensions
+            if (!video.videoWidth || !video.videoHeight) {
+                console.warn('Video not ready yet, skipping frame');
+                isProcessing = false;
+                document.getElementById('response').classList.remove('processing');
+                return;
+            }
+            
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0);
+            
+            // Convert canvas to base64
+            const base64Image = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+
+            try {
+                const headers = {
+                    'Content-Type': 'application/json',
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'Pragma': 'no-cache',
+                    'Expires': '0'
+                };
+                
+                if (apiKey) {
+                    headers['Authorization'] = `Bearer ${apiKey}`;
+                }
+
+                // Add timestamp and frame counter to make each request unique
+                const timestamp = Date.now();
+                const frameId = Math.random().toString(36).substring(2, 15);
+                
+                // Add context to instruction to ensure fresh analysis
+                const enhancedInstruction = `${instruction}\n\nProvide a brief, fresh description of this current frame. Keep your response short and concise (2-3 sentences max).`;
+
+                const response = await fetch(`${baseUrl}/chat/completions?t=${timestamp}&frame=${frameId}`, {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify({
+                        model: modelName,
+                        messages: [
+                            {
+                                role: 'user',
+                                content: [
+                                    {
+                                        type: 'text',
+                                        text: enhancedInstruction
+                                    },
+                                    {
+                                        type: 'image_url',
+                                        image_url: {
+                                            url: `data:image/jpeg;base64,${base64Image}?t=${timestamp}`
+                                        }
+                                    }
+                                ]
+                            }
+                        ],
+                        max_tokens: 150,
+                        temperature: 0.7,
+                        seed: Math.floor(Math.random() * 1000000),
+                        top_p: 0.9,
+                        presence_penalty: 0.1,
+                        frequency_penalty: 0.1
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`API Error: ${response.status} - ${errorText}`);
+                }
+
+                const data = await response.json();
+                const content = data.choices[0].message.content;
+                
+                // Calculate latency
+                const latency = Date.now() - frameStartTime;
+                totalLatency += latency;
+                processedFrames++;
+                const avgLatency = (totalLatency / processedFrames / 1000).toFixed(2);
+                
+                // Log the inference if logging is enabled
+                if (document.getElementById('enableLogging').checked) {
+                    const sourceType = document.getElementById('sourceType').value;
+                    const imageData = document.getElementById('saveImages').checked ? 
+                        canvas.toDataURL('image/jpeg', 0.8) : null;
+                    addLog(sourceType, instruction, content, latency, imageData);
+                }
+                
+                // Format response with markdown
+                const timeStr = new Date().toLocaleTimeString();
+                const latencyBadge = `<span class="timestamp">🕐 ${timeStr}</span><span class="latency">⏱️ ${(latency/1000).toFixed(2)}s</span>`;
+                const markdownContent = marked.parse(content);
+                document.getElementById('response').innerHTML = latencyBadge + '<hr>' + markdownContent;
+                
+                const sourceType = document.getElementById('sourceType').value;
+                const sourceEmoji = sourceType === 'camera' ? '📷' : '🖥️';
+                const loggingIndicator = document.getElementById('enableLogging').checked ? ' | 📝 Logging' : '';
+                showStatus(`✅ Running ${sourceEmoji} - Latency: ${(latency/1000).toFixed(2)}s | Avg: ${avgLatency}s | Processed: ${processedFrames} | Skipped: ${skippedFrames}${loggingIndicator}`, 'success');
+                
+                // Auto-adjust interval if enabled and inference is slower than interval
+                const autoAdjust = document.getElementById('autoAdjust').checked;
+                const currentInterval = parseInt(document.getElementById('interval').value);
+                
+                if (autoAdjust && latency > currentInterval * 1.5) {
+                    const suggestedInterval = Math.ceil(latency / 500) * 500; // Round up to nearest 500ms
+                    console.log(`⚠️ Inference (${latency}ms) is slower than interval (${currentInterval}ms). Consider increasing to ${suggestedInterval}ms or more.`);
+                    
+                    // Show warning if consistently slow (more than 30% frames skipped)
+                    if (processedFrames > 3 && skippedFrames > processedFrames * 0.3) {
+                        const warningHtml = `
+                            <div style="background: #fff3cd; border: 2px solid #ffc107; border-radius: 5px; padding: 15px; margin-bottom: 15px;">
+                                <h3 style="margin-top: 0; color: #856404;">⚠️ Warning: Inference Too Slow</h3>
+                                <ul style="margin-bottom: 0;">
+                                    <li>Increase interval to <strong>${suggestedInterval}ms</strong> or more</li>
+                                    <li>Use a faster/smaller model</li>
+                                    <li>Reduce max_tokens parameter</li>
+                                </ul>
+                            </div>
+                        `;
+                        document.getElementById('response').innerHTML = warningHtml + latencyBadge + '<hr>' + markdownContent;
+                    }
+                }
+                
+            } catch (err) {
+                console.error('Error sending frame:', err);
+                console.error('Full error details:', {
+                    name: err.name,
+                    message: err.message,
+                    stack: err.stack
+                });
+                
+                // Show error in response area with more details
+                const errorTime = new Date().toLocaleTimeString();
+                document.getElementById('response').innerHTML = `
+                    <div style="background: #ffebee; border: 2px solid #f44336; border-radius: 5px; padding: 15px;">
+                        <h3 style="margin-top: 0; color: #c62828;">❌ Error</h3>
+                        <p><strong>Time:</strong> ${errorTime}</p>
+                        <p><strong>Message:</strong> ${err.message}</p>
+                        <p style="margin-bottom: 0;"><small>Check browser console (F12) for more details.</small></p>
+                    </div>
+                `;
+                
+                // Update status with detailed error
+                showStatus(`❌ Error: ${err.message}`, 'error');
+                
+                // If it's a network error, stop the stream
+                if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError') || err.message.includes('fetch')) {
+                    console.warn('Network error detected, stopping capture in 3 seconds...');
+                    setTimeout(() => {
+                        if (isRunning) {
+                            showStatus('❌ Network error - stopping capture. Check if API server is running.', 'error');
+                            stop();
+                        }
+                    }, 3000);
+                }
+            } finally {
+                isProcessing = false;
+                document.getElementById('response').classList.remove('processing');
+            }
+        }
+
+        // Clean up on page unload
+        window.addEventListener('beforeunload', () => {
+            stop();
+        });
+    </script>
+</body>
+</html>
