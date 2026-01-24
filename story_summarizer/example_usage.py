@@ -4,6 +4,7 @@ Example: Using the Story Summarizer with different stories and configurations.
 This script demonstrates various ways to use the Story Summarizer workflow system.
 """
 
+import os
 from story_summarizer import summarize_story
 
 
@@ -33,9 +34,11 @@ def example_1_basic_usage():
     """
     
     # Run the workflow
-    summary = summarize_story(story, max_words=100)
+    result = summarize_story(story, max_words=100)
     print("Summary:\n")
-    print(summary)
+    print(result['summary_text'])
+    print(f"\nTitle: {result['title']}")
+    print(f"Original: {result['original_words']} words → Summary: {result['summary_words']} words")
 
 
 def example_2_with_focus():
@@ -73,14 +76,16 @@ def example_2_with_focus():
     """
     
     # Workflow with specific focus
-    summary = summarize_story(
+    result = summarize_story(
         story=story,
         max_words=120,
         focus_areas="Sarah's moral dilemma and her relationship with Marcus"
     )
     
     print("Abridged Story:\n")
-    print(summary)
+    print(result['summary_text'])
+    print(f"\nTitle: {result['title']}")
+    print(f"Original: {result['original_words']} words → Summary: {result['summary_words']} words")
 
 
 def example_3_very_short_summary():
@@ -113,10 +118,12 @@ def example_3_very_short_summary():
     She simply replied, "We're only human if we act like it, even at the edge of the void."
     """
     
-    summary = summarize_story(story, max_words=50)
+    result = summarize_story(story, max_words=50)
     
     print("Ultra-Brief Summary:\n")
-    print(summary)
+    print(result['summary_text'])
+    print(f"\nTitle: {result['title']}")
+    print(f"Original: {result['original_words']} words → Summary: {result['summary_words']} words")
 
 
 def example_4_comparing_different_lengths():
@@ -148,14 +155,63 @@ def example_4_comparing_different_lengths():
     """
     
     print("50-word version:")
-    summary_short = summarize_story(story, max_words=50)
-    print(summary_short)
+    result_short = summarize_story(story, max_words=50)
+    print(result_short['summary_text'])
+    print(f"Title: {result_short['title']} | Words: {result_short['summary_words']}")
     
     print("\n" + "-" * 70 + "\n")
     
     print("100-word version:")
-    summary_medium = summarize_story(story, max_words=100)
-    print(summary_medium)
+    result_medium = summarize_story(story, max_words=100)
+    print(result_medium['summary_text'])
+    print(f"Title: {result_medium['title']} | Words: {result_medium['summary_words']}")
+
+
+def example_5_from_file(file_path=None):
+    """Example 5: Load and summarize a story from a txt file."""
+    print("\n" + "=" * 70)
+    print("EXAMPLE 5: Summarize from File")
+    print("=" * 70 + "\n")
+    
+    # Default file path if none provided
+    if file_path is None:
+        file_path = "sample_story.txt"
+    
+    # Check if file exists
+    if not os.path.exists(file_path):
+        print(f"⏭️  Skipping: File '{file_path}' not found.")
+        print(f"   To run this example, create a file at: {file_path}")
+        return
+    
+    # Load the story from file
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            story = f.read().strip()
+        
+        if not story:
+            print(f"⏭️  Skipping: File '{file_path}' is empty.")
+            return
+        
+        print(f"📄 Loaded story from: {file_path}")
+        print(f"📊 File size: {len(story)} characters, {len(story.split())} words\n")
+        
+        # Summarize the story
+        result = summarize_story(
+            story=story,
+            max_words=150,
+            focus_areas="main plot and character development"
+        )
+        
+        print("\n" + "-" * 70)
+        print("RESULTS:")
+        print("-" * 70)
+        print(f"\nTitle: {result['title']}")
+        print(f"\nSummary ({result['summary_words']} words):\n")
+        print(result['summary_text'])
+        print(f"\n📊 Compression: {result['original_words']} → {result['summary_words']} words ({result['strength_used']} strength)")
+        
+    except Exception as e:
+        print(f"❌ Error reading or processing file: {e}")
 
 
 def main():
@@ -167,9 +223,10 @@ def main():
     # Run examples
     try:
         example_1_basic_usage()
-        example_2_with_focus()
+        #example_2_with_focus()
         example_3_very_short_summary()
-        example_4_comparing_different_lengths()
+        #example_4_comparing_different_lengths()
+        # example_5_from_file()
         
         print("\n" + "=" * 70)
         print("All examples completed successfully!")
