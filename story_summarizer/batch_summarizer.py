@@ -4,11 +4,21 @@ Batch Story Summarizer: Process multiple story files from a folder.
 This script reads all .txt files from an input folder, processes them using the 
 Story Summarizer workflow, and saves the summaries to an output folder with the 
 same filenames.
+
+Usage:
+    # From the my_code directory:
+    cd /path/to/my_code
+    python3 -m story_summarizer.batch_summarizer
+    
+    # Or use run_batch.py for programmatic execution:
+    python3 -m story_summarizer.run_batch
 """
 
 import os
 import glob
 from pathlib import Path
+
+# Import from the package (must be run as module: python3 -m story_summarizer.batch_summarizer)
 from story_summarizer import summarize_story
 
 
@@ -26,15 +36,25 @@ def get_txt_files(input_folder):
     return sorted(files)
 
 
-def process_batch(input_folder, output_folder, focus_areas=None, max_words=100):
+def process_batch(input_folder, output_folder, focus_areas=None, max_words=3000, model_context_limit=None):
     """Process all .txt files from input folder and save summaries to output folder.
     
     Args:
         input_folder: Path to folder containing story .txt files
         output_folder: Path to folder where summaries will be saved
         focus_areas: Optional focus areas for summarization (applied to all stories)
-        max_words: Maximum words for each summary (default: 100)
+        max_words: Maximum words for each summary (default: 3000)
+        model_context_limit: Model's context window size in tokens (default: auto-detect)
     """
+    # Import agents to access them for clearing conversation history
+    from story_summarizer.agents import (
+        character_analyst,
+        content_analyst,
+        summary_generator,
+        reconstruction_generator,
+        title_generator
+    )
+    
     # Validate input folder
     if not os.path.exists(input_folder):
         print(f"❌ Error: Input folder '{input_folder}' does not exist.")
@@ -102,6 +122,14 @@ def process_batch(input_folder, output_folder, focus_areas=None, max_words=100):
                 print(f"  ⚠️  Skipped: File is empty")
                 continue
             
+            # CRITICAL: Clear conversation history from all agents to prevent context overflow
+            # Each agent accumulates messages across batch processing, causing token overflow
+            character_analyst.messages.clear()
+            content_analyst.messages.clear()
+            summary_generator.messages.clear()
+            reconstruction_generator.messages.clear()
+            title_generator.messages.clear()
+            
             # Count original words
             original_word_count = len(story.split())
             
@@ -110,16 +138,19 @@ def process_batch(input_folder, output_folder, focus_areas=None, max_words=100):
             result = summarize_story(
                 story=story,
                 max_words=max_words,
-                focus_areas=focus_areas
+                focus_areas=focus_areas,
+                model_context_limit=model_context_limit
             )
             
             # Extract results
             title = result['title']
             summary_text = result['summary_text']
-            summary_word_count = len(summary_text.split())
+            summary_word_count = result['summary_words']
+            original_word_count = result['original_words']
+            strength_used = result['strength_used']
             
             # Calculate compression ratio
-            compression_ratio = (1 - summary_word_count / original_word_count) * 100
+            compression_ratio = (1 - summary_word_count / original_word_count) * 100 if original_word_count > 0 else 0
             
             # Format output with title, blank line, and summary
             output_content = f"{title}\n\n{summary_text}"
@@ -132,7 +163,8 @@ def process_batch(input_folder, output_folder, focus_areas=None, max_words=100):
             # Print statistics
             print(f"  ✓ Saved summary to: {output_path}")
             print(f"  📖 Title: {title}")
-            print(f"  📊 Stats: {original_word_count} words → {summary_word_count} words ({compression_ratio:.1f}% reduction)\n")
+            print(f"  📊 Stats: {original_word_count} words → {summary_word_count} words ({compression_ratio:.1f}% reduction)")
+            print(f"  ⚡ Strength: {strength_used}\n")
             successful += 1
             
         except Exception as e:
@@ -175,15 +207,29 @@ def main():
     
     # Get max words
     print("\nOptional: Enter maximum words for each summary")
-    max_words_input = input("Max words (press Enter for default 100): ").strip()
+    max_words_input = input("Max words (press Enter for default 3000): ").strip()
     if max_words_input:
         try:
             max_words = int(max_words_input)
         except ValueError:
-            print("Invalid number, using default 100")
-            max_words = 100
+            print("Invalid number, using default 3000")
+            max_words = 3000
     else:
-        max_words = 100
+        max_words = 3000
+    
+    # Get model context limit
+    print("\nOptional: Enter model context limit in tokens")
+    print("(Leave blank to auto-detect from model)")
+    print("Common values: 32768, 128000, 200000")
+    context_limit_input = input("Context limit (press Enter for auto-detect): ").strip()
+    if context_limit_input:
+        try:
+            model_context_limit = int(context_limit_input)
+        except ValueError:
+            print("Invalid number, will auto-detect")
+            model_context_limit = None
+    else:
+        model_context_limit = None
     
     # Confirm and process
     print("\n" + "-" * 70)
@@ -192,6 +238,7 @@ def main():
     print(f"  Output folder: {output_folder}")
     print(f"  Focus areas:   {focus_areas if focus_areas else '(none)'}")
     print(f"  Max words:     {max_words}")
+    print(f"  Context limit: {model_context_limit if model_context_limit else 'auto-detect'}")
     print("-" * 70 + "\n")
     
     confirm = input("Proceed with batch processing? (y/n): ").strip().lower()
@@ -207,7 +254,8 @@ def main():
             input_folder=input_folder,
             output_folder=output_folder,
             focus_areas=focus_areas,
-            max_words=max_words
+            max_words=max_words,
+            model_context_limit=model_context_limit
         )
     except Exception as e:
         print(f"\n❌ Batch processing error: {e}")
