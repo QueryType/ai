@@ -1,7 +1,12 @@
-# Story Chunker
+# Projects
 
-The Story Chunker project is designed to break down narratives into manageable sections, enhancing readability and coherence.
+## Existing Projects
+- Project A
+- Project B
 
-## Language Statistics
+## New Project
+- Story Chunker
+
+## Language Percentages
 - Python: 85.4%
 - HTML: 14.6%
