@@ -19,6 +19,9 @@ Multimodal image analyzer and tagger that automatically analyzes images using Op
 ### 🔧 [MCP Tools](./mcp)
 Programs and utilities built on the Model Context Protocol (MCP) for AI agent integration.
 
+### 🕉️ [MymicroGPT](./mymicroGPT)
+A pure Python, zero-dependency GPT that learns Devanagari character patterns from Indian names and generates new, plausible-sounding Sanskrit/Hindi names. Based on Karpathy's microgpt architecture with a custom autograd engine, character-level tokenizer for Devanagari Unicode, and a ~32K name dataset spanning historical figures, mythology, and Sanskrit vocabulary. No pip install required.
+
 ### 📹 [Real-time Webcam & Screen Capture](./rt_webcam_scr)
 A powerful web-based interface for real-time vision model analysis using webcam or screen capture. Works with any OpenAI-compatible vision API with features like frame skipping, performance metrics, and advanced logging.
 
