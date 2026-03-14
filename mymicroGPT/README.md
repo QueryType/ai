@@ -19,13 +19,23 @@ python inference.py --model model_best.json
 
 No pip install, no PyTorch, no GPU needed. Runs on a MacBook Air with 8GB RAM.
 
+**Have an Apple Silicon Mac?** Train **37x faster** with the MPS-accelerated version:
+
+```bash
+pip install torch
+python train_mps.py --num_steps 3000 --save_path model_mps.json
+```
+
 ## Project Files
 
 | File | Purpose |
 |------|---------|
 | `generate_dataset.py` | Builds `input.txt` — ~32K Devanagari names from 5 categories |
-| `train.py` | Trains the GPT, tracks best checkpoint, saves weights to JSON |
+| `train.py` | Trains the GPT (pure Python, zero dependencies) |
+| `train_mps.py` | GPU-accelerated trainer (PyTorch + Apple Silicon MPS) |
 | `inference.py` | Loads saved weights and generates names (fast, no autograd) |
+| `benchmark.html` | Interactive CPU vs MPS benchmark visualization |
+| `architecture_comparison.md` | Detailed comparison of both implementations |
 | `README.md` | You are here |
 
 ## What It Does
@@ -126,6 +136,37 @@ Karpathy's original uses 27 tokens (a-z + BOS). Devanagari has ~58 tokens:
 
 The 2x larger vocabulary means the model needs wider embeddings (24 vs 16), longer block size (24 vs 8, since Devanagari names can be longer), and more training steps to converge.
 
+## MPS Training (Apple Silicon GPU)
+
+`train_mps.py` is a PyTorch reimplementation that runs on Apple Silicon's Metal Performance Shaders (MPS) backend. It produces the **exact same JSON model format** — fully compatible with `inference.py`.
+
+```bash
+pip install torch
+
+# Default run (~1 min on M-series Mac!)
+python train_mps.py --save_path model_mps.json
+
+# Longer training for better quality (~3 min)
+python train_mps.py --num_steps 10000 --save_path model_mps.json
+
+# Force CPU if needed
+python train_mps.py --device cpu --save_path model_cpu.json
+```
+
+### CPU vs MPS Benchmark (3000 steps, 8880 params)
+
+| | Pure Python (`train.py`) | PyTorch + MPS (`train_mps.py`) |
+|---|---|---|
+| **Wall clock** | 36 min 3 sec | 58 sec |
+| **Time per step** | ~720 ms | ~19 ms |
+| **Speedup** | — | **37x** |
+| **Best avg loss** | 3.108 | 2.642 |
+| **Dependencies** | None | PyTorch |
+
+MPS is not only faster — it converges to a lower loss because PyTorch's float32 tensor operations and single-pass backward produce more numerically stable gradients than scalar `Value` accumulation.
+
+Open `benchmark.html` for an interactive visualization of these results, or see `architecture_comparison.md` for a detailed breakdown of implementation differences.
+
 ## Customizing the Dataset
 
 Edit `generate_dataset.py` to change what the model learns:
@@ -137,7 +178,13 @@ Edit `generate_dataset.py` to change what the model learns:
 
 ## Requirements
 
+### Pure Python (`train.py`)
 - **Python 3.6+** (the `python3` that comes with macOS works)
 - **RAM**: ~100-200 MB peak during training. An 8GB MacBook Air is more than enough.
 - **Disk**: `model.json` is ~1-2 MB
 - **No dependencies**: no pip install, no numpy, no PyTorch
+
+### MPS-accelerated (`train_mps.py`)
+- **Python 3.8+** with **PyTorch** (`pip install torch`)
+- **Apple Silicon Mac** (M1/M2/M3/M4) for MPS acceleration; falls back to CPU on other hardware
+- Same RAM and disk requirements as above

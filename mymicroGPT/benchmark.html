@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Devanagari MicroGPT — CPU vs MPS Benchmark</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --bg2: #1a1d27;
+    --bg3: #242736;
+    --text: #e4e4e7;
+    --text2: #9ca3af;
+    --cpu: #f59e0b;
+    --cpu-dim: #92610b;
+    --mps: #06b6d4;
+    --mps-dim: #0a7a8f;
+    --accent: #8b5cf6;
+    --border: #2e3244;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+  .watermark {
+    position: fixed;
+    font-size: 20vw;
+    color: rgba(255,255,255,0.015);
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 0;
+    font-weight: 700;
+  }
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem;
+    position: relative;
+    z-index: 1;
+  }
+  header {
+    text-align: center;
+    margin-bottom: 3rem;
+    animation: fadeInDown 0.8s ease-out;
+  }
+  header h1 {
+    font-size: 2.2rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    background: linear-gradient(135deg, var(--cpu), var(--mps));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  header p {
+    color: var(--text2);
+    font-size: 1.1rem;
+  }
+  header .tag {
+    display: inline-block;
+    margin-top: 0.75rem;
+    padding: 0.25rem 0.75rem;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 99px;
+    font-size: 0.85rem;
+    color: var(--text2);
+  }
+
+  /* Hero stat cards */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.25rem;
+    margin-bottom: 3rem;
+  }
+  .stat-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.75rem 1.5rem;
+    text-align: center;
+    animation: fadeInUp 0.6s ease-out both;
+  }
+  .stat-card:nth-child(1) { animation-delay: 0.1s; }
+  .stat-card:nth-child(2) { animation-delay: 0.25s; }
+  .stat-card:nth-child(3) { animation-delay: 0.4s; }
+  .stat-card .number {
+    font-size: 3rem;
+    font-weight: 800;
+    line-height: 1.1;
+    margin-bottom: 0.25rem;
+  }
+  .stat-card:nth-child(1) .number { color: var(--mps); }
+  .stat-card:nth-child(2) .number { color: var(--accent); }
+  .stat-card:nth-child(3) .number { color: var(--text2); }
+  .stat-card .label {
+    font-size: 0.95rem;
+    color: var(--text2);
+  }
+  .stat-card .detail {
+    font-size: 0.8rem;
+    color: #6b7280;
+    margin-top: 0.4rem;
+  }
+
+  /* Section */
+  .section {
+    margin-bottom: 3rem;
+  }
+  .section h2 {
+    font-size: 1.35rem;
+    font-weight: 600;
+    margin-bottom: 1.25rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* Chart */
+  .chart-container {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    position: relative;
+  }
+  canvas { display: block; width: 100%; }
+  .chart-legend {
+    display: flex;
+    gap: 2rem;
+    justify-content: center;
+    margin-top: 1rem;
+    font-size: 0.9rem;
+    color: var(--text2);
+  }
+  .chart-legend span {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+  .tooltip {
+    position: absolute;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.6rem 0.8rem;
+    font-size: 0.8rem;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s;
+    z-index: 10;
+    white-space: nowrap;
+  }
+
+  /* Timeline bar */
+  .timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  .timeline-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+  .timeline-label {
+    width: 120px;
+    text-align: right;
+    font-size: 0.9rem;
+    font-weight: 500;
+    flex-shrink: 0;
+  }
+  .timeline-bar-bg {
+    flex: 1;
+    height: 40px;
+    background: var(--bg3);
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+  }
+  .timeline-bar {
+    height: 100%;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    padding: 0 1rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #000;
+    animation: growWidth 1.2s ease-out both;
+  }
+  .timeline-row:nth-child(1) .timeline-bar {
+    background: linear-gradient(90deg, var(--cpu), #fbbf24);
+    width: 100%;
+    animation-delay: 0.3s;
+  }
+  .timeline-row:nth-child(2) .timeline-bar {
+    background: linear-gradient(90deg, var(--mps), #22d3ee);
+    width: 2.68%;
+    animation-delay: 0.6s;
+  }
+
+  /* Arch table */
+  .arch-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+  }
+  .arch-table th, .arch-table td {
+    padding: 0.75rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  .arch-table th {
+    color: var(--text2);
+    font-weight: 500;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .arch-table td:nth-child(2) { color: var(--cpu); }
+  .arch-table td:nth-child(3) { color: var(--mps); }
+  .arch-table tr:last-child td { border-bottom: none; }
+  .arch-table-wrap {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  /* Per-step */
+  .step-compare {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.25rem;
+  }
+  .step-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    text-align: center;
+  }
+  .step-card .ms {
+    font-size: 2.5rem;
+    font-weight: 800;
+    line-height: 1.1;
+  }
+  .step-card:nth-child(1) .ms { color: var(--cpu); }
+  .step-card:nth-child(2) .ms { color: var(--mps); }
+  .step-card .unit {
+    font-size: 1rem;
+    color: var(--text2);
+  }
+  .step-card .sub {
+    font-size: 0.8rem;
+    color: #6b7280;
+    margin-top: 0.4rem;
+  }
+
+  footer {
+    text-align: center;
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+    color: #6b7280;
+    font-size: 0.8rem;
+  }
+
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes fadeInDown {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes growWidth {
+    from { max-width: 0; overflow: hidden; }
+    to { max-width: 100%; }
+  }
+
+  @media (max-width: 700px) {
+    .stats { grid-template-columns: 1fr; }
+    .step-compare { grid-template-columns: 1fr; }
+    header h1 { font-size: 1.6rem; }
+    .stat-card .number { font-size: 2.2rem; }
+    .timeline-label { width: 80px; font-size: 0.8rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="watermark">देवनागरी</div>
+
+<div class="container">
+  <header>
+    <h1>देवनागरी MicroGPT — CPU vs MPS Benchmark</h1>
+    <p>Pure Python autograd vs PyTorch on Apple Silicon</p>
+    <span class="tag">8,880 params &middot; 58 tokens &middot; 3,000 steps &middot; MacBook Air</span>
+  </header>
+
+  <!-- Hero Stats -->
+  <div class="stats">
+    <div class="stat-card">
+      <div class="number">37x</div>
+      <div class="label">Faster with MPS</div>
+      <div class="detail">58 sec vs 36 min 3 sec</div>
+    </div>
+    <div class="stat-card">
+      <div class="number">15%</div>
+      <div class="label">Lower Loss</div>
+      <div class="detail">2.64 vs 3.11 avg loss</div>
+    </div>
+    <div class="stat-card">
+      <div class="number">8,880</div>
+      <div class="label">Same Parameters</div>
+      <div class="detail">Identical architecture</div>
+    </div>
+  </div>
+
+  <!-- Loss Curve Chart -->
+  <div class="section">
+    <h2>Training Loss Curves</h2>
+    <div class="chart-container">
+      <canvas id="lossChart" height="360"></canvas>
+      <div class="tooltip" id="tooltip"></div>
+      <div class="chart-legend">
+        <span><span class="legend-dot" style="background:var(--cpu)"></span> CPU (train.py)</span>
+        <span><span class="legend-dot" style="background:var(--mps)"></span> MPS (train_mps.py)</span>
+        <span style="color:#555">— dashed = per-step loss, solid = avg(50)</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Training Timeline -->
+  <div class="section">
+    <h2>Wall-Clock Time</h2>
+    <div class="chart-container">
+      <div class="timeline">
+        <div class="timeline-row">
+          <div class="timeline-label" style="color:var(--cpu)">CPU</div>
+          <div class="timeline-bar-bg">
+            <div class="timeline-bar">36 min 3 sec</div>
+          </div>
+        </div>
+        <div class="timeline-row">
+          <div class="timeline-label" style="color:var(--mps)">MPS</div>
+          <div class="timeline-bar-bg">
+            <div class="timeline-bar">58 sec</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Time per step -->
+  <div class="section">
+    <h2>Time per Step</h2>
+    <div class="step-compare">
+      <div class="step-card">
+        <div class="ms">720</div>
+        <div class="unit">ms / step</div>
+        <div class="sub">Pure Python &middot; scalar Value autograd</div>
+      </div>
+      <div class="step-card">
+        <div class="ms">19</div>
+        <div class="unit">ms / step</div>
+        <div class="sub">PyTorch &middot; MPS GPU tensors</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Architecture Comparison -->
+  <div class="section">
+    <h2>Architecture Comparison</h2>
+    <div class="arch-table-wrap">
+      <table class="arch-table">
+        <thead>
+          <tr><th>Aspect</th><th>CPU (train.py)</th><th>MPS (train_mps.py)</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Autograd</td>
+            <td>Custom scalar <code>Value</code> class</td>
+            <td><code>torch.autograd</code> on tensors</td>
+          </tr>
+          <tr>
+            <td>Data type</td>
+            <td>Python lists of <code>Value</code> objects</td>
+            <td><code>torch.Tensor</code> (float32)</td>
+          </tr>
+          <tr>
+            <td>Linear algebra</td>
+            <td>Nested list comprehensions</td>
+            <td>Vectorized <code>@</code> and <code>einsum</code></td>
+          </tr>
+          <tr>
+            <td>Multi-head attention</td>
+            <td>Explicit per-head Python loop</td>
+            <td><code>view</code> + <code>einsum</code> (all heads parallel)</td>
+          </tr>
+          <tr>
+            <td>Backward pass</td>
+            <td>Per-position <code>loss.backward()</code></td>
+            <td>Single <code>total_loss.backward()</code></td>
+          </tr>
+          <tr>
+            <td>Optimizer</td>
+            <td>8,880 scalar updates in Python loop</td>
+            <td>~10 tensor-level updates</td>
+          </tr>
+          <tr>
+            <td>Dependencies</td>
+            <td>None (stdlib only)</td>
+            <td>PyTorch</td>
+          </tr>
+          <tr>
+            <td>Model save format</td>
+            <td colspan="2" style="color:var(--text);text-align:center">Identical JSON — both compatible with <code>inference.py</code></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <footer>
+    देवनागरी MicroGPT &middot; Based on Karpathy's microgpt &middot; Benchmarked on Apple Silicon MacBook Air
+  </footer>
+</div>
+
+<script>
+const cpuData = [
+  {step:1,loss:4.0607,avg:4.0607},{step:100,loss:3.7013,avg:3.5755},
+  {step:200,loss:3.7753,avg:3.4776},{step:300,loss:4.6707,avg:3.5308},
+  {step:400,loss:3.3735,avg:3.6399},{step:500,loss:3.5650,avg:3.5173},
+  {step:600,loss:2.9775,avg:3.5885},{step:700,loss:2.7475,avg:3.4268},
+  {step:800,loss:3.6062,avg:3.4323},{step:900,loss:3.4301,avg:3.3868},
+  {step:1000,loss:4.0141,avg:3.4504},{step:1100,loss:3.8049,avg:3.5021},
+  {step:1200,loss:3.9837,avg:3.4391},{step:1300,loss:2.9006,avg:3.4420},
+  {step:1400,loss:3.5903,avg:3.4808},{step:1500,loss:3.3463,avg:3.3252},
+  {step:1600,loss:3.7119,avg:3.4390},{step:1700,loss:2.8300,avg:3.3589},
+  {step:1800,loss:2.7847,avg:3.3314},{step:1900,loss:3.5354,avg:3.3242},
+  {step:2000,loss:3.3216,avg:3.3517},{step:2100,loss:3.6712,avg:3.4510},
+  {step:2200,loss:2.9242,avg:3.3674},{step:2300,loss:3.3405,avg:3.4757},
+  {step:2400,loss:3.1366,avg:3.3237},{step:2500,loss:3.7794,avg:3.3491},
+  {step:2600,loss:2.9257,avg:3.1434},{step:2700,loss:3.6184,avg:3.2607},
+  {step:2800,loss:3.7344,avg:3.2532},{step:2900,loss:3.1193,avg:3.3325},
+  {step:3000,loss:3.5579,avg:3.1080}
+];
+
+const mpsData = [
+  {step:1,loss:4.0595,avg:4.0595},{step:100,loss:3.3517,avg:3.3661},
+  {step:200,loss:3.7076,avg:3.2835},{step:300,loss:4.0043,avg:3.2413},
+  {step:400,loss:2.9245,avg:3.4008},{step:500,loss:3.2243,avg:3.1864},
+  {step:600,loss:3.1890,avg:3.1344},{step:700,loss:2.5521,avg:3.0530},
+  {step:800,loss:3.5615,avg:2.9310},{step:900,loss:2.8910,avg:2.9980},
+  {step:1000,loss:3.0048,avg:3.0679},{step:1100,loss:3.1723,avg:3.1393},
+  {step:1200,loss:3.7535,avg:3.0228},{step:1300,loss:2.9470,avg:3.0174},
+  {step:1400,loss:2.6784,avg:2.9218},{step:1500,loss:2.4186,avg:2.8597},
+  {step:1600,loss:2.8719,avg:3.0482},{step:1700,loss:2.7053,avg:2.8654},
+  {step:1800,loss:2.4152,avg:2.8156},{step:1900,loss:2.9071,avg:2.7609},
+  {step:2000,loss:2.4462,avg:2.8476},{step:2100,loss:3.0972,avg:2.9690},
+  {step:2200,loss:2.6699,avg:2.8955},{step:2300,loss:2.8757,avg:2.8471},
+  {step:2400,loss:2.6475,avg:2.7372},{step:2500,loss:3.1534,avg:2.7895},
+  {step:2600,loss:2.5825,avg:2.6670},{step:2700,loss:2.7976,avg:2.7687},
+  {step:2800,loss:3.0019,avg:2.8014},{step:2900,loss:2.8036,avg:2.7851},
+  {step:3000,loss:2.9322,avg:2.6417}
+];
+
+function drawChart() {
+  const canvas = document.getElementById('lossChart');
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.parentElement.getBoundingClientRect();
+  const W = rect.width - 48;
+  const H = 360;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  const pad = { top: 20, right: 20, bottom: 40, left: 55 };
+  const cw = W - pad.left - pad.right;
+  const ch = H - pad.top - pad.bottom;
+
+  const allLoss = [...cpuData, ...mpsData];
+  const minY = 2.2;
+  const maxY = 4.8;
+  const minX = 0;
+  const maxX = 3000;
+
+  function xPos(step) { return pad.left + (step - minX) / (maxX - minX) * cw; }
+  function yPos(val) { return pad.top + (1 - (val - minY) / (maxY - minY)) * ch; }
+
+  // Grid
+  ctx.strokeStyle = '#1e2130';
+  ctx.lineWidth = 1;
+  for (let y = 2.5; y <= 4.5; y += 0.5) {
+    ctx.beginPath();
+    ctx.moveTo(pad.left, yPos(y));
+    ctx.lineTo(pad.left + cw, yPos(y));
+    ctx.stroke();
+  }
+  for (let x = 0; x <= 3000; x += 500) {
+    ctx.beginPath();
+    ctx.moveTo(xPos(x), pad.top);
+    ctx.lineTo(xPos(x), pad.top + ch);
+    ctx.stroke();
+  }
+
+  // Axes labels
+  ctx.fillStyle = '#6b7280';
+  ctx.font = '11px -apple-system, sans-serif';
+  ctx.textAlign = 'right';
+  for (let y = 2.5; y <= 4.5; y += 0.5) {
+    ctx.fillText(y.toFixed(1), pad.left - 8, yPos(y) + 4);
+  }
+  ctx.textAlign = 'center';
+  for (let x = 0; x <= 3000; x += 500) {
+    ctx.fillText(x, xPos(x), pad.top + ch + 24);
+  }
+  ctx.fillText('Training Step', pad.left + cw / 2, H - 4);
+  ctx.save();
+  ctx.translate(14, pad.top + ch / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText('Loss', 0, 0);
+  ctx.restore();
+
+  // Draw line helper
+  function drawLine(data, key, color, dashed) {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = dashed ? 1.2 : 2.5;
+    ctx.setLineDash(dashed ? [4, 4] : []);
+    ctx.beginPath();
+    data.forEach((d, i) => {
+      const x = xPos(d.step);
+      const y = yPos(d[key]);
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // Per-step loss (dashed)
+  drawLine(cpuData, 'loss', 'rgba(245,158,11,0.3)', true);
+  drawLine(mpsData, 'loss', 'rgba(6,182,212,0.3)', true);
+
+  // Avg loss (solid)
+  drawLine(cpuData, 'avg', '#f59e0b', false);
+  drawLine(mpsData, 'avg', '#06b6d4', false);
+
+  // Dots on avg lines
+  function drawDots(data, color) {
+    data.forEach(d => {
+      ctx.beginPath();
+      ctx.arc(xPos(d.step), yPos(d.avg), 3, 0, Math.PI * 2);
+      ctx.fillStyle = color;
+      ctx.fill();
+    });
+  }
+  drawDots(cpuData, '#f59e0b');
+  drawDots(mpsData, '#06b6d4');
+
+  // Final loss labels
+  const cpuFinal = cpuData[cpuData.length - 1];
+  const mpsFinal = mpsData[mpsData.length - 1];
+  ctx.font = 'bold 12px -apple-system, sans-serif';
+  ctx.fillStyle = '#f59e0b';
+  ctx.textAlign = 'right';
+  ctx.fillText('3.11', xPos(cpuFinal.step) - 8, yPos(cpuFinal.avg) - 8);
+  ctx.fillStyle = '#06b6d4';
+  ctx.fillText('2.64', xPos(mpsFinal.step) - 8, yPos(mpsFinal.avg) - 8);
+
+  // Tooltip handling
+  const tooltip = document.getElementById('tooltip');
+  canvas.addEventListener('mousemove', e => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+
+    let closest = null;
+    let minDist = Infinity;
+    let source = '';
+
+    [['CPU', cpuData, '#f59e0b'], ['MPS', mpsData, '#06b6d4']].forEach(([name, data, color]) => {
+      data.forEach(d => {
+        const dx = mx - xPos(d.step);
+        const dy = my - yPos(d.avg);
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < minDist && dist < 30) {
+          minDist = dist;
+          closest = d;
+          source = name;
+        }
+      });
+    });
+
+    if (closest) {
+      tooltip.style.opacity = '1';
+      tooltip.style.left = (xPos(closest.step) + 15) + 'px';
+      tooltip.style.top = (yPos(closest.avg) - 15) + 'px';
+      tooltip.innerHTML = `<strong>${source}</strong> step ${closest.step}<br>loss: ${closest.loss.toFixed(4)}<br>avg: ${closest.avg.toFixed(4)}`;
+    } else {
+      tooltip.style.opacity = '0';
+    }
+  });
+
+  canvas.addEventListener('mouseleave', () => {
+    tooltip.style.opacity = '0';
+  });
+}
+
+drawChart();
+window.addEventListener('resize', drawChart);
+</script>
+</body>
+</html>

@@ -125,6 +125,21 @@ The architectural simplicity that makes microgpt beautiful is fully preserved. O
 
 ---
 
-## What's Next
+## What Happened Next: PyTorch + MPS (37x Speedup)
 
-The pure Python approach tops out at ~5,000 steps before patience runs thin (~30 min on a MacBook Air). For better results, the natural next step is a **PyTorch + MPS** version that would train 50-100x faster on Apple Silicon GPU, enabling 50K+ steps in under a minute. The architecture would be identical — just replacing scalar `Value` operations with vectorized `torch.Tensor` operations.
+The pure Python approach topped out at ~5,000 steps before patience ran thin (~30 min on a MacBook Air). So we built `train_mps.py` — a PyTorch reimplementation that runs on Apple Silicon's Metal Performance Shaders (MPS) backend.
+
+The architecture is identical — same GPT-2 structure, same hyperparameters, same JSON save format (fully compatible with `inference.py`). The difference is replacing scalar `Value` operations with vectorized `torch.Tensor` operations.
+
+### Benchmark Results (3000 steps, 8880 params)
+
+| | Pure Python (`train.py`) | PyTorch + MPS (`train_mps.py`) |
+|---|---|---|
+| **Wall clock** | 36 min 3 sec | 58 sec |
+| **Time per step** | ~720 ms | ~19 ms |
+| **Speedup** | — | **37x** |
+| **Best avg loss** | 3.108 | 2.642 |
+
+MPS achieves lower loss not just because of speed — PyTorch's float32 tensor math and single-pass backward are more numerically stable than scalar `Value` accumulation with per-position backward calls.
+
+See `architecture_comparison.md` for a detailed breakdown, or open `benchmark.html` for an interactive visualization.
