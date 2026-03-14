@@ -1,0 +1,9 @@
+# Trained model weights (generated artifacts)
+model*.json
+
+# Backup files
+*.old
+
+# Python
+__pycache__/
+*.pyc
