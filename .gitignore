@@ -54,3 +54,7 @@ ENV/
 .mypy_cache/
 .dmypy.json
 dmypy.json
+
+# Claude Code
+CLAUDE.md
+.claude/
