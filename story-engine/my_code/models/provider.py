@@ -14,6 +14,12 @@ load_dotenv()
 _DEFAULT_LOCAL_MODEL = "default"
 
 
+def system_prompt_suffix(prompt: str) -> str:
+    """Append STORY_ENGINE_SYSTEM_SUFFIX to a system prompt if set."""
+    suffix = os.environ.get("STORY_ENGINE_SYSTEM_SUFFIX", "").strip()
+    return f"{prompt}\n{suffix}" if suffix else prompt
+
+
 def get_model(role: str):
     """Return a Strands model instance for the given agent role.
 
@@ -38,6 +44,7 @@ def get_model(role: str):
             model_id=os.environ.get(f"STORY_ENGINE_{role.upper()}_MODEL", "deepseek/deepseek-v3.2"),
             api_key=os.environ["OPENROUTER_API_KEY"],
         )
+
 
     elif provider == "anthropic":
         from strands.models import AnthropicModel
