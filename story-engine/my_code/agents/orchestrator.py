@@ -12,11 +12,13 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import asdict
+from datetime import datetime
 from pathlib import Path
 
 from my_code.agents.evaluator import create_evaluator
 from my_code.agents.lore_injector import create_lore_injector
 from my_code.agents.narrator import create_narrator
+from my_code.agents.summariser import create_summariser
 from my_code.models.data_models import (
     EvalResult,
     HumanInput,
@@ -70,6 +72,40 @@ def _clear_checkpoint(output_file: str):
 
 
 # ---------------------------------------------------------------------------
+# Run log
+# ---------------------------------------------------------------------------
+
+def _log_path(output_file: str) -> Path:
+    """Derive the run log file path from the output file path, with a timestamp."""
+    p = Path(output_file)
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    return p.parent / f"{p.stem}_{ts}.log"
+
+
+def _attach_run_log(output_file: str) -> logging.FileHandler:
+    """Add a FileHandler on the my_code package logger so only our control-flow
+    logs go to the run log (excludes Strands SDK / httpx HTTP noise)."""
+    lp = _log_path(output_file)
+    lp.parent.mkdir(parents=True, exist_ok=True)
+    handler = logging.FileHandler(lp, mode="a", encoding="utf-8")
+    handler.setLevel(logging.DEBUG)
+    handler.setFormatter(
+        logging.Formatter(
+            "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+    )
+    logging.getLogger("my_code").addHandler(handler)
+    return handler
+
+
+def _detach_run_log(handler: logging.FileHandler) -> None:
+    """Remove the file handler from the my_code logger and close it."""
+    logging.getLogger("my_code").removeHandler(handler)
+    handler.close()
+
+
+# ---------------------------------------------------------------------------
 # Main entry point
 # ---------------------------------------------------------------------------
 
@@ -89,102 +125,117 @@ def run_scene(file_path: str) -> str:
     scene = parse_scene_file(file_path)
     meta = scene.meta
     mode = meta.mode
+
+    # --- Attach run log (appends to output/<stem>.log for the duration of this run) ---
+    run_log_handler = _attach_run_log(meta.output_file)
+    logger.info("Run log: %s", _log_path(meta.output_file))
     logger.info("Scene: %s | Mode: %s | Beats: %d", meta.title, mode, len(scene.beats))
 
-    # --- Load checkpoint ---
-    checkpoint = _load_checkpoint(meta.output_file)
-    checkpoint_beats: dict[str, str] = checkpoint["beats"]
-    prior_summary: str = checkpoint.get("prior_summary", "")
+    try:
+        # --- Load checkpoint ---
+        checkpoint = _load_checkpoint(meta.output_file)
+        checkpoint_beats: dict[str, str] = checkpoint["beats"]
+        prior_summary: str = checkpoint.get("prior_summary", "")
 
-    if checkpoint_beats:
-        logger.info("Resuming from checkpoint: %d/%d beats already done", len(checkpoint_beats), len(scene.beats))
+        if checkpoint_beats:
+            logger.info("Resuming from checkpoint: %d/%d beats already done", len(checkpoint_beats), len(scene.beats))
 
-    # --- Create sub-agents ---
-    lore_injector = create_lore_injector()
-    narrator = create_narrator(scene)
-    evaluator = create_evaluator()
+        # --- Create sub-agents ---
+        lore_injector = create_lore_injector()
+        narrator = create_narrator(scene)
+        evaluator = create_evaluator()
+        summariser = create_summariser()
+        logger.info("Agents ready: lore_injector | narrator | evaluator | summariser")
 
-    # --- Serialise characters once for lore injector ---
-    characters_json = json.dumps([asdict(c) for c in scene.characters], ensure_ascii=False)
+        # --- Serialise characters once for lore injector ---
+        characters_json = json.dumps([asdict(c) for c in scene.characters], ensure_ascii=False)
 
-    # --- Replay completed beats into narrator conversation for context ---
-    if checkpoint_beats:
+        # --- Replay completed beats into narrator conversation for context ---
+        if checkpoint_beats:
+            for beat in scene.beats:
+                key = str(beat.index)
+                if key in checkpoint_beats:
+                    # Feed the beat instruction + prose as a conversation turn
+                    # so the narrator has context continuity
+                    narrator(
+                        f"[Previously written — beat {beat.index}/{len(scene.beats)}]\n"
+                        f"Instruction: {beat.text}\n\n"
+                        f"Output:\n{checkpoint_beats[key]}"
+                    )
+                    logger.info("Beat %d: restored from checkpoint", beat.index)
+
+        # --- Beat loop ---
         for beat in scene.beats:
             key = str(beat.index)
+
+            # Skip already-completed beats
             if key in checkpoint_beats:
-                # Feed the beat instruction + prose as a conversation turn
-                # so the narrator has context continuity
-                narrator(
-                    f"[Previously written — beat {beat.index}/{len(scene.beats)}]\n"
-                    f"Instruction: {beat.text}\n\n"
-                    f"Output:\n{checkpoint_beats[key]}"
-                )
-                logger.info("Beat %d: restored from checkpoint", beat.index)
+                continue
 
-    # --- Beat loop ---
-    for beat in scene.beats:
-        key = str(beat.index)
+            logger.info("--- Beat %d/%d ---", beat.index, len(scene.beats))
 
-        # Skip already-completed beats
-        if key in checkpoint_beats:
-            continue
-
-        logger.info("--- Beat %d/%d ---", beat.index, len(scene.beats))
-
-        # 1. Lore injection
-        lore_context = _call_lore_injector(
-            lore_injector, beat.text, beat.index, characters_json, scene.world_info
-        )
-
-        # 2. Build narrator context
-        author_note_text = None
-        if scene.author_note and beat.index > 0 and beat.index % scene.author_note.depth == 0:
-            author_note_text = scene.author_note.content
-
-        ctx = NarratorContext(
-            beat_instruction=beat.text,
-            lore_context=lore_context,
-            beat_index=beat.index,
-            beat_total=len(scene.beats),
-            author_note=author_note_text,
-        )
-
-        # 3. Narrate + evaluate loop (with retries)
-        prose, retry_count = _narrate_and_evaluate(
-            narrator, evaluator, ctx, scene.writing_style, prior_summary
-        )
-
-        if retry_count >= MAX_RETRIES:
-            logger.warning("Beat %d: max retries hit, using best attempt", beat.index)
-
-        # 4. Human input (mode-dependent)
-        action = "continue"
-        if mode == "interactive" or (mode == "semi-interactive" and beat.has_pause):
-            action, prose = _handle_human_input(
-                beat, scene, prose, narrator, evaluator, ctx, prior_summary, checkpoint_beats
+            # 1. Lore injection
+            lore_context = _call_lore_injector(
+                lore_injector, beat.text, beat.index, characters_json, scene.world_info
             )
 
-        if action == "stop":
-            # Save checkpoint before exiting so we can resume later
+            # 2. Build narrator context
+            author_note_text = None
+            if scene.author_note and beat.index > 0 and beat.index % scene.author_note.depth == 0:
+                author_note_text = scene.author_note.content
+
+            ctx = NarratorContext(
+                beat_instruction=beat.text,
+                lore_context=lore_context,
+                beat_index=beat.index,
+                beat_total=len(scene.beats),
+                author_note=author_note_text,
+            )
+
+            # 3. Narrate + evaluate loop (with retries)
+            prose, retry_count = _narrate_and_evaluate(
+                narrator, evaluator, ctx, scene.writing_style, prior_summary
+            )
+
+
+            if retry_count >= MAX_RETRIES:
+                logger.warning("Beat %d: max retries hit, using best attempt", beat.index)
+
+            # 4. Human input (mode-dependent)
+            action = "continue"
+            if mode == "interactive" or (mode == "semi-interactive" and beat.has_pause):
+                action, prose = _handle_human_input(
+                    beat, scene, prose, narrator, evaluator, ctx, prior_summary, checkpoint_beats
+                )
+
+            if action == "stop":
+                # Save checkpoint before exiting so we can resume later
+                _save_checkpoint(meta.output_file, checkpoint_beats, prior_summary)
+                break
+            elif action == "skip":
+                logger.info("Beat %d: skipped by user", beat.index)
+                continue
+
+            # 5. Summarise beat for coherence tracking, then save checkpoint
+            checkpoint_beats[key] = prose
+            is_last_beat = beat.index == scene.beats[-1].index
+            if not is_last_beat:
+                logger.info("Beat %d/%d: → summariser", beat.index, len(scene.beats))
+                beat_summary = _summarise_beat(summariser, prose, beat.index)
+                logger.info("Beat %d/%d: ← summariser", beat.index, len(scene.beats))
+                prior_summary += f"\n\n### Beat {beat.index} Summary\n{beat_summary}"
             _save_checkpoint(meta.output_file, checkpoint_beats, prior_summary)
-            break
-        elif action == "skip":
-            logger.info("Beat %d: skipped by user", beat.index)
-            continue
+            logger.info("Beat %d: saved (%d words)", beat.index, len(prose.split()))
 
-        # 5. Save beat to checkpoint immediately
-        checkpoint_beats[key] = prose
-        prior_summary += f"\nBeat {beat.index}: {_one_line_summary(prose)}"
-        _save_checkpoint(meta.output_file, checkpoint_beats, prior_summary)
-        logger.info("Beat %d: saved (%d words)", beat.index, len(prose.split()))
-
-    # --- Final output ---
-    # Assemble beats in order from checkpoint
-    completed_beats = [checkpoint_beats[str(b.index)] for b in scene.beats if str(b.index) in checkpoint_beats]
-    output_path = _save_final_output(completed_beats, meta)
-    _clear_checkpoint(meta.output_file)
-    logger.info("Output written to: %s", output_path)
-    return output_path
+        # --- Final output ---
+        # Assemble beats in order from checkpoint
+        completed_beats = [checkpoint_beats[str(b.index)] for b in scene.beats if str(b.index) in checkpoint_beats]
+        output_path = _save_final_output(completed_beats, meta)
+        _clear_checkpoint(meta.output_file)
+        logger.info("Output written to: %s", output_path)
+        return output_path
+    finally:
+        _detach_run_log(run_log_handler)
 
 
 # ---------------------------------------------------------------------------
@@ -202,7 +253,9 @@ def _call_lore_injector(
         f"Characters: {characters_json}\n\n"
         f"World info: {world_info}"
     )
+    logger.debug("Beat %d: → lore_injector", beat_index)
     result = agent(prompt)
+    logger.debug("Beat %d: ← lore_injector", beat_index)
     return str(result)
 
 
@@ -271,12 +324,16 @@ def _narrate_and_evaluate(
 ) -> tuple[str, int]:
     """Run the narrator → evaluator loop with retries. Returns (prose, retry_count)."""
     retry_count = 0
+    logger.info("Beat %d/%d: → narrator (attempt 1)", ctx.beat_index, ctx.beat_total)
     prose = _call_narrator(narrator, ctx)
+    logger.info("Beat %d/%d: ← narrator (%d words)", ctx.beat_index, ctx.beat_total, len(prose.split()))
 
     while retry_count < MAX_RETRIES:
+        logger.info("Beat %d/%d: → evaluator", ctx.beat_index, ctx.beat_total)
         eval_result = _call_evaluator(evaluator, ctx.beat_instruction, prose, writing_style, prior_summary)
         logger.info(
-            "Eval: %s (score=%.2f) %s",
+            "Beat %d/%d: ← evaluator %s score=%.2f | %s",
+            ctx.beat_index, ctx.beat_total,
             eval_result.result, eval_result.score, eval_result.reason,
         )
 
@@ -285,10 +342,17 @@ def _narrate_and_evaluate(
 
         retry_count += 1
         if retry_count < MAX_RETRIES:
-            logger.info("Retrying beat (attempt %d/%d): %s", retry_count + 1, MAX_RETRIES, eval_result.reason)
+            logger.info(
+                "Beat %d/%d: → narrator (retry %d/%d)",
+                ctx.beat_index, ctx.beat_total, retry_count + 1, MAX_RETRIES,
+            )
             # Append evaluator feedback to context for the retry
             ctx.redirect_instruction = f"[Evaluator feedback — please address]: {eval_result.reason}"
             prose = _call_narrator(narrator, ctx)
+            logger.info(
+                "Beat %d/%d: ← narrator (%d words)",
+                ctx.beat_index, ctx.beat_total, len(prose.split()),
+            )
 
     return prose, retry_count
 
@@ -304,6 +368,8 @@ def _handle_human_input(
     while True:
         human = _prompt_human(beat.index, len(scene.beats), prose)
 
+        logger.info("Beat %d/%d: human action=%s", beat.index, len(scene.beats), human.action)
+
         if human.action == "continue":
             return "continue", prose
 
@@ -315,17 +381,22 @@ def _handle_human_input(
 
         elif human.action == "retry":
             ctx.redirect_instruction = None
+            logger.info("Beat %d/%d: → narrator (human retry)", beat.index, len(scene.beats))
             prose = _call_narrator(narrator, ctx)
-            # Re-evaluate
+            logger.info("Beat %d/%d: ← narrator (%d words)", beat.index, len(scene.beats), len(prose.split()))
+            logger.info("Beat %d/%d: → evaluator (human retry)", beat.index, len(scene.beats))
             eval_result = _call_evaluator(evaluator, ctx.beat_instruction, prose, scene.writing_style, prior_summary)
-            logger.info("Retry eval: %s (score=%.2f)", eval_result.result, eval_result.score)
+            logger.info("Beat %d/%d: ← evaluator %s score=%.2f", beat.index, len(scene.beats), eval_result.result, eval_result.score)
             continue  # Show to human again
 
         elif human.action == "redirect":
             ctx.redirect_instruction = human.text
+            logger.info("Beat %d/%d: → narrator (human redirect)", beat.index, len(scene.beats))
             prose = _call_narrator(narrator, ctx)
+            logger.info("Beat %d/%d: ← narrator (%d words)", beat.index, len(scene.beats), len(prose.split()))
+            logger.info("Beat %d/%d: → evaluator (human redirect)", beat.index, len(scene.beats))
             eval_result = _call_evaluator(evaluator, ctx.beat_instruction, prose, scene.writing_style, prior_summary)
-            logger.info("Redirect eval: %s (score=%.2f)", eval_result.result, eval_result.score)
+            logger.info("Beat %d/%d: ← evaluator %s score=%.2f", beat.index, len(scene.beats), eval_result.result, eval_result.score)
             continue  # Show to human again
 
     return "continue", prose
@@ -396,12 +467,8 @@ def _save_final_output(completed_beats: list[str], meta) -> str:
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _one_line_summary(prose: str) -> str:
-    """Extract a one-line summary from prose (first sentence, max 100 chars)."""
-    # Take first sentence
-    for end in (".", "!", "?"):
-        idx = prose.find(end)
-        if 0 < idx < 150:
-            return prose[: idx + 1]
-    # Fallback: first 100 chars
-    return prose[:100].rsplit(" ", 1)[0] + "..."
+def _summarise_beat(agent, prose: str, beat_index: int) -> str:
+    """Call the BeatSummariserAgent to produce bullet-point summary of a beat."""
+    prompt = f"Summarise beat {beat_index}:\n\n{prose}"
+    result = agent(prompt)
+    return str(result).strip()
