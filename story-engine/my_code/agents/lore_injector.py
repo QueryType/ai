@@ -11,7 +11,7 @@ from __future__ import annotations
 from strands import Agent
 from strands.agent.conversation_manager.null_conversation_manager import NullConversationManager
 
-from my_code.models.provider import get_model
+from my_code.models.provider import get_model, system_prompt_suffix
 from my_code.tools.lore_tools import build_lore_block, get_character_card, scan_for_triggers
 
 LORE_INJECTOR_SYSTEM_PROMPT = """\
@@ -35,7 +35,7 @@ def create_lore_injector() -> Agent:
     """Create a fresh LoreInjectorAgent instance."""
     return Agent(
         name="LoreInjector",
-        system_prompt=LORE_INJECTOR_SYSTEM_PROMPT,
+        system_prompt=system_prompt_suffix(LORE_INJECTOR_SYSTEM_PROMPT),
         tools=[scan_for_triggers, get_character_card, build_lore_block],
         model=get_model("lore_injector"),
         conversation_manager=NullConversationManager(),

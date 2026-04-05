@@ -12,7 +12,7 @@ from strands import Agent
 from strands.agent.conversation_manager.summarizing_conversation_manager import SummarizingConversationManager
 
 from my_code.models.data_models import ParsedScene
-from my_code.models.provider import get_model
+from my_code.models.provider import get_model, system_prompt_suffix
 
 
 def _build_narrator_system_prompt(scene: ParsedScene) -> str:
@@ -80,7 +80,7 @@ def create_narrator(scene: ParsedScene) -> Agent:
     """
     return Agent(
         name="Narrator",
-        system_prompt=_build_narrator_system_prompt(scene),
+        system_prompt=system_prompt_suffix(_build_narrator_system_prompt(scene)),
         tools=[],  # pure generation — no tools
         model=get_model("narrator"),
         conversation_manager=SummarizingConversationManager(
