@@ -58,3 +58,6 @@ dmypy.json
 # Claude Code
 CLAUDE.md
 .claude/
+
+# Conda
+story-engine/conda_activate_strandsagents
