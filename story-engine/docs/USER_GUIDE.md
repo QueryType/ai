@@ -588,7 +588,33 @@ Adjust `target_length` in `[meta]`. The engine calculates a per-beat word target
 words_per_beat = target_length / number_of_beats
 ```
 
-The narrator uses this as guidance, not a hard limit.
+The narrator uses this as guidance, not a hard limit. **Scale `target_length` with beat count** — more beats means more total words needed to keep each beat substantive (e.g. 5 beats × ~900 words = `target_length: 4500`).
+
+### How to set the context window
+
+The narrator is the most context-hungry agent. Use this formula to estimate the minimum context window your model needs:
+
+```
+words_per_beat  = target_length / beat_count
+tokens_per_beat = (words_per_beat × 1.33) + 500   # prose + lore/instruction overhead
+context_window  = 2000 + 11 × tokens_per_beat × 1.2
+```
+
+The `11` comes from `preserve_recent_messages=10` (verbatim history kept) + the current beat being generated. The `2000` is the approximate system prompt overhead. The `1.2` is a 20% safety buffer.
+
+**Quick reference:**
+
+| `target_length` | Beats | `words_per_beat` | Recommended context |
+|----------------|-------|-----------------|-------------------|
+| 1500 | 3 | 500 | ~12K tokens |
+| 3000 | 5 | 600 | ~14K tokens |
+| 4500 | 5 | 900 | ~25K tokens |
+| 6000 | 6 | 1000 | ~27K tokens |
+| 9000 | 10 | 900 | ~25K tokens |
+
+**Important:** The narrator keeps the last 10 beats in verbatim history before summarising. If your scene has more than 10 beats, older beats are compressed and continuity may degrade. For scenes with many beats, either:
+- Keep beats ≤ 10 and use a higher `target_length` for longer prose per beat, or
+- Accept that the narrator will rely on its summarised history for early beats
 
 ### Slow generation
 
