@@ -11,7 +11,7 @@ from strands import tool
 
 
 @tool
-def check_beat_coverage(beat_instruction: str, prose_output: str) -> str:
+def check_beat_coverage(beat_instruction: str, prose_output: str, covered: bool, reason: str) -> str:
     """Check whether the prose covers the narrative event in the beat instruction.
 
     The evaluator agent uses its LLM reasoning to determine coverage,
@@ -20,18 +20,17 @@ def check_beat_coverage(beat_instruction: str, prose_output: str) -> str:
     Args:
         beat_instruction: The original beat text from [scene-beats].
         prose_output: The prose written by the narrator.
+        covered: True if the prose covers the beat event, False otherwise.
+        reason: Explanation of the coverage verdict.
 
     Returns:
         JSON with 'covered' (bool) and 'reason' (str).
     """
-    # This tool is called by the evaluator agent after it has reasoned about coverage.
-    # The agent passes its assessment through the arguments.
-    # We just structure and return — the LLM does the actual evaluation.
-    return json.dumps({"covered": True, "reason": ""})
+    return json.dumps({"covered": covered, "reason": reason})
 
 
 @tool
-def check_style_compliance(prose_output: str, writing_style: str) -> str:
+def check_style_compliance(prose_output: str, writing_style: str, compliant: bool, issues_json: str) -> str:
     """Check whether the prose matches the declared writing style.
 
     The evaluator agent reasons about style compliance, then calls this
@@ -40,30 +39,36 @@ def check_style_compliance(prose_output: str, writing_style: str) -> str:
     Args:
         prose_output: The prose written by the narrator.
         writing_style: The [writing-style] section content.
+        compliant: True if the prose matches the style directives, False otherwise.
+        issues_json: JSON array of specific style issues found (empty array if compliant).
 
     Returns:
         JSON with 'compliant' (bool) and 'issues' (list of strings).
     """
-    return json.dumps({"compliant": True, "issues": []})
+    issues = json.loads(issues_json) if issues_json else []
+    return json.dumps({"compliant": compliant, "issues": issues})
 
 
 @tool
-def check_coherence(prose_output: str, prior_summary: str) -> str:
-    """Check whether the prose is consistent with prior beat events.
+def check_coherence(prose_output: str, prior_summary: str, coherent: bool, reason: str) -> str:
+    """Record the evaluator's coherence assessment for this beat.
 
-    The evaluator agent reasons about coherence, then calls this tool
-    to record the structured result. Auto-passes for the first beat.
+    The evaluator agent reasons about whether the prose is consistent with
+    prior beat summaries, then calls this tool with its verdict.
+    Auto-passes if prior_summary is empty (first beat).
 
     Args:
         prose_output: The prose written by the narrator.
-        prior_summary: Summary of prior beats (empty for beat 1).
+        prior_summary: Accumulated bullet-point summaries of prior beats.
+        coherent: True if the prose is consistent with prior beats, False if contradictions found.
+        reason: Explanation of the coherence verdict, or specific contradictions found.
 
     Returns:
         JSON with 'coherent' (bool) and 'reason' (str).
     """
     if not prior_summary.strip():
         return json.dumps({"coherent": True, "reason": "First beat — no prior context."})
-    return json.dumps({"coherent": True, "reason": ""})
+    return json.dumps({"coherent": coherent, "reason": reason})
 
 
 @tool
