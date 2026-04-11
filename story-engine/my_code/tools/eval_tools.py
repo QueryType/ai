@@ -1,6 +1,11 @@
 """Evaluator tools — beat coverage, style compliance, coherence, result emission.
 
 Owned by EvaluatorAgent. See AGENT_DESIGN.md §2.4.
+
+Tool signatures deliberately do NOT include prose_output, beat_instruction, or
+writing_style as parameters. The LLM already has those in its context window —
+repeating them as tool call arguments would inflate each generated tool call by
+~1200 tokens × 3 calls = ~3600 tokens, which blows past ctx=4096 every beat.
 """
 
 from __future__ import annotations
@@ -11,15 +16,13 @@ from strands import tool
 
 
 @tool
-def check_beat_coverage(beat_instruction: str, prose_output: str, covered: bool, reason: str) -> str:
-    """Check whether the prose covers the narrative event in the beat instruction.
+def check_beat_coverage(covered: bool, reason: str) -> str:
+    """Record whether the prose covers the narrative event in the beat instruction.
 
-    The evaluator agent uses its LLM reasoning to determine coverage,
-    then calls this tool to record the structured result.
+    Read the beat instruction and prose carefully, then call this tool with
+    your verdict. covered=True only if the core event clearly happened.
 
     Args:
-        beat_instruction: The original beat text from [scene-beats].
-        prose_output: The prose written by the narrator.
         covered: True if the prose covers the beat event, False otherwise.
         reason: Explanation of the coverage verdict.
 
@@ -30,15 +33,14 @@ def check_beat_coverage(beat_instruction: str, prose_output: str, covered: bool,
 
 
 @tool
-def check_style_compliance(prose_output: str, writing_style: str, compliant: bool, issues_json: str) -> str:
-    """Check whether the prose matches the declared writing style.
+def check_style_compliance(compliant: bool, issues_json: str) -> str:
+    """Record whether the prose matches the declared writing style.
 
-    The evaluator agent reasons about style compliance, then calls this
-    tool to record the structured result.
+    Read the prose and writing style directives carefully, then call this tool
+    with your verdict. Check for POV consistency, tense, show-don't-tell,
+    dialogue formatting, sentence variety.
 
     Args:
-        prose_output: The prose written by the narrator.
-        writing_style: The [writing-style] section content.
         compliant: True if the prose matches the style directives, False otherwise.
         issues_json: JSON array of specific style issues found (empty array if compliant).
 
@@ -50,24 +52,20 @@ def check_style_compliance(prose_output: str, writing_style: str, compliant: boo
 
 
 @tool
-def check_coherence(prose_output: str, prior_summary: str, coherent: bool, reason: str) -> str:
-    """Record the evaluator's coherence assessment for this beat.
+def check_coherence(coherent: bool, reason: str) -> str:
+    """Record the coherence assessment for this beat vs prior beats.
 
-    The evaluator agent reasons about whether the prose is consistent with
-    prior beat summaries, then calls this tool with its verdict.
-    Auto-passes if prior_summary is empty (first beat).
+    Read the prose and prior beat summaries carefully. Check for contradictions:
+    characters in the wrong place, events that didn't happen yet, facts established
+    differently. Auto-passes if prior_summary is empty (first beat).
 
     Args:
-        prose_output: The prose written by the narrator.
-        prior_summary: Accumulated bullet-point summaries of prior beats.
         coherent: True if the prose is consistent with prior beats, False if contradictions found.
         reason: Explanation of the coherence verdict, or specific contradictions found.
 
     Returns:
         JSON with 'coherent' (bool) and 'reason' (str).
     """
-    if not prior_summary.strip():
-        return json.dumps({"coherent": True, "reason": "First beat — no prior context."})
     return json.dumps({"coherent": coherent, "reason": reason})
 
 
