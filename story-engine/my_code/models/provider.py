@@ -24,7 +24,7 @@ def get_model(role: str):
     """Return a Strands model instance for the given agent role.
 
     Args:
-        role: One of "narrator", "evaluator", "orchestrator", "lore_injector".
+        role: One of "narrator", "evaluator", "summariser", "orchestrator", "lore_injector".
 
     Returns:
         A Strands Model instance ready to pass to Agent(model=...).
@@ -32,8 +32,12 @@ def get_model(role: str):
     provider = os.environ.get("STORY_ENGINE_PROVIDER", "local")
 
     if provider == "local":
+        base_url = os.environ.get(
+            f"STORY_ENGINE_{role.upper()}_BASE_URL",
+            os.environ.get("STORY_ENGINE_LOCAL_BASE_URL", "http://localhost:1234/v1"),
+        )
         return _build_openai_compat(
-            base_url=os.environ.get("STORY_ENGINE_LOCAL_BASE_URL", "http://localhost:1234/v1"),
+            base_url=base_url,
             model_id=os.environ.get(f"STORY_ENGINE_{role.upper()}_MODEL", _DEFAULT_LOCAL_MODEL),
             api_key="not-needed",
         )
