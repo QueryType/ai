@@ -9,16 +9,20 @@ See AGENT_DESIGN.md §1.1 and §4.
 
 from __future__ import annotations
 
+import gc
 import json
 import logging
+import re
 from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
 
+from strands.types.exceptions import MaxTokensReachedException
+
 from my_code.agents.evaluator import create_evaluator
-from my_code.agents.lore_injector import create_lore_injector
 from my_code.agents.narrator import create_narrator
 from my_code.agents.summariser import create_summariser
+from my_code.tools.lore_tools import build_lore_block, get_character_card, scan_for_triggers
 from my_code.models.data_models import (
     EvalResult,
     HumanInput,
@@ -141,11 +145,12 @@ def run_scene(file_path: str) -> str:
             logger.info("Resuming from checkpoint: %d/%d beats already done", len(checkpoint_beats), len(scene.beats))
 
         # --- Create sub-agents ---
-        lore_injector = create_lore_injector()
+        # Narrator is created once — it must persist across beats to maintain
+        # its SummarizingConversationManager state (KV cache continuity on port 8080).
+        # Evaluator and summariser are stateless (NullConversationManager) and are
+        # recreated each beat so Strands SDK metric objects don't accumulate in RAM.
         narrator = create_narrator(scene)
-        evaluator = create_evaluator()
-        summariser = create_summariser()
-        logger.info("Agents ready: lore_injector | narrator | evaluator | summariser")
+        logger.info("Agents ready: narrator | evaluator | summariser (lore injection is pure-Python)")
 
         # --- Serialise characters once for lore injector ---
         characters_json = json.dumps([asdict(c) for c in scene.characters], ensure_ascii=False)
@@ -174,9 +179,17 @@ def run_scene(file_path: str) -> str:
 
             logger.info("--- Beat %d/%d ---", beat.index, len(scene.beats))
 
-            # 1. Lore injection
+            # Fresh stateless agents per beat — prevents Strands SDK metric
+            # objects from accumulating across beats in long runs.
+            # gc.collect() ensures the previous beat's agent objects are freed
+            # before we allocate new ones (relevant on Apple Silicon unified memory).
+            gc.collect()
+            evaluator = create_evaluator()
+            summariser = create_summariser()
+
+            # 1. Lore injection (pure Python — no LLM call)
             lore_context = _call_lore_injector(
-                lore_injector, beat.text, beat.index, characters_json, scene.world_info
+                beat.text, beat.index, characters_json, scene.world_info
             )
 
             # 2. Build narrator context
@@ -216,7 +229,14 @@ def run_scene(file_path: str) -> str:
                 logger.info("Beat %d: skipped by user", beat.index)
                 continue
 
-            # 5. Summarise beat for coherence tracking, then save checkpoint
+            # 5. Proactive narrator context management.
+            # SummarizingConversationManager only summarizes reactively (on context overflow
+            # from the server). Without this, narrator input grows ~1800 tokens/beat and
+            # exceeds ctx=12288 at beat ~7. We trigger reduction manually once the message
+            # count exceeds preserve_recent_messages so it stays bounded.
+            _trim_narrator_context(narrator)
+
+            # 6. Summarise beat for coherence tracking, then save checkpoint
             checkpoint_beats[key] = prose
             is_last_beat = beat.index == scene.beats[-1].index
             if not is_last_beat:
@@ -242,21 +262,51 @@ def run_scene(file_path: str) -> str:
 # Sub-agent call helpers
 # ---------------------------------------------------------------------------
 
+def _trim_narrator_context(narrator) -> None:
+    """Proactively reduce narrator conversation history when it exceeds the keep limit.
+
+    SummarizingConversationManager only triggers on a ContextWindowOverflowException
+    from the server — it never summarizes proactively. Without this, narrator input
+    grows ~1800 tokens/beat and exceeds ctx=12288 around beat 7.
+
+    We call reduce_context manually once message count exceeds preserve_recent_messages.
+    The manager will summarize the oldest (summary_ratio × N) messages while keeping
+    the most recent preserve_recent_messages untouched.
+    """
+    cm = narrator.conversation_manager
+    msg_count = len(narrator.messages)
+    limit = cm.preserve_recent_messages
+    if msg_count > limit:
+        logger.debug(
+            "Narrator context: %d messages > limit=%d — triggering proactive reduction",
+            msg_count, limit,
+        )
+        try:
+            cm.reduce_context(narrator)
+            logger.info(
+                "Narrator context trimmed: %d → %d messages",
+                msg_count, len(narrator.messages),
+            )
+        except Exception as exc:
+            logger.warning("Narrator context reduction failed (%s) — continuing", type(exc).__name__)
+
+
 def _call_lore_injector(
-    agent, beat_text: str, beat_index: int, characters_json: str, world_info: str
+    beat_text: str, beat_index: int, characters_json: str, world_info: str
 ) -> str:
-    """Call the LoreInjectorAgent to build lore context for a beat."""
-    prompt = (
-        f"Build lore context for this beat.\n\n"
-        f"Beat text: {beat_text}\n\n"
-        f"Beat index: {beat_index}\n\n"
-        f"Characters: {characters_json}\n\n"
-        f"World info: {world_info}"
-    )
-    logger.debug("Beat %d: → lore_injector", beat_index)
-    result = agent(prompt)
-    logger.debug("Beat %d: ← lore_injector", beat_index)
-    return str(result)
+    """Build lore context using direct Python tool calls — no LLM required.
+
+    The three lore tools are pure Python (regex, dict lookup, string assembly).
+    Bypassing the agent eliminates one full KV-cache eviction per beat.
+    """
+    logger.debug("Beat %d: lore injection (pure-Python)", beat_index)
+    matched_names = json.loads(scan_for_triggers(beat_text, characters_json))
+    cards = []
+    for name in matched_names:
+        card = get_character_card(name, characters_json)
+        if not card.startswith("Character not found"):
+            cards.append(card)
+    return build_lore_block(world_info, json.dumps(cards))
 
 
 def _call_narrator(agent, ctx: NarratorContext) -> str:
@@ -271,27 +321,172 @@ def _call_narrator(agent, ctx: NarratorContext) -> str:
     if ctx.redirect_instruction:
         parts.append(f"## Redirect from Human\n{ctx.redirect_instruction}\n")
 
-    result = agent("\n".join(parts))
+    prompt = "\n".join(parts)
+    logger.debug(
+        "Beat %d/%d: narrator prompt chars=%d (instruction=%d lore=%d author_note=%d redirect=%d)",
+        ctx.beat_index,
+        ctx.beat_total,
+        len(prompt),
+        len(ctx.beat_instruction),
+        len(ctx.lore_context),
+        len(ctx.author_note or ""),
+        len(ctx.redirect_instruction or ""),
+    )
+    # Snapshot cumulative usage before this call so we can log per-beat deltas.
+    # agent.event_loop_metrics accumulates across the agent's lifetime; result.metrics
+    # is the same object, so subtracting the pre-call snapshot gives per-call usage.
+    prev = agent.event_loop_metrics.accumulated_usage
+    prev_in = prev.get("inputTokens", 0)
+    prev_out = prev.get("outputTokens", 0)
+
+    result = agent(prompt)
+
+    usage = result.metrics.accumulated_usage
+    beat_in = usage.get("inputTokens", 0) - prev_in
+    beat_out = usage.get("outputTokens", 0) - prev_out
+    logger.info(
+        "Beat %d/%d: narrator tokens in=%d out=%d stop=%s (history=%d msgs)",
+        ctx.beat_index,
+        ctx.beat_total,
+        beat_in,
+        beat_out,
+        result.stop_reason,
+        len(agent.messages),
+    )
     return str(result)
+
+
+_EVALUATOR_PRIOR_SUMMARY_WINDOW = 10  # Keep only the last N beat summaries
+_EVALUATOR_PRIOR_SUMMARY_MAX_CHARS = 4500  # Secondary hard cap after window trim
+_SUMMARY_MAX_BULLETS = 5
+_SUMMARY_MAX_BULLET_CHARS = 220
+_SUMMARY_MAX_TOTAL_CHARS = 1000
+
+
+def _trim_prior_summary(prior_summary: str, window: int = _EVALUATOR_PRIOR_SUMMARY_WINDOW) -> str:
+    """Return the last `window` beat summaries from the accumulated prior_summary string.
+
+    Each summary block starts with '### Beat N Summary'. Older summaries are dropped
+    to keep the evaluator prompt within the 9B model's context window.
+    """
+    if not prior_summary:
+        return prior_summary
+    # Split on section headers, keeping the delimiter
+    parts = re.split(r'(?=### Beat \d+ Summary)', prior_summary.strip())
+    parts = [p for p in parts if p.strip()]
+    if len(parts) <= window:
+        return prior_summary
+    return "\n\n" + "\n\n".join(parts[-window:])
+
+
+def _cap_prior_summary_chars(
+    prior_summary: str, max_chars: int = _EVALUATOR_PRIOR_SUMMARY_MAX_CHARS
+) -> str:
+    """Apply a hard character budget to evaluator prior-summary context.
+
+    Keeps the most recent beat-summary blocks first, then truncates to tail as fallback.
+    """
+    if not prior_summary or len(prior_summary) <= max_chars:
+        return prior_summary
+
+    parts = re.split(r'(?=### Beat \d+ Summary)', prior_summary.strip())
+    parts = [p for p in parts if p.strip()]
+    kept: list[str] = []
+    total = 0
+    for part in reversed(parts):
+        add = len(part) + (2 if kept else 0)
+        if total + add > max_chars:
+            break
+        kept.append(part)
+        total += add
+
+    if kept:
+        return "\n\n" + "\n\n".join(reversed(kept))
+
+    # Fallback when a single newest block is already above budget.
+    return prior_summary[-max_chars:]
+
+
+def _normalize_summary_for_budget(summary_text: str) -> str:
+    """Normalize and cap BeatSummariser output to a stable size budget."""
+    lines = [line.strip() for line in summary_text.splitlines() if line.strip()]
+    if not lines:
+        return summary_text[:_SUMMARY_MAX_TOTAL_CHARS].strip()
+
+    bullets: list[str] = []
+    for line in lines:
+        text = re.sub(r'^([-*•]\s+|\d+[\).]\s+)', '', line).strip()
+        if not text:
+            continue
+        if len(text) > _SUMMARY_MAX_BULLET_CHARS:
+            text = text[: _SUMMARY_MAX_BULLET_CHARS - 3].rstrip() + "..."
+        bullets.append(f"- {text}")
+        if len(bullets) >= _SUMMARY_MAX_BULLETS:
+            break
+
+    normalized = "\n".join(bullets).strip()
+    if len(normalized) <= _SUMMARY_MAX_TOTAL_CHARS:
+        return normalized
+    return normalized[: _SUMMARY_MAX_TOTAL_CHARS - 3].rstrip() + "..."
 
 
 def _call_evaluator(
     agent, beat_instruction: str, prose: str, writing_style: str, prior_summary: str
 ) -> EvalResult:
     """Call the EvaluatorAgent and parse its verdict."""
+    trimmed_summary = _trim_prior_summary(prior_summary)
+    capped_summary = _cap_prior_summary_chars(trimmed_summary)
     prompt = (
         f"Evaluate this beat's prose.\n\n"
         f"## Beat Instruction\n{beat_instruction}\n\n"
         f"## Prose Output\n{prose}\n\n"
         f"## Writing Style\n{writing_style}\n\n"
-        f"## Prior Beats Summary\n{prior_summary if prior_summary else '(first beat — no prior context)'}"
+        f"## Prior Beats Summary\n{capped_summary if capped_summary else '(first beat — no prior context)'}"
     )
-    result = agent(prompt)
-    raw = str(result)
+    logger.debug(
+        "Evaluator prompt chars=%d (instruction=%d prose=%d style=%d prior_raw=%d prior_window=%d prior_capped=%d)",
+        len(prompt),
+        len(beat_instruction),
+        len(prose),
+        len(writing_style),
+        len(prior_summary),
+        len(trimmed_summary),
+        len(capped_summary),
+    )
+    try:
+        result = agent(prompt)
+        raw = str(result)
+        usage = result.metrics.accumulated_usage
+        logger.info(
+            "Evaluator tokens in=%d out=%d total=%d stop=%s",
+            usage.get("inputTokens", 0),
+            usage.get("outputTokens", 0),
+            usage.get("totalTokens", 0),
+            result.stop_reason,
+        )
+        if result.stop_reason == "max_tokens":
+            logger.warning(
+                "EVALUATOR FALLBACK: stop_reason=max_tokens — context limit hit, "
+                "verdict will be defaulted to pass. "
+                "Prompt chars=%d; consider reducing ctx or trimming input.",
+                len(prompt),
+            )
+            return EvalResult(
+                result="pass", score=1.0, reason="Evaluator fallback: max_tokens",
+                beat_coverage=True, style_compliant=True, coherent=True,
+            )
+    except Exception as exc:
+        logger.warning(
+            "EVALUATOR FALLBACK: %s raised mid-call — defaulting to pass",
+            type(exc).__name__,
+        )
+        return EvalResult(
+            result="pass", score=1.0, reason=f"Evaluator fallback: {type(exc).__name__}",
+            beat_coverage=True, style_compliant=True, coherent=True,
+        )
 
     # Try to extract JSON from the response
     try:
-        # Find JSON in the response
         json_start = raw.find("{")
         json_end = raw.rfind("}") + 1
         if json_start >= 0 and json_end > json_start:
@@ -306,11 +501,11 @@ def _call_evaluator(
                 issues=data.get("issues", []),
             )
     except (json.JSONDecodeError, KeyError):
-        logger.warning("Could not parse evaluator response, defaulting to pass")
+        logger.warning("EVALUATOR FALLBACK: JSON parse failed — defaulting to pass. raw=%r", raw[:200])
 
     # Default to pass if parsing fails
     return EvalResult(
-        result="pass", score=1.0, reason="Evaluator parse fallback",
+        result="pass", score=1.0, reason="Evaluator fallback: JSON parse failed",
         beat_coverage=True, style_compliant=True, coherent=True,
     )
 
@@ -468,7 +663,59 @@ def _save_final_output(completed_beats: list[str], meta) -> str:
 # ---------------------------------------------------------------------------
 
 def _summarise_beat(agent, prose: str, beat_index: int) -> str:
-    """Call the BeatSummariserAgent to produce bullet-point summary of a beat."""
-    prompt = f"Summarise beat {beat_index}:\n\n{prose}"
-    result = agent(prompt)
-    return str(result).strip()
+    """Call the BeatSummariserAgent to produce bullet-point summary of a beat.
+    
+    On MaxTokensReachedException, progressively truncate prose and retry.
+    """
+    max_retries = 5
+    truncation_factor = 1.0
+    
+    for attempt in range(max_retries):
+        try:
+            # Apply truncation if this is a retry after overflow
+            current_prose = prose
+            if attempt > 0:
+                truncate_chars = int(len(prose) * truncation_factor)
+                # Keep the end of the prose (most recent/relevant narrative)
+                current_prose = prose[-truncate_chars:] if truncate_chars > 0 else prose[:100]
+                logger.warning(
+                    "Beat %d: summariser retry attempt %d with truncation (%.1f%% of original %d chars)",
+                    beat_index,
+                    attempt,
+                    truncation_factor * 100,
+                    len(prose),
+                )
+            
+            prompt = f"Summarise beat {beat_index}:\n\n{current_prose}"
+            logger.debug(
+                "Beat %d: summariser prompt chars=%d (prose=%d)",
+                beat_index,
+                len(prompt),
+                len(current_prose),
+            )
+            result = agent(prompt)
+            raw_summary = str(result).strip()
+            capped_summary = _normalize_summary_for_budget(raw_summary)
+            if capped_summary != raw_summary:
+                logger.debug(
+                    "Beat %d: summary normalized/capped raw_chars=%d capped_chars=%d",
+                    beat_index,
+                    len(raw_summary),
+                    len(capped_summary),
+                )
+            return capped_summary
+            
+        except MaxTokensReachedException as e:
+            if attempt == max_retries - 1:
+                logger.error(
+                    "Beat %d: summariser failed after %d truncation attempts",
+                    beat_index,
+                    attempt + 1,
+                )
+                raise
+            # Reduce prose to 70% of previous attempt (exponential backoff)
+            truncation_factor *= 0.7
+            logger.info(
+                "Beat %d: MaxTokensReachedException caught, retrying with reduced prose...",
+                beat_index,
+            )

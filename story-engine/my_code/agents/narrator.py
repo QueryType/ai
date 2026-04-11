@@ -85,6 +85,6 @@ def create_narrator(scene: ParsedScene) -> Agent:
         model=get_model("narrator"),
         conversation_manager=SummarizingConversationManager(
             summary_ratio=0.3,
-            preserve_recent_messages=10,
+            preserve_recent_messages=6,
         ),
     )

@@ -42,6 +42,6 @@ def create_summariser() -> Agent:
         name="BeatSummariser",
         system_prompt=system_prompt_suffix(SUMMARISER_SYSTEM_PROMPT),
         tools=[],
-        model=get_model("orchestrator"),
+        model=get_model("summariser"),
         conversation_manager=NullConversationManager(),
     )
