@@ -53,11 +53,16 @@ STORY_ENGINE_PROVIDER=local
 # Local backend URL (LM Studio / llama.cpp / Ollama)
 STORY_ENGINE_LOCAL_BASE_URL=http://192.168.1.5:7890/v1
 
+# Optional per-role endpoint overrides
+STORY_ENGINE_NARRATOR_BASE_URL=http://192.168.1.5:8080/v1
+STORY_ENGINE_EVALUATOR_BASE_URL=http://192.168.1.5:8081/v1
+STORY_ENGINE_SUMMARISER_BASE_URL=http://192.168.1.5:8081/v1
+
 # Model IDs — set to whatever you have loaded
 STORY_ENGINE_NARRATOR_MODEL=qwen3.5-9b-uncensored-hauhaucs-aggressive
 STORY_ENGINE_EVALUATOR_MODEL=qwen3.5-9b-uncensored-hauhaucs-aggressive
+STORY_ENGINE_SUMMARISER_MODEL=qwen3.5-9b-uncensored-hauhaucs-aggressive
 STORY_ENGINE_ORCHESTRATOR_MODEL=qwen3.5-9b-uncensored-hauhaucs-aggressive
-STORY_ENGINE_LORE_INJECTOR_MODEL=qwen3.5-9b-uncensored-hauhaucs-aggressive
 
 # Cloud keys (only needed if STORY_ENGINE_PROVIDER != local)
 # OPENROUTER_API_KEY=sk-or-...
@@ -77,16 +82,18 @@ STORY_ENGINE_LORE_INJECTOR_MODEL=qwen3.5-9b-uncensored-hauhaucs-aggressive
 
 ### 2.3 Per-Role Models
 
-The engine uses 4 agents, each configurable independently:
+The engine uses role-based model routing for its LLM-backed components:
 
 | Env Var | Agent | Job | Can use cheaper model? |
 |---------|-------|-----|------------------------|
 | `STORY_ENGINE_NARRATOR_MODEL` | Narrator | Writes prose | No — use your best model |
 | `STORY_ENGINE_EVALUATOR_MODEL` | Evaluator | Quality checks | Yes — lighter model works |
-| `STORY_ENGINE_ORCHESTRATOR_MODEL` | Orchestrator | Coordinates | Yes — lighter model works |
-| `STORY_ENGINE_LORE_INJECTOR_MODEL` | Lore Injector | Context assembly | Yes — lighter model works |
+| `STORY_ENGINE_SUMMARISER_MODEL` | BeatSummariser | Continuity summaries | Yes — lighter model works |
+| `STORY_ENGINE_ORCHESTRATOR_MODEL` | Reserved orchestration role | Available for future LLM orchestration tasks | Yes |
 
-When using a single local model, set all four to the same value.
+Notes:
+- Lore injection is pure Python and does not use an LLM model setting.
+- When using a single local model endpoint, set narrator/evaluator/summariser to the same model ID.
 
 ### 2.4 Command Line Options
 
@@ -578,7 +585,15 @@ Models known to support tool calling well:
 
 ### Evaluator always passes
 
-This is normal for capable models. The evaluator checks beat coverage, style compliance, and coherence. If the narrator does a good job, everything passes. You'll see retries when the model drifts off-topic or misses the beat instruction.
+For a capable narrator on well-written beats, all-pass is the expected outcome. However, if you see `EVALUATOR FALLBACK` warnings in the log, the evaluator is NOT evaluating — it is defaulting to pass due to a failure:
+
+```
+[WARNING] EVALUATOR FALLBACK: stop_reason=max_tokens — context limit hit...
+[WARNING] EVALUATOR FALLBACK: MaxTokensReachedException raised mid-call...
+[WARNING] EVALUATOR FALLBACK: JSON parse failed...
+```
+
+The most common cause is the evaluator's tool functions being passed prose as arguments (inflating each tool call by ~1200 tokens × 3 calls). The `check_*` tools in `my_code/tools/eval_tools.py` must only accept booleans and reason strings — not `prose_output` or `beat_instruction`. If you modify those tools, do not add large text parameters.
 
 ### Output is too long / too short
 
@@ -612,14 +627,22 @@ The `11` comes from `preserve_recent_messages=10` (verbatim history kept) + the 
 | 6000 | 6 | 1000 | ~27K tokens |
 | 9000 | 10 | 900 | ~25K tokens |
 
-**Important:** The narrator keeps the last 10 beats in verbatim history before summarising. If your scene has more than 10 beats, older beats are compressed and continuity may degrade. For scenes with many beats, either:
-- Keep beats ≤ 10 and use a higher `target_length` for longer prose per beat, or
-- Accept that the narrator will rely on its summarised history for early beats
+**Important:** The narrator keeps the last 6 messages (`preserve_recent_messages=6`) in verbatim history. Older messages are proactively summarised after each beat via `_trim_narrator_context()`. This keeps input tokens bounded regardless of scene length. Continuity for early beats relies on the generated summary rather than verbatim text.
 
 ### Slow generation
 
-Local models take time. A 9B model typically does ~3-4 minutes per beat (lore + narrate + evaluate = 3 LLM calls per beat, plus tool calls). Tips:
+Expected timings on a two-server setup (31B narrator, 9B evaluator):
 
+| Step | Typical time |
+|------|-------------|
+| Narrator (per beat) | 2–3 min (scales with output length) |
+| Evaluator (per beat) | 20–35s |
+| Summariser (per beat) | 15–25s |
+| **Total per beat** | **~3 min** |
+
+If evaluator is taking 3+ minutes, it has regressed to the broken state — check for `EVALUATOR FALLBACK` warnings and verify the eval tool signatures haven't grown large parameters.
+
+Tips for faster runs:
 - Use `autonomous` mode to avoid pause overhead
-- Reduce number of beats for testing
-- Use a faster model for evaluator/orchestrator/lore roles
+- Use the MoE narrator variant (26B-A4B) for same memory at higher token/s
+- Run the 9B evaluator/summariser server with `--n-gpu-layers 99` to keep it fully on Metal
