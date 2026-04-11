@@ -58,9 +58,11 @@ STORY_ENGINE_PROVIDER=local
 STORY_ENGINE_LOCAL_BASE_URL=http://192.168.1.5:7890/v1
 STORY_ENGINE_NARRATOR_MODEL=your-model-name
 STORY_ENGINE_EVALUATOR_MODEL=your-model-name
+STORY_ENGINE_SUMMARISER_MODEL=your-model-name
 STORY_ENGINE_ORCHESTRATOR_MODEL=your-model-name
-STORY_ENGINE_LORE_INJECTOR_MODEL=your-model-name
 ```
+
+Lore injection is pure Python and does not require a model setting.
 
 Supported providers: **LM Studio**, **llama.cpp**, **Ollama**, **OpenRouter**, **Anthropic**, **AWS Bedrock**.
 
@@ -144,6 +146,8 @@ story-engine/
 ## Documentation
 
 Full user guide: **[docs/USER_GUIDE.md](docs/USER_GUIDE.md)**
+
+Agent architecture and workflow: **[docs/AGENT_WORKFLOW.md](docs/AGENT_WORKFLOW.md)**
 
 Covers: scene file reference, all section options, execution modes, interactive commands, output formats, stitching multi-scene stories, resume/checkpoints, and troubleshooting.
 
