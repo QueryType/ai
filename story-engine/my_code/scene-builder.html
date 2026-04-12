@@ -395,6 +395,71 @@ textarea[rows="2"] { min-height: 58px; }
   margin-right: 4px;
 }
 
+/* ── Character editor cards ── */
+.char-editor-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  margin-bottom: 10px;
+}
+.char-editor-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.char-editor-name {
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--accent2);
+  flex: 1;
+}
+.char-editor-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.char-editor-grid .field-group { margin-bottom: 0; }
+.char-editor-full { margin-top: 10px; }
+.char-editor-full .field-group { margin-bottom: 8px; }
+
+/* ── Inline regen areas ── */
+.regen-inline {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  margin-top: 8px;
+  display: none;
+}
+.regen-inline.open { display: block; }
+.regen-inline textarea { margin-top: 6px; }
+.regen-inline-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.regen-result-box {
+  background: rgba(91,124,246,0.07);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  margin-top: 8px;
+  display: none;
+  font-size: 13px;
+  white-space: pre-wrap;
+}
+.regen-result-box.open { display: block; }
+.regen-label {
+  font-size: 11px;
+  color: var(--yellow);
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+
 /* ── Phase visibility ── */
 .phase { display: none; }
 .phase.active { display: block; }
@@ -625,6 +690,25 @@ hr.divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; 
       <div class="field-group">
         <div class="hint">Lore injected every beat. Keep under 300 words.</div>
         <textarea id="d-world-info" rows="5" class="mono" oninput="onDetailsChange()"></textarea>
+        <button class="btn btn-secondary btn-sm mt-8" onclick="toggleSectionRegen('world')">Regenerate with AI…</button>
+        <div class="regen-inline" id="world-regen-area">
+          <div style="font-size:12px; color:var(--muted);">Optional nudge (leave blank for clean regen):</div>
+          <textarea id="world-regen-nudge" rows="2" placeholder="e.g. Add more detail about the river and the pre-dawn stillness"></textarea>
+          <div class="regen-inline-row">
+            <button class="btn btn-primary btn-sm" onclick="regenSection('world')">Generate</button>
+            <span id="world-regen-spinner" style="display:none"><span class="inline-spinner"></span></span>
+            <button class="btn btn-secondary btn-sm" onclick="toggleSectionRegen('world')">Cancel</button>
+            <span id="world-regen-error" style="color:var(--red); font-size:12px; display:none;"></span>
+          </div>
+          <div class="regen-result-box" id="world-regen-result">
+            <div class="regen-label">New world-info — confirm to replace:</div>
+            <div id="world-regen-preview" style="font-size:12px; color:var(--muted); white-space:pre-wrap;"></div>
+            <div style="display:flex; gap:8px; margin-top:8px;">
+              <button class="btn btn-primary btn-sm" onclick="confirmSectionRegen('world')">Accept</button>
+              <button class="btn btn-secondary btn-sm" onclick="discardSectionRegen('world')">Discard</button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <hr class="divider">
@@ -662,6 +746,24 @@ hr.divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; 
       <div class="field-group">
         <div class="hint">Persistent thematic reminder injected every N beats. One bullet per line.</div>
         <textarea id="d-author-note" rows="4" oninput="onDetailsChange()"></textarea>
+        <button class="btn btn-secondary btn-sm mt-8" onclick="toggleSectionRegen('note')">Regenerate with AI…</button>
+        <div class="regen-inline" id="note-regen-area">
+          <textarea id="note-regen-nudge" rows="2" placeholder="e.g. Focus on the cost of loyalty, not just duty"></textarea>
+          <div class="regen-inline-row">
+            <button class="btn btn-primary btn-sm" onclick="regenSection('note')">Generate</button>
+            <span id="note-regen-spinner" style="display:none"><span class="inline-spinner"></span></span>
+            <button class="btn btn-secondary btn-sm" onclick="toggleSectionRegen('note')">Cancel</button>
+            <span id="note-regen-error" style="color:var(--red); font-size:12px; display:none;"></span>
+          </div>
+          <div class="regen-result-box" id="note-regen-result">
+            <div class="regen-label">New author note — confirm to replace:</div>
+            <div id="note-regen-preview" style="font-size:12px; color:var(--muted); white-space:pre-wrap;"></div>
+            <div style="display:flex; gap:8px; margin-top:8px;">
+              <button class="btn btn-primary btn-sm" onclick="confirmSectionRegen('note')">Accept</button>
+              <button class="btn btn-secondary btn-sm" onclick="discardSectionRegen('note')">Discard</button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <hr class="divider">
@@ -671,8 +773,62 @@ hr.divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; 
       <div class="field-group">
         <div class="hint">Scene-specific creative direction — where to open, what to emphasise, what to avoid.</div>
         <textarea id="d-writing-instructions" rows="4" oninput="onDetailsChange()"></textarea>
+        <button class="btn btn-secondary btn-sm mt-8" onclick="toggleSectionRegen('wi')">Regenerate with AI…</button>
+        <div class="regen-inline" id="wi-regen-area">
+          <textarea id="wi-regen-nudge" rows="2" placeholder="e.g. Open on the sound of the river, not on action — establish stillness first"></textarea>
+          <div class="regen-inline-row">
+            <button class="btn btn-primary btn-sm" onclick="regenSection('wi')">Generate</button>
+            <span id="wi-regen-spinner" style="display:none"><span class="inline-spinner"></span></span>
+            <button class="btn btn-secondary btn-sm" onclick="toggleSectionRegen('wi')">Cancel</button>
+            <span id="wi-regen-error" style="color:var(--red); font-size:12px; display:none;"></span>
+          </div>
+          <div class="regen-result-box" id="wi-regen-result">
+            <div class="regen-label">New writing instructions — confirm to replace:</div>
+            <div id="wi-regen-preview" style="font-size:12px; color:var(--muted); white-space:pre-wrap;"></div>
+            <div style="display:flex; gap:8px; margin-top:8px;">
+              <button class="btn btn-primary btn-sm" onclick="confirmSectionRegen('wi')">Accept</button>
+              <button class="btn btn-secondary btn-sm" onclick="discardSectionRegen('wi')">Discard</button>
+            </div>
+          </div>
+        </div>
       </div>
 
+    </div>
+  </details>
+
+  <!-- ── Characters accordion ── -->
+  <details id="char-details" style="margin-bottom:20px;">
+    <summary style="cursor:pointer; padding:8px 12px; background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius); font-size:13px; font-weight:600; color:var(--muted); user-select:none; list-style:none; display:flex; align-items:center; justify-content:space-between;">
+      <span id="char-details-label">▸ Characters — edit cards, triggers, add or remove</span>
+      <span style="font-size:11px; font-weight:400;">click to expand &amp; edit</span>
+    </summary>
+    <div style="border:1px solid var(--border); border-top:none; border-radius:0 0 var(--radius) var(--radius); padding:16px; background:var(--bg2);">
+      <div id="char-editor-list"></div>
+
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:4px;">
+        <button class="btn btn-secondary btn-sm" onclick="addCharacterCard()">+ Add character</button>
+        <button class="btn btn-secondary btn-sm" onclick="toggleCharRegen()">Regenerate characters with AI…</button>
+      </div>
+
+      <!-- Character regen area -->
+      <div class="regen-inline" id="char-regen-area">
+        <div style="font-size:12px; color:var(--muted);">Optional: describe what to change or add (leave blank to regenerate from current brief)</div>
+        <textarea id="char-regen-nudge" rows="2" placeholder="e.g. Make Krishna more detached and philosophical, add a third character — Kunti observing from a distance"></textarea>
+        <div class="regen-inline-row">
+          <button class="btn btn-primary btn-sm" id="char-regen-go" onclick="regenCharacters()">Generate</button>
+          <span id="char-regen-spinner" style="display:none"><span class="inline-spinner"></span> Generating…</span>
+          <button class="btn btn-secondary btn-sm" onclick="toggleCharRegen()">Cancel</button>
+          <span id="char-regen-error" style="color:var(--red); font-size:12px; display:none;"></span>
+        </div>
+        <div class="regen-result-box" id="char-regen-result">
+          <div class="regen-label">New character cards — confirm to replace:</div>
+          <div id="char-regen-preview" style="font-size:12px; color:var(--muted); max-height:200px; overflow:auto;"></div>
+          <div style="display:flex; gap:8px; margin-top:8px;">
+            <button class="btn btn-primary btn-sm" onclick="confirmCharRegen()">Accept</button>
+            <button class="btn btn-secondary btn-sm" onclick="discardCharRegen()">Discard</button>
+          </div>
+        </div>
+      </div>
     </div>
   </details>
 
@@ -726,6 +882,29 @@ hr.divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; 
       <label>Writing style</label>
       <div class="hint">Sentence rhythm, dialogue format, sensory emphasis — the HOW of the prose.</div>
       <textarea id="f-writing-style" rows="7" oninput="onVoiceChange()"></textarea>
+    </div>
+  </div>
+
+  <button class="btn btn-secondary btn-sm mt-8" onclick="toggleVoiceRegen()">Regenerate with AI…</button>
+  <div class="regen-inline" id="voice-regen-area">
+    <div style="font-size:12px; color:var(--muted);">Optional nudge (leave blank for clean regen):</div>
+    <textarea id="voice-regen-nudge" rows="2" placeholder="e.g. Make the narrator more philosophical, let the prose breathe more between sentences"></textarea>
+    <div class="regen-inline-row">
+      <button class="btn btn-primary btn-sm" onclick="regenVoice()">Generate</button>
+      <span id="voice-regen-spinner" style="display:none"><span class="inline-spinner"></span></span>
+      <button class="btn btn-secondary btn-sm" onclick="toggleVoiceRegen()">Cancel</button>
+      <span id="voice-regen-error" style="color:var(--red); font-size:12px; display:none;"></span>
+    </div>
+    <div class="regen-result-box" id="voice-regen-result">
+      <div class="regen-label">New narrator voice — confirm to replace:</div>
+      <div style="font-size:11px; color:var(--muted); margin-bottom:4px; font-weight:600; text-transform:uppercase; letter-spacing:.04em;">Narrator Prompt</div>
+      <div id="voice-regen-preview-np" style="font-size:12px; color:var(--muted); white-space:pre-wrap; margin-bottom:10px;"></div>
+      <div style="font-size:11px; color:var(--muted); margin-bottom:4px; font-weight:600; text-transform:uppercase; letter-spacing:.04em;">Writing Style</div>
+      <div id="voice-regen-preview-ws" style="font-size:12px; color:var(--muted); white-space:pre-wrap;"></div>
+      <div style="display:flex; gap:8px; margin-top:10px;">
+        <button class="btn btn-primary btn-sm" onclick="confirmVoiceRegen()">Accept</button>
+        <button class="btn btn-secondary btn-sm" onclick="discardVoiceRegen()">Discard</button>
+      </div>
     </div>
   </div>
 
@@ -873,7 +1052,7 @@ function renderPhase() {
   });
   // Render phase content
   if (S.phase === 'interview')        renderInterview();
-  if (S.phase === 'review_beats')     { renderBeats(); renderDetails(); }
+  if (S.phase === 'review_beats')     { renderBeats(); renderDetails(); renderCharEditors(); }
   if (S.phase === 'review_voice')     renderVoice();
   if (S.phase === 'review_triggers')  renderTriggers();
   if (S.phase === 'preview')          renderPreview();
@@ -1246,6 +1425,14 @@ document.addEventListener('toggle', e => {
     if (summary) summary.textContent = e.target.open
       ? '▾ Scene Details — meta, world, setup, author note'
       : '▸ Scene Details — meta, world, setup, author note';
+  }
+  if (e.target.id === 'char-details') {
+    const label = document.getElementById('char-details-label');
+    if (label) {
+      const n = S.generated?.characters?.length || 0;
+      const base = `Characters — ${n} character${n !== 1 ? 's' : ''} — edit cards, triggers, add or remove`;
+      label.textContent = (e.target.open ? '▾ ' : '▸ ') + base;
+    }
   }
 }, true);
 
@@ -1915,6 +2102,388 @@ function clearStorage() {
   const ind = document.getElementById('save-indicator');
   if (ind) { ind.textContent = 'Cleared'; ind.style.color = 'var(--yellow)'; }
   setTimeout(() => { if (ind) { ind.textContent = '—'; ind.style.color = ''; } }, 2000);
+}
+
+
+// ── Character editors ─────────────────────────────────────────────────────────
+
+const CHAR_ROLES = ['player-character', 'npc', 'antagonist', 'neutral'];
+
+function renderCharEditors() {
+  const list = document.getElementById('char-editor-list');
+  if (!list) return;
+  if (!S.generated) S.generated = {};
+  const chars = S.generated.characters || [];
+  list.innerHTML = '';
+  chars.forEach((char, i) => {
+    const card = document.createElement('div');
+    card.className = 'char-editor-card';
+    card.innerHTML = `
+      <div class="char-editor-header">
+        <span class="char-editor-name">${escHtml(char.name || `Character ${i+1}`)}</span>
+        <button class="btn btn-danger btn-sm" onclick="removeCharacterCard(${i})" title="Remove character">✕ Remove</button>
+      </div>
+      <div class="char-editor-grid">
+        <div class="field-group">
+          <label>Name</label>
+          <input type="text" value="${escHtml(char.name||'')}" oninput="updateCharField(${i},'name',this.value)">
+        </div>
+        <div class="field-group">
+          <label>Role</label>
+          <select onchange="updateCharField(${i},'role',this.value)">
+            ${CHAR_ROLES.map(r => `<option value="${r}"${r===char.role?' selected':''}>${r}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div class="char-editor-full">
+        <div class="field-group">
+          <label>Triggers</label>
+          <textarea rows="2" oninput="updateCharField(${i},'triggers',this.value)">${escHtml(char.triggers||'')}</textarea>
+        </div>
+        <div class="field-group">
+          <label>Description</label>
+          <textarea rows="3" oninput="updateCharField(${i},'description',this.value)">${escHtml(char.description||'')}</textarea>
+        </div>
+        <div class="field-group">
+          <label>Personality</label>
+          <textarea rows="2" oninput="updateCharField(${i},'personality',this.value)">${escHtml(char.personality||'')}</textarea>
+        </div>
+        <div class="field-group">
+          <label>Backstory</label>
+          <textarea rows="2" oninput="updateCharField(${i},'backstory',this.value)">${escHtml(char.backstory||'')}</textarea>
+        </div>
+        <div class="field-group">
+          <label>Speech style</label>
+          <textarea rows="2" oninput="updateCharField(${i},'speech_style',this.value)">${escHtml(char.speech_style||'')}</textarea>
+        </div>
+      </div>`;
+    list.appendChild(card);
+  });
+  // Update accordion label
+  const label = document.getElementById('char-details-label');
+  if (label) {
+    const det = document.getElementById('char-details');
+    const arrow = det?.open ? '▾' : '▸';
+    label.textContent = `${arrow} Characters — ${chars.length} character${chars.length !== 1 ? 's' : ''} — edit cards, triggers, add or remove`;
+  }
+}
+
+function addCharacterCard() {
+  if (!S.generated) S.generated = {};
+  if (!S.generated.characters) S.generated.characters = [];
+  S.generated.characters.push({ name: '', role: 'npc', triggers: '', description: '', personality: '', backstory: '', speech_style: '' });
+  S.triggers.push({ name: '', triggers: '' });
+  scheduleSave();
+  renderCharEditors();
+  const det = document.getElementById('char-details');
+  if (det && !det.open) det.open = true;
+  setTimeout(() => {
+    const cards = document.querySelectorAll('.char-editor-card');
+    if (cards.length) cards[cards.length-1].scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, 50);
+}
+
+function removeCharacterCard(i) {
+  const chars = S.generated?.characters;
+  if (!chars) return;
+  if (chars.length <= 1) { alert('At least one character is required.'); return; }
+  if (!confirm(`Remove character "${chars[i].name || `Character ${i+1}`}"?`)) return;
+  chars.splice(i, 1);
+  if (S.triggers.length > i) S.triggers.splice(i, 1);
+  scheduleSave();
+  renderCharEditors();
+}
+
+function updateCharField(i, field, val) {
+  if (!S.generated?.characters?.[i]) return;
+  S.generated.characters[i][field] = val;
+  if (field === 'triggers') {
+    if (!S.triggers[i]) S.triggers[i] = { name: S.generated.characters[i].name || '', triggers: '' };
+    S.triggers[i].triggers = val;
+  }
+  if (field === 'name') {
+    // Update visible name label in card header without re-rendering (avoids focus loss)
+    const cards = document.querySelectorAll('#char-editor-list .char-editor-card');
+    if (cards[i]) {
+      const nameEl = cards[i].querySelector('.char-editor-name');
+      if (nameEl) nameEl.textContent = val || `Character ${i+1}`;
+    }
+    if (!S.triggers[i]) S.triggers[i] = { name: '', triggers: '' };
+    S.triggers[i].name = val;
+    // Update accordion label character count (not a full re-render)
+    const label = document.getElementById('char-details-label');
+    if (label) {
+      const det = document.getElementById('char-details');
+      const arrow = det?.open ? '▾' : '▸';
+      const n = S.generated?.characters?.length || 0;
+      label.textContent = `${arrow} Characters — ${n} character${n !== 1 ? 's' : ''} — edit cards, triggers, add or remove`;
+    }
+  }
+  scheduleSave();
+}
+
+function toggleCharRegen() {
+  const area = document.getElementById('char-regen-area');
+  if (!area) return;
+  area.classList.toggle('open');
+  if (area.classList.contains('open')) {
+    document.getElementById('char-regen-nudge')?.focus();
+    document.getElementById('char-regen-result')?.classList.remove('open');
+  }
+}
+
+const SYSTEM_CHAR_REGEN = `You are a story character designer. Given a scene context, generate complete character cards.
+Return ONLY valid JSON — an array of character objects. No markdown fences. No explanation outside the JSON.`;
+
+async function regenCharacters() {
+  const nudge  = document.getElementById('char-regen-nudge').value.trim();
+  const spinner = document.getElementById('char-regen-spinner');
+  const errEl   = document.getElementById('char-regen-error');
+  const resEl   = document.getElementById('char-regen-result');
+  const goBtn   = document.getElementById('char-regen-go');
+
+  spinner.style.display = 'inline-block';
+  errEl.style.display   = 'none';
+  resEl.classList.remove('open');
+  if (goBtn) goBtn.disabled = true;
+
+  const existing = (S.generated?.characters || []).map((c, i) =>
+    `${i+1}. ${c.name || '?'} (${c.role || 'npc'}): ${c.description || c.personality || ''}`
+  ).join('\n');
+
+  const prompt = `Generate complete character cards for this scene.
+
+TITLE: ${S.interview.title || S.context?.title || ''}
+GENRE/TONE: ${S.interview.genreTone || ''}
+SCENARIO: ${S.interview.scenario || S.context?.scenario || ''}
+WORLD: ${S.context?.world_info || S.generated?.world_info || ''}
+
+CURRENT CHARACTERS:
+${existing || 'None defined yet.'}
+
+${nudge ? `REQUESTED CHANGES:\n${nudge}` : 'Regenerate based on the current scene brief.'}
+
+Return ONLY a JSON array:
+[
+  {
+    "name": "...",
+    "role": "player-character|npc|antagonist|neutral",
+    "triggers": "comma, separated, keywords, pronouns, role titles",
+    "description": "...",
+    "personality": "...",
+    "backstory": "...",
+    "speech_style": "..."
+  }
+]`;
+
+  try {
+    const raw = await callLLM(SYSTEM_CHAR_REGEN, prompt, 2048);
+    const result = parseJSON(raw);
+    const chars = Array.isArray(result) ? result : [result];
+    spinner.style.display = 'none';
+    if (goBtn) goBtn.disabled = false;
+    resEl._pending = chars;
+    const preview = document.getElementById('char-regen-preview');
+    if (preview) {
+      preview.innerHTML = chars.map(c =>
+        `<div style="border-bottom:1px solid var(--border); padding-bottom:6px; margin-bottom:6px;">
+          <strong style="color:var(--accent2);">${escHtml(c.name||'?')}</strong>
+          <span style="color:var(--muted); font-size:11px; margin-left:6px;">${escHtml(c.role||'')}</span>
+          <div style="margin-top:3px; font-size:12px;">${escHtml((c.description||'').slice(0,140))}${(c.description||'').length > 140 ? '…' : ''}</div>
+        </div>`
+      ).join('');
+    }
+    resEl.classList.add('open');
+  } catch(e) {
+    spinner.style.display = 'none';
+    if (goBtn) goBtn.disabled = false;
+    errEl.textContent = 'Failed: ' + (e.message || String(e));
+    errEl.style.display = 'block';
+  }
+}
+
+function confirmCharRegen() {
+  const resEl = document.getElementById('char-regen-result');
+  if (!resEl?._pending) return;
+  S.generated.characters = resEl._pending;
+  S.triggers = resEl._pending.map(c => ({ name: c.name || '', triggers: c.triggers || '' }));
+  resEl._pending = null;
+  scheduleSave();
+  toggleCharRegen();
+  renderCharEditors();
+}
+
+function discardCharRegen() {
+  const resEl = document.getElementById('char-regen-result');
+  if (resEl) { resEl.classList.remove('open'); resEl._pending = null; }
+}
+
+
+// ── Voice regen ───────────────────────────────────────────────────────────────
+
+function toggleVoiceRegen() {
+  const area = document.getElementById('voice-regen-area');
+  if (!area) return;
+  area.classList.toggle('open');
+  if (area.classList.contains('open')) {
+    document.getElementById('voice-regen-nudge')?.focus();
+    document.getElementById('voice-regen-result')?.classList.remove('open');
+  }
+}
+
+const SYSTEM_VOICE_REGEN = `You are a story structure assistant. Given a scene brief, write a narrator prompt and a writing style.
+Return ONLY valid JSON. No markdown fences. No explanation outside the JSON.`;
+
+async function regenVoice() {
+  const nudge   = document.getElementById('voice-regen-nudge').value.trim();
+  const spinner = document.getElementById('voice-regen-spinner');
+  const errEl   = document.getElementById('voice-regen-error');
+  const resEl   = document.getElementById('voice-regen-result');
+
+  spinner.style.display = 'inline-block';
+  errEl.style.display   = 'none';
+  resEl.classList.remove('open');
+
+  const prompt = `Write a narrator prompt and writing style for this scene.
+
+TITLE: ${S.interview.title || ''}
+GENRE/TONE: ${S.interview.genreTone || ''}
+SCENARIO: ${S.interview.scenario || ''}
+POV: ${S.interview.pov || 'third-person'}
+
+CURRENT NARRATOR PROMPT:
+${S.voice.narratorPrompt || '(none)'}
+
+CURRENT WRITING STYLE:
+${S.voice.writingStyle || '(none)'}
+
+${nudge ? `REQUESTED CHANGES:\n${nudge}` : 'Regenerate based on the current scene brief.'}
+
+Return ONLY this JSON:
+{
+  "narrator_prompt": "...",
+  "writing_style": "..."
+}`;
+
+  try {
+    const raw = await callLLM(SYSTEM_VOICE_REGEN, prompt, 1024);
+    const result = parseJSON(raw);
+    spinner.style.display = 'none';
+    resEl._pending = result;
+    const npEl = document.getElementById('voice-regen-preview-np');
+    const wsEl = document.getElementById('voice-regen-preview-ws');
+    if (npEl) npEl.textContent = result.narrator_prompt || '';
+    if (wsEl) wsEl.textContent = result.writing_style   || '';
+    resEl.classList.add('open');
+  } catch(e) {
+    spinner.style.display = 'none';
+    errEl.textContent = 'Failed: ' + (e.message || String(e));
+    errEl.style.display = 'block';
+  }
+}
+
+function confirmVoiceRegen() {
+  const resEl = document.getElementById('voice-regen-result');
+  if (!resEl?._pending) return;
+  const r = resEl._pending;
+  if (r.narrator_prompt) S.voice.narratorPrompt = r.narrator_prompt;
+  if (r.writing_style)   S.voice.writingStyle   = r.writing_style;
+  resEl._pending = null;
+  scheduleSave();
+  toggleVoiceRegen();
+  renderVoice();
+}
+
+function discardVoiceRegen() {
+  const resEl = document.getElementById('voice-regen-result');
+  if (resEl) { resEl.classList.remove('open'); resEl._pending = null; }
+}
+
+
+// ── Section regen (world, note, wi) ──────────────────────────────────────────
+
+const SECTION_CFG = {
+  world: {
+    label: 'world info',
+    system: 'You are a story world-builder. Write a concise world-info block (strictly under 300 words) to be injected into every beat as background lore. Return ONLY plain text, no labels, no JSON.',
+    currentFn: () => S.generated?.world_info || '',
+    applyFn:   v  => { if (!S.generated) S.generated = {}; S.generated.world_info = v; const el = document.getElementById('d-world-info'); if (el) el.value = v; }
+  },
+  note: {
+    label: 'author note',
+    system: 'You are a story structure assistant. Write a concise author note (1-3 thematic bullet points, one per line) to be injected periodically as a narrator reminder. Return ONLY plain text, one bullet per line, no JSON.',
+    currentFn: () => S.generated?.author_note_content || '',
+    applyFn:   v  => { if (!S.generated) S.generated = {}; S.generated.author_note_content = v; const el = document.getElementById('d-author-note'); if (el) el.value = v; }
+  },
+  wi: {
+    label: 'writing instructions',
+    system: 'You are a story structure assistant. Write scene-specific creative direction for the narrator: where to open, what sensory details to emphasise, how to close. Return ONLY plain text, no JSON.',
+    currentFn: () => S.generated?.writing_instructions || '',
+    applyFn:   v  => { if (!S.generated) S.generated = {}; S.generated.writing_instructions = v; const el = document.getElementById('d-writing-instructions'); if (el) el.value = v; }
+  }
+};
+
+function toggleSectionRegen(section) {
+  const area = document.getElementById(`${section}-regen-area`);
+  if (!area) return;
+  area.classList.toggle('open');
+  if (area.classList.contains('open')) {
+    document.getElementById(`${section}-regen-nudge`)?.focus();
+    document.getElementById(`${section}-regen-result`)?.classList.remove('open');
+  }
+}
+
+async function regenSection(section) {
+  const cfg     = SECTION_CFG[section];
+  if (!cfg) return;
+  const nudge   = document.getElementById(`${section}-regen-nudge`).value.trim();
+  const spinner = document.getElementById(`${section}-regen-spinner`);
+  const errEl   = document.getElementById(`${section}-regen-error`);
+  const resEl   = document.getElementById(`${section}-regen-result`);
+
+  spinner.style.display = 'inline-block';
+  errEl.style.display   = 'none';
+  resEl.classList.remove('open');
+
+  const prompt = `Write the ${cfg.label} for this scene.
+
+TITLE: ${S.interview.title || ''}
+GENRE/TONE: ${S.interview.genreTone || ''}
+SCENARIO: ${S.interview.scenario || ''}
+
+CURRENT ${cfg.label.toUpperCase()}:
+${cfg.currentFn() || '(none)'}
+
+${nudge ? `REQUESTED CHANGES:\n${nudge}` : 'Regenerate from the current scene brief. Match the existing tone and scope.'}
+
+Return ONLY the ${cfg.label} text. No labels. No JSON wrapper. No explanation.`;
+
+  try {
+    const result = await callLLM(cfg.system, prompt, 512);
+    spinner.style.display = 'none';
+    resEl._pending = result.trim();
+    const prev = document.getElementById(`${section}-regen-preview`);
+    if (prev) prev.textContent = resEl._pending;
+    resEl.classList.add('open');
+  } catch(e) {
+    spinner.style.display = 'none';
+    errEl.textContent = 'Failed: ' + (e.message || String(e));
+    errEl.style.display = 'block';
+  }
+}
+
+function confirmSectionRegen(section) {
+  const resEl = document.getElementById(`${section}-regen-result`);
+  if (!resEl?._pending) return;
+  SECTION_CFG[section]?.applyFn(resEl._pending);
+  resEl._pending = null;
+  scheduleSave();
+  toggleSectionRegen(section);
+}
+
+function discardSectionRegen(section) {
+  const resEl = document.getElementById(`${section}-regen-result`);
+  if (resEl) { resEl.classList.remove('open'); resEl._pending = null; }
 }
 
 
