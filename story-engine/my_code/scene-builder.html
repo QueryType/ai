@@ -1,0 +1,1947 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Story Engine — Scene Builder</title>
+<style>
+:root {
+  --bg:       #0f1117;
+  --bg2:      #1a1d27;
+  --bg3:      #22263a;
+  --border:   #2e3347;
+  --accent:   #5b7cf6;
+  --accent2:  #7c9af8;
+  --green:    #4caf7d;
+  --red:      #e05a5a;
+  --yellow:   #d4a843;
+  --text:     #d6daf0;
+  --muted:    #7a7f99;
+  --radius:   6px;
+}
+
+/* ── Light theme ── */
+:root[data-theme="light"] {
+  --bg:       #f4f5f9;
+  --bg2:      #ffffff;
+  --bg3:      #eaecf4;
+  --border:   #c8cde0;
+  --accent:   #3d5cf5;
+  --accent2:  #2a47d6;
+  --green:    #2a7a52;
+  --red:      #c0392b;
+  --yellow:   #9a6f00;
+  --text:     #1a1d2e;
+  --muted:    #5c6080;
+}
+
+/* ── System theme (follows OS preference) ── */
+@media (prefers-color-scheme: light) {
+  :root[data-theme="system"] {
+    --bg:       #f4f5f9;
+    --bg2:      #ffffff;
+    --bg3:      #eaecf4;
+    --border:   #c8cde0;
+    --accent:   #3d5cf5;
+    --accent2:  #2a47d6;
+    --green:    #2a7a52;
+    --red:      #c0392b;
+    --yellow:   #9a6f00;
+    --text:     #1a1d2e;
+    --muted:    #5c6080;
+  }
+}
+
+/* ── Theme toggle ── */
+.theme-toggle {
+  display: flex;
+  gap: 2px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 2px;
+}
+.theme-btn {
+  padding: 3px 9px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  line-height: 1.4;
+}
+.theme-btn:hover { color: var(--text); }
+.theme-btn.active { background: var(--bg2); color: var(--accent2); box-shadow: 0 1px 2px rgba(0,0,0,0.15); }
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-size: 14px;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Config bar ── */
+#config-bar {
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  padding: 8px 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+}
+#config-bar .app-title {
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--accent2);
+  white-space: nowrap;
+  margin-right: 8px;
+}
+#config-bar label { color: var(--muted); font-size: 12px; white-space: nowrap; }
+#config-bar input {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  padding: 4px 8px;
+  font-size: 12px;
+  font-family: monospace;
+}
+#config-bar input:focus { outline: none; border-color: var(--accent); }
+#config-server { width: 220px; }
+#config-model  { width: 120px; }
+#config-nsfw-label { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; cursor: pointer; user-select: none; }
+#config-nsfw { cursor: pointer; }
+.save-indicator { margin-left: auto; font-size: 11px; color: var(--muted); }
+
+/* ── Phase header ── */
+#phase-header {
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.step-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--bg3);
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+.step-pill.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.step-pill.done   { background: var(--green); color: #fff; border-color: var(--green); }
+.step-sep { color: var(--border); font-size: 16px; }
+
+/* ── Main content ── */
+#main { flex: 1; padding: 24px 28px; max-width: 860px; width: 100%; }
+
+/* ── Forms ── */
+.section-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--accent2);
+  margin-bottom: 20px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.field-group { margin-bottom: 20px; }
+.field-group label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+}
+.field-group .hint {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 6px;
+  line-height: 1.5;
+}
+input[type="text"], textarea, select {
+  width: 100%;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  padding: 8px 12px;
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+  line-height: 1.5;
+}
+input[type="text"]:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+textarea.mono { font-family: monospace; font-size: 13px; }
+textarea[rows="1"] { min-height: 36px; }
+textarea[rows="2"] { min-height: 58px; }
+.row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+/* radio groups */
+.radio-group { display: flex; flex-wrap: wrap; gap: 8px; }
+.radio-group label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text);
+  user-select: none;
+  transition: border-color 0.15s, background 0.15s;
+}
+.radio-group label:has(input:checked) {
+  border-color: var(--accent);
+  background: rgba(91,124,246,0.12);
+  color: var(--accent2);
+}
+.radio-group input[type="radio"] { display: none; }
+
+/* character list */
+.char-list { display: flex; flex-direction: column; gap: 8px; }
+.char-entry { display: flex; gap: 8px; align-items: flex-start; }
+.char-entry textarea { flex: 1; min-height: 52px; }
+
+/* ── Buttons ── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s, background 0.15s;
+}
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-primary  { background: var(--accent); color: #fff; }
+.btn-primary:hover:not(:disabled) { background: var(--accent2); }
+.btn-secondary { background: var(--bg3); color: var(--text); border: 1px solid var(--border); }
+.btn-secondary:hover:not(:disabled) { border-color: var(--accent); color: var(--accent2); }
+.btn-danger    { background: transparent; color: var(--red); border: 1px solid var(--red); padding: 4px 10px; font-size: 12px; }
+.btn-danger:hover:not(:disabled) { background: rgba(224,90,90,0.1); }
+.btn-sm { padding: 4px 10px; font-size: 12px; font-weight: 500; }
+.btn-icon { padding: 4px 7px; background: var(--bg3); border: 1px solid var(--border); color: var(--muted); font-size: 13px; }
+.btn-icon:hover:not(:disabled) { color: var(--text); border-color: var(--accent); }
+
+/* ── Beat cards ── */
+.beat-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+.beat-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.beat-card.rewriting { border-color: var(--yellow); }
+.beat-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--bg3);
+  border-bottom: 1px solid var(--border);
+}
+.beat-num {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 6px;
+  min-width: 28px;
+  text-align: center;
+}
+.beat-title-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid transparent;
+  border-radius: 0;
+  padding: 2px 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent2);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.beat-title-input:focus { border-bottom-color: var(--accent); outline: none; }
+.beat-controls { display: flex; gap: 4px; margin-left: auto; align-items: center; }
+.pause-badge {
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 3px;
+  cursor: pointer;
+  user-select: none;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  transition: all 0.15s;
+}
+.pause-badge.on { background: rgba(212,168,67,0.15); border-color: var(--yellow); color: var(--yellow); }
+.beat-card-body { padding: 10px 12px; }
+.beat-instruction { min-height: 70px; font-size: 13px; }
+.beat-rewrite-area {
+  padding: 10px 12px;
+  border-top: 1px solid var(--border);
+  background: rgba(212,168,67,0.04);
+  display: none;
+}
+.beat-rewrite-area.open { display: block; }
+.beat-rewrite-row { display: flex; gap: 8px; margin-top: 8px; }
+
+/* ── Generating screen ── */
+#phase-generating {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 320px;
+  gap: 20px;
+  text-align: center;
+}
+.spinner {
+  width: 40px; height: 40px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.gen-status { font-size: 15px; color: var(--text); }
+.gen-elapsed { font-size: 13px; color: var(--muted); }
+.error-box {
+  background: rgba(224,90,90,0.08);
+  border: 1px solid var(--red);
+  border-radius: var(--radius);
+  padding: 16px;
+  max-width: 600px;
+  text-align: left;
+}
+.error-box h3 { color: var(--red); margin-bottom: 8px; }
+.error-raw { font-family: monospace; font-size: 12px; color: var(--muted); max-height: 200px; overflow: auto; margin-top: 8px; white-space: pre-wrap; }
+
+/* ── Preview ── */
+#preview-output {
+  width: 100%;
+  min-height: 480px;
+  font-family: monospace;
+  font-size: 12px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  padding: 14px;
+  resize: vertical;
+}
+
+/* ── Extend area ── */
+.extend-area {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  margin-top: 8px;
+  display: none;
+}
+.extend-area.open { display: block; }
+.extend-row { display: flex; gap: 8px; margin-top: 8px; align-items: flex-end; }
+
+/* ── Trigger cards ── */
+.trigger-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  margin-bottom: 10px;
+}
+.trigger-card .char-name { font-weight: 700; color: var(--accent2); margin-bottom: 8px; font-size: 13px; }
+
+/* ── Voice section ── */
+.voice-block { margin-bottom: 20px; }
+
+/* ── Inline spinner ── */
+.inline-spinner {
+  display: inline-block;
+  width: 14px; height: 14px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  vertical-align: middle;
+  margin-right: 4px;
+}
+
+/* ── Phase visibility ── */
+.phase { display: none; }
+.phase.active { display: block; }
+#phase-generating.active { display: flex; }
+
+/* ── Utilities ── */
+.btn-row { display: flex; gap: 10px; align-items: center; margin-top: 24px; flex-wrap: wrap; }
+.text-muted { color: var(--muted); }
+.mt-8 { margin-top: 8px; }
+.mt-16 { margin-top: 16px; }
+hr.divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+
+/* file drop zone */
+.drop-zone {
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+  margin-top: 20px;
+}
+.drop-zone:hover, .drop-zone.dragover { border-color: var(--accent); color: var(--accent2); }
+</style>
+</head>
+<body>
+
+<!-- ── Config bar ── -->
+<div id="config-bar">
+  <span class="app-title">Story Engine</span>
+  <label for="config-server">Server URL</label>
+  <input type="text" id="config-server" value="http://192.168.1.5:8081/v1" spellcheck="false">
+  <label for="config-model">Model</label>
+  <input type="text" id="config-model" value="default" spellcheck="false">
+  <label id="config-nsfw-label">
+    <input type="checkbox" id="config-nsfw"> NSFW
+  </label>
+  <span class="save-indicator" id="save-indicator">—</span>
+  <div class="theme-toggle" style="margin-left:auto;" id="theme-toggle">
+    <button class="theme-btn" data-theme="dark"   onclick="setTheme('dark')"  title="Dark theme">🌙 Dark</button>
+    <button class="theme-btn" data-theme="light"  onclick="setTheme('light')" title="Light theme">☀️ Light</button>
+    <button class="theme-btn" data-theme="system" onclick="setTheme('system')" title="Follow OS preference">💻 System</button>
+  </div>
+  <div style="display:flex; gap:6px;">
+    <button class="btn btn-secondary btn-sm" onclick="clearStorage()" title="Clear saved state from localStorage">Clear Storage</button>
+    <button class="btn btn-secondary btn-sm" id="btn-new" onclick="confirmNew()">New Scene</button>
+  </div>
+</div>
+
+<!-- ── Phase header ── -->
+<div id="phase-header">
+  <span class="step-pill" data-phase="interview" id="pill-interview">1 Interview</span>
+  <span class="step-sep">›</span>
+  <span class="step-pill" data-phase="generating" id="pill-generating">2 Generate</span>
+  <span class="step-sep">›</span>
+  <span class="step-pill" data-phase="review_beats" id="pill-review_beats">3 Beats</span>
+  <span class="step-sep">›</span>
+  <span class="step-pill" data-phase="review_voice" id="pill-review_voice">4 Voice</span>
+  <span class="step-sep">›</span>
+  <span class="step-pill" data-phase="review_triggers" id="pill-review_triggers">5 Triggers</span>
+  <span class="step-sep">›</span>
+  <span class="step-pill" data-phase="preview" id="pill-preview">6 Preview</span>
+</div>
+
+<div id="main">
+
+<!-- ── Phase: Interview ── -->
+<div class="phase" id="phase-interview">
+  <div class="section-title">Scene Brief</div>
+
+  <div class="row-2">
+    <div class="field-group">
+      <label>Title</label>
+      <input type="text" id="f-title" placeholder="The Weight of What Is Left Unsaid" oninput="onInterviewChange()">
+    </div>
+    <div class="field-group">
+      <label>Output file path</label>
+      <input type="text" id="f-output" placeholder="output/scene.md" oninput="onInterviewChange()">
+    </div>
+  </div>
+
+  <div class="field-group">
+    <label>Genre, tone &amp; themes</label>
+    <div class="hint">What kind of story is this? Genre, emotional register, core themes. e.g. "Literary mythological fiction — philosophical weight, modern interiority, the collision of loyalty and truth."</div>
+    <textarea id="f-genre" rows="3" oninput="onInterviewChange()"></textarea>
+  </div>
+
+  <div class="field-group">
+    <label>World &amp; setting</label>
+    <div class="hint">Where and when? Key rules or constraints. Cultural details, lore the narrator needs.</div>
+    <textarea id="f-world" rows="3" oninput="onInterviewChange()"></textarea>
+  </div>
+
+  <div class="field-group">
+    <label>Characters</label>
+    <div class="hint">One entry per character — name, role, appearance, personality under pressure, relevant backstory. The LLM will build the full cards. e.g. "Karna, warrior-king, the man who chooses honour over survival — dignified, warm, already at peace with tomorrow."</div>
+    <div class="char-list" id="char-list"></div>
+    <button class="btn btn-secondary btn-sm mt-8" onclick="addCharacter()">+ Add character</button>
+  </div>
+
+  <div class="field-group">
+    <label>Scenario</label>
+    <div class="hint">What's happening as the scene opens? What pressure is already active? What is the thing that cannot be taken back once said — and who must say it?</div>
+    <textarea id="f-scenario" rows="3" oninput="onInterviewChange()"></textarea>
+  </div>
+
+  <div class="row-2">
+    <div class="field-group">
+      <label>Target length</label>
+      <div class="radio-group" id="rg-length">
+        <label><input type="radio" name="length" value="1500"> Short (~1500 words)</label>
+        <label><input type="radio" name="length" value="3500" checked> Medium (~3500 words)</label>
+        <label><input type="radio" name="length" value="6000"> Long (~6000 words)</label>
+        <label><input type="radio" name="length" value="9000"> Epic (~9000 words)</label>
+      </div>
+    </div>
+    <div class="field-group">
+      <label>Point of view</label>
+      <div class="radio-group" id="rg-pov">
+        <label><input type="radio" name="pov" value="third-person" checked> Third-person</label>
+        <label><input type="radio" name="pov" value="third-person-limited"> Third-person limited</label>
+        <label><input type="radio" name="pov" value="first-person"> First-person</label>
+        <label><input type="radio" name="pov" value="second-person"> Second-person</label>
+      </div>
+    </div>
+  </div>
+
+  <div class="field-group">
+    <label>Execution mode</label>
+    <div class="radio-group" id="rg-mode">
+      <label><input type="radio" name="mode" value="autonomous" checked> Autonomous — runs all beats unattended</label>
+      <label><input type="radio" name="mode" value="semi-interactive"> Semi-interactive — pauses at [pause] markers</label>
+      <label><input type="radio" name="mode" value="interactive"> Interactive — pauses after every beat</label>
+    </div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-primary" id="btn-generate" onclick="startGeneration()">Generate Scene</button>
+    <span id="interview-error" style="color:var(--red); font-size:13px;"></span>
+  </div>
+
+  <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-picker').click()">
+    <input type="file" id="file-picker" accept=".md" style="display:none" onchange="loadFile(this)">
+    Drop an existing scene .md here, or click to open — skips to beat review
+  </div>
+</div>
+
+<!-- ── Phase: Generating ── -->
+<div class="phase" id="phase-generating">
+  <div id="gen-spinner-area">
+    <div class="spinner"></div>
+    <div class="gen-status" id="gen-status">Generating scene structure…</div>
+    <div class="gen-elapsed" id="gen-elapsed">0s</div>
+    <button class="btn btn-secondary btn-sm" id="btn-cancel" onclick="cancelGeneration()">Cancel</button>
+  </div>
+  <div class="error-box" id="gen-error-box" style="display:none">
+    <h3 id="gen-error-title">Generation failed</h3>
+    <p id="gen-error-msg"></p>
+    <pre class="error-raw" id="gen-error-raw"></pre>
+    <div class="btn-row mt-8">
+      <button class="btn btn-primary" onclick="retryGeneration()">Retry</button>
+      <button class="btn btn-secondary" onclick="goPhase('interview')">Back to interview</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Phase: Beat review ── -->
+<div class="phase" id="phase-review_beats">
+  <div class="section-title">Beat Arc Review</div>
+
+  <!-- Scene Details accordion -->
+  <details id="scene-details" style="margin-bottom:20px;">
+    <summary style="cursor:pointer; padding:8px 12px; background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius); font-size:13px; font-weight:600; color:var(--muted); user-select:none; list-style:none; display:flex; align-items:center; justify-content:space-between;">
+      <span>▸ Scene Details — meta, world, setup, author note</span>
+      <span style="font-size:11px; font-weight:400;">click to expand &amp; edit</span>
+    </summary>
+    <div style="border:1px solid var(--border); border-top:none; border-radius:0 0 var(--radius) var(--radius); padding:16px; background:var(--bg2);">
+
+      <!-- Meta -->
+      <div style="font-size:11px; font-weight:700; color:var(--accent); text-transform:uppercase; letter-spacing:.05em; margin-bottom:10px;">Meta</div>
+      <div class="row-2">
+        <div class="field-group">
+          <label>Title</label>
+          <input type="text" id="d-title" oninput="onDetailsChange()">
+        </div>
+        <div class="field-group">
+          <label>Output file path</label>
+          <input type="text" id="d-output" oninput="onDetailsChange()">
+        </div>
+      </div>
+      <div class="row-2">
+        <div class="field-group">
+          <label>Point of view</label>
+          <select id="d-pov" onchange="onDetailsChange()">
+            <option value="third-person">Third-person</option>
+            <option value="third-person-limited">Third-person limited</option>
+            <option value="first-person">First-person</option>
+            <option value="second-person">Second-person</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <label>Mode</label>
+          <select id="d-mode" onchange="onDetailsChange()">
+            <option value="autonomous">Autonomous</option>
+            <option value="semi-interactive">Semi-interactive</option>
+            <option value="interactive">Interactive</option>
+          </select>
+        </div>
+      </div>
+      <div class="row-2">
+        <div class="field-group">
+          <label>Target length (words)</label>
+          <input type="number" id="d-length" step="500" min="500" oninput="onDetailsChange()">
+        </div>
+        <div class="field-group" style="display:flex; align-items:flex-end; padding-bottom:4px;">
+          <label id="d-nsfw-label" style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:13px; text-transform:none; letter-spacing:0;">
+            <input type="checkbox" id="d-nsfw" onchange="onDetailsChange()"> NSFW content
+          </label>
+        </div>
+      </div>
+
+      <hr class="divider">
+
+      <!-- World info -->
+      <div style="font-size:11px; font-weight:700; color:var(--accent); text-transform:uppercase; letter-spacing:.05em; margin-bottom:10px;">World Info</div>
+      <div class="field-group">
+        <div class="hint">Lore injected every beat. Keep under 300 words.</div>
+        <textarea id="d-world-info" rows="5" class="mono" oninput="onDetailsChange()"></textarea>
+      </div>
+
+      <hr class="divider">
+
+      <!-- Scene setup -->
+      <div style="font-size:11px; font-weight:700; color:var(--accent); text-transform:uppercase; letter-spacing:.05em; margin-bottom:10px;">Scene Setup</div>
+      <div class="field-group">
+        <label>Location</label>
+        <textarea id="d-location" rows="2" oninput="onDetailsChange()"></textarea>
+      </div>
+      <div class="row-2">
+        <div class="field-group">
+          <label>Time</label>
+          <textarea id="d-time" rows="1" oninput="onDetailsChange()"></textarea>
+        </div>
+        <div class="field-group">
+          <label>Atmosphere</label>
+          <textarea id="d-atmosphere" rows="2" oninput="onDetailsChange()"></textarea>
+        </div>
+      </div>
+
+      <hr class="divider">
+
+      <!-- Scenario -->
+      <div style="font-size:11px; font-weight:700; color:var(--accent); text-transform:uppercase; letter-spacing:.05em; margin-bottom:10px;">Scenario</div>
+      <div class="field-group">
+        <div class="hint">Read once at scene start — sets the opening context.</div>
+        <textarea id="d-scenario" rows="4" oninput="onDetailsChange()"></textarea>
+      </div>
+
+      <hr class="divider">
+
+      <!-- Author note -->
+      <div style="font-size:11px; font-weight:700; color:var(--accent); text-transform:uppercase; letter-spacing:.05em; margin-bottom:10px;">Author Note</div>
+      <div class="field-group">
+        <div class="hint">Persistent thematic reminder injected every N beats. One bullet per line.</div>
+        <textarea id="d-author-note" rows="4" oninput="onDetailsChange()"></textarea>
+      </div>
+
+      <hr class="divider">
+
+      <!-- Writing instructions -->
+      <div style="font-size:11px; font-weight:700; color:var(--accent); text-transform:uppercase; letter-spacing:.05em; margin-bottom:10px;">Writing Instructions</div>
+      <div class="field-group">
+        <div class="hint">Scene-specific creative direction — where to open, what to emphasise, what to avoid.</div>
+        <textarea id="d-writing-instructions" rows="4" oninput="onDetailsChange()"></textarea>
+      </div>
+
+    </div>
+  </details>
+
+  <div class="beat-list" id="beat-list"></div>
+
+  <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px;">
+    <button class="btn btn-secondary btn-sm" onclick="addManualBeat()">+ Add beat</button>
+    <button class="btn btn-secondary btn-sm" id="btn-extend-open" onclick="toggleExtend()">Extend with AI…</button>
+  </div>
+
+  <div class="extend-area" id="extend-area">
+    <div style="font-size:13px; color:var(--muted); margin-bottom:6px;">Describe the direction for new beats:</div>
+    <textarea id="extend-direction" rows="2" placeholder="Continue to the climax, add a beat where they are interrupted…"></textarea>
+    <div class="extend-row">
+      <div class="field-group" style="margin:0; width:100px;">
+        <label style="font-size:11px;">Beats to add</label>
+        <input type="number" id="extend-count" value="2" min="1" max="7" style="width:100%;">
+      </div>
+      <button class="btn btn-primary btn-sm" id="btn-extend-go" onclick="extendBeats()">Generate</button>
+      <div id="extend-spinner" style="display:none"><span class="inline-spinner"></span> Generating…</div>
+      <button class="btn btn-secondary btn-sm" onclick="toggleExtend()">Cancel</button>
+    </div>
+    <div id="extend-preview" style="display:none; margin-top:12px;">
+      <div style="font-size:12px; color:var(--yellow); margin-bottom:6px;">New beats — confirm to append:</div>
+      <div id="extend-preview-list"></div>
+      <div style="display:flex; gap:8px; margin-top:8px;">
+        <button class="btn btn-primary btn-sm" onclick="confirmExtend()">Append</button>
+        <button class="btn btn-secondary btn-sm" onclick="discardExtend()">Discard</button>
+      </div>
+    </div>
+    <div id="extend-error" style="color:var(--red); font-size:12px; margin-top:6px; display:none;"></div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-primary" onclick="goPhase('review_voice')">Continue to Voice &amp; Style →</button>
+    <span class="text-muted" style="font-size:12px;" id="beats-count-label"></span>
+  </div>
+</div>
+
+<!-- ── Phase: Voice & Style ── -->
+<div class="phase" id="phase-review_voice">
+  <div class="section-title">Narrator Voice &amp; Style</div>
+
+  <div class="voice-block">
+    <div class="field-group">
+      <label>Narrator prompt</label>
+      <div class="hint">Who is the narrator? Tense, POV control rules, what it must/must not do.</div>
+      <textarea id="f-narrator-prompt" rows="7" oninput="onVoiceChange()"></textarea>
+    </div>
+    <div class="field-group">
+      <label>Writing style</label>
+      <div class="hint">Sentence rhythm, dialogue format, sensory emphasis — the HOW of the prose.</div>
+      <textarea id="f-writing-style" rows="7" oninput="onVoiceChange()"></textarea>
+    </div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-secondary" onclick="goPhase('review_beats')">← Back to Beats</button>
+    <button class="btn btn-primary" onclick="goPhase('review_triggers')">Continue to Triggers →</button>
+  </div>
+</div>
+
+<!-- ── Phase: Triggers ── -->
+<div class="phase" id="phase-review_triggers">
+  <div class="section-title">Character Triggers</div>
+  <p class="text-muted" style="margin-bottom:16px; font-size:13px; line-height:1.6;">
+    These keywords activate a character's card when they appear in beat text.
+    Cover every way you'll refer to each character — name variants, pronouns, role titles.
+  </p>
+  <div id="trigger-list"></div>
+  <div class="btn-row">
+    <button class="btn btn-secondary" onclick="goPhase('review_voice')">← Back to Voice</button>
+    <button class="btn btn-primary" onclick="goPhase('preview')">Continue to Preview →</button>
+  </div>
+</div>
+
+<!-- ── Phase: Preview ── -->
+<div class="phase" id="phase-preview">
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+    <div class="section-title" style="margin:0; border:none; padding:0;">Preview &amp; Export</div>
+    <div style="display:flex; gap:8px;">
+      <button class="btn btn-secondary btn-sm" onclick="validateScene()">Validate</button>
+      <button class="btn btn-secondary btn-sm" onclick="renderPreview()">Refresh</button>
+      <button class="btn btn-primary" onclick="downloadFile()">Download .md</button>
+    </div>
+  </div>
+
+  <!-- Validation results -->
+  <div id="validation-results" style="display:none; margin-bottom:16px;"></div>
+
+  <textarea id="preview-output" class="mono" readonly spellcheck="false"></textarea>
+  <div style="font-size:12px; color:var(--muted); margin-top:6px;" id="preview-stats"></div>
+  <div class="btn-row">
+    <button class="btn btn-secondary" onclick="goPhase('review_triggers')">← Back to Triggers</button>
+  </div>
+</div>
+
+</div><!-- #main -->
+
+<script>
+'use strict';
+
+// ── State ──────────────────────────────────────────────────────────────────────
+
+const DEFAULT_STATE = {
+  phase: 'interview',
+  config: { serverUrl: 'http://192.168.1.5:8081/v1', model: 'default', nsfw: false },
+  interview: {
+    title: '', outputFile: '', genreTone: '', world: '',
+    characters: [''],
+    scenario: '', targetLength: 3500, pov: 'third-person', mode: 'autonomous'
+  },
+  generated: null,
+  beats: [],
+  voice: { narratorPrompt: '', writingStyle: '' },
+  triggers: [],   // [{name, triggers}]
+  context: {}     // {title, scenario, world_info} for LLM rewrite/extend
+};
+
+const LS_KEY       = 'story-engine-builder-v1';
+const THEME_KEY    = 'story-engine-theme';
+
+function setTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  try { localStorage.setItem(THEME_KEY, theme); } catch(e) {}
+  document.querySelectorAll('.theme-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.theme === theme);
+  });
+}
+
+function loadTheme() {
+  const saved = localStorage.getItem(THEME_KEY) || 'system';
+  setTheme(saved);
+}
+
+let S = loadState();
+let _saveTimer = null;
+let _elapsedTimer = null;
+let _abortController = null;
+let _pendingExtendBeats = null;
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (raw) return deepMerge(JSON.parse(raw), DEFAULT_STATE);
+  } catch(e) {}
+  return JSON.parse(JSON.stringify(DEFAULT_STATE));
+}
+
+function deepMerge(obj, defaults) {
+  const result = Object.assign({}, defaults);
+  for (const key of Object.keys(obj)) {
+    if (key in result && typeof result[key] === 'object' && !Array.isArray(result[key]) && result[key] !== null) {
+      result[key] = deepMerge(obj[key] || {}, result[key]);
+    } else {
+      result[key] = obj[key];
+    }
+  }
+  return result;
+}
+
+function saveState() {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch(e) {}
+  const el = document.getElementById('save-indicator');
+  if (el) { el.textContent = 'Saved'; setTimeout(() => { el.textContent = '—'; }, 1500); }
+}
+
+function scheduleSave() {
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(saveState, 400);
+}
+
+
+// ── Phase management ──────────────────────────────────────────────────────────
+
+const PHASES = ['interview','generating','review_beats','review_voice','review_triggers','preview'];
+
+function goPhase(phase) {
+  S.phase = phase;
+  scheduleSave();
+  renderPhase();
+}
+
+function renderPhase() {
+  // Phase panels
+  PHASES.forEach(p => {
+    const el = document.getElementById('phase-' + p);
+    if (el) el.classList.toggle('active', p === S.phase);
+  });
+  // Step pills
+  const idx = PHASES.indexOf(S.phase);
+  PHASES.forEach((p, i) => {
+    const pill = document.getElementById('pill-' + p);
+    if (!pill) return;
+    pill.classList.remove('active', 'done');
+    if (i < idx) pill.classList.add('done');
+    else if (i === idx) pill.classList.add('active');
+  });
+  // Render phase content
+  if (S.phase === 'interview')        renderInterview();
+  if (S.phase === 'review_beats')     { renderBeats(); renderDetails(); }
+  if (S.phase === 'review_voice')     renderVoice();
+  if (S.phase === 'review_triggers')  renderTriggers();
+  if (S.phase === 'preview')          renderPreview();
+}
+
+
+// ── Config bar ────────────────────────────────────────────────────────────────
+
+document.getElementById('config-server').addEventListener('input', e => {
+  S.config.serverUrl = e.target.value.trim(); scheduleSave();
+});
+document.getElementById('config-model').addEventListener('input', e => {
+  S.config.model = e.target.value.trim(); scheduleSave();
+});
+document.getElementById('config-nsfw').addEventListener('change', e => {
+  S.config.nsfw = e.target.checked; scheduleSave();
+});
+
+
+// ── Interview ─────────────────────────────────────────────────────────────────
+
+function renderInterview() {
+  const iv = S.interview;
+  document.getElementById('f-title').value    = iv.title    || '';
+  document.getElementById('f-output').value   = iv.outputFile || '';
+  document.getElementById('f-genre').value    = iv.genreTone  || '';
+  document.getElementById('f-world').value    = iv.world      || '';
+  document.getElementById('f-scenario').value = iv.scenario   || '';
+
+  // Radios
+  const setRadio = (name, val) => {
+    const r = document.querySelector(`input[name="${name}"][value="${val}"]`);
+    if (r) r.checked = true;
+  };
+  setRadio('length', String(iv.targetLength || 3500));
+  setRadio('pov',    iv.pov  || 'third-person');
+  setRadio('mode',   iv.mode || 'autonomous');
+
+  // Character list
+  renderCharList();
+
+  // Config bar
+  document.getElementById('config-server').value = S.config.serverUrl;
+  document.getElementById('config-model').value  = S.config.model;
+  document.getElementById('config-nsfw').checked = !!S.config.nsfw;
+
+  // Drop zone
+  const dz = document.getElementById('drop-zone');
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dragover'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
+  dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('dragover'); if (e.dataTransfer.files[0]) loadFile({ files: e.dataTransfer.files }); });
+}
+
+function renderCharList() {
+  const list = document.getElementById('char-list');
+  list.innerHTML = '';
+  (S.interview.characters || ['']).forEach((ch, i) => {
+    const row = document.createElement('div');
+    row.className = 'char-entry';
+    row.innerHTML = `
+      <textarea rows="2" placeholder="e.g. Karna, warrior-king of Anga — the man who chooses honour over survival. Dignified, warm, already at peace with tomorrow."
+        oninput="updateChar(${i}, this.value)">${escHtml(ch)}</textarea>
+      <button class="btn btn-danger" onclick="removeChar(${i})" title="Remove character">✕</button>`;
+    list.appendChild(row);
+  });
+}
+
+function addCharacter() {
+  S.interview.characters.push('');
+  renderCharList();
+}
+
+function removeChar(i) {
+  if (S.interview.characters.length <= 1) return;
+  S.interview.characters.splice(i, 1);
+  renderCharList();
+  scheduleSave();
+}
+
+function updateChar(i, val) {
+  S.interview.characters[i] = val;
+  scheduleSave();
+}
+
+function onInterviewChange() {
+  const iv = S.interview;
+  iv.title      = document.getElementById('f-title').value;
+  iv.genreTone  = document.getElementById('f-genre').value;
+  iv.world      = document.getElementById('f-world').value;
+  iv.scenario   = document.getElementById('f-scenario').value;
+
+  // Auto-suggest output path from title
+  const manualOut = document.getElementById('f-output').value;
+  if (!manualOut || manualOut === `output/${slugify(iv._lastTitle || '')}.md`) {
+    document.getElementById('f-output').value = `output/${slugify(iv.title)}.md`;
+  }
+  iv._lastTitle = iv.title;
+  iv.outputFile = document.getElementById('f-output').value;
+
+  // Radios
+  const lenEl  = document.querySelector('input[name="length"]:checked');
+  const povEl  = document.querySelector('input[name="pov"]:checked');
+  const modeEl = document.querySelector('input[name="mode"]:checked');
+  if (lenEl)  iv.targetLength = parseInt(lenEl.value);
+  if (povEl)  iv.pov  = povEl.value;
+  if (modeEl) iv.mode = modeEl.value;
+
+  scheduleSave();
+}
+
+// Also capture radio changes
+document.addEventListener('change', e => {
+  if (['length','pov','mode'].includes(e.target.name)) onInterviewChange();
+});
+
+
+// ── Generation ────────────────────────────────────────────────────────────────
+
+function validateInterview() {
+  const iv = S.interview;
+  if (!iv.title.trim())       return 'Title is required.';
+  if (!iv.genreTone.trim())   return 'Genre / tone description is required.';
+  if (!iv.world.trim())       return 'World description is required.';
+  const chars = (iv.characters || []).filter(c => c.trim());
+  if (!chars.length)          return 'At least one character is required.';
+  if (!iv.scenario.trim())    return 'Scenario is required.';
+  return null;
+}
+
+async function startGeneration() {
+  const err = validateInterview();
+  if (err) { document.getElementById('interview-error').textContent = err; return; }
+  document.getElementById('interview-error').textContent = '';
+  // Capture latest radio values
+  onInterviewChange();
+  goPhase('generating');
+  showGenSpinner('Generating scene structure…');
+  await runGeneration();
+}
+
+function retryGeneration() {
+  document.getElementById('gen-error-box').style.display = 'none';
+  showGenSpinner('Retrying…');
+  runGeneration();
+}
+
+function showGenSpinner(msg) {
+  document.getElementById('gen-spinner-area').style.display = 'flex';
+  document.getElementById('gen-spinner-area').style.flexDirection = 'column';
+  document.getElementById('gen-spinner-area').style.alignItems = 'center';
+  document.getElementById('gen-spinner-area').style.gap = '16px';
+  document.getElementById('gen-error-box').style.display = 'none';
+  document.getElementById('gen-status').textContent = msg;
+  document.getElementById('gen-elapsed').textContent = '0s';
+  let t = 0;
+  clearInterval(_elapsedTimer);
+  _elapsedTimer = setInterval(() => {
+    t++;
+    document.getElementById('gen-elapsed').textContent = `${t}s`;
+  }, 1000);
+}
+
+function cancelGeneration() {
+  if (_abortController) _abortController.abort();
+  clearInterval(_elapsedTimer);
+  goPhase('interview');
+}
+
+function buildFullPrompt(iv) {
+  const beatCount = Math.max(3, Math.min(10, Math.round(iv.targetLength / 700)));
+  const wpb = Math.floor(iv.targetLength / beatCount);
+  const chars = iv.characters.filter(c => c.trim());
+  const charsBlock = chars.map((c, i) => `Character ${i+1}:\n${c}`).join('\n\n');
+  return `Build a Story Engine scene structure from this brief.
+
+TITLE: ${iv.title}
+GENRE / TONE / THEMES: ${iv.genreTone}
+WORLD / SETTING: ${iv.world}
+SCENARIO: ${iv.scenario}
+TARGET: ${iv.targetLength} words total · ${beatCount} beats · ~${wpb} words each
+POV: ${iv.pov}
+
+CHARACTERS:
+${charsBlock}
+
+Return this JSON (all fields required):
+{
+  "narrator_prompt": "...",
+  "writing_style": "...",
+  "author_note_content": "...",
+  "world_info": "...",
+  "scene_setup": {
+    "location": "...",
+    "time": "...",
+    "atmosphere": "..."
+  },
+  "characters": [
+    {
+      "name": "...",
+      "role": "player-character|npc|antagonist|neutral",
+      "triggers": "comma, separated, keywords",
+      "description": "...",
+      "personality": "...",
+      "backstory": "...",
+      "speech_style": "..."
+    }
+  ],
+  "beats": [
+    {
+      "title": "SHORT TITLE",
+      "instruction": "2-4 sentences of directional beat guidance",
+      "pause": false
+    }
+  ],
+  "writing_instructions": "scene-specific creative direction"
+}`;
+}
+
+const SYSTEM_FULL = `You are a story structure assistant. Given a scene brief, produce a complete JSON object with all fields needed for a Story Engine scene file.
+
+Rules:
+- narrator_prompt: who the narrator is, tense, POV control rules, what it must/must not do
+- writing_style: sentence rhythm, dialogue format, sensory emphasis — the HOW of the prose
+- author_note_content: one persistent thematic reminder, 1-2 sentences max
+- world_info: concise lore injected every beat, STRICTLY under 300 words
+- beats: min 3, max 10; each title SHORT and evocative (e.g. "THE DESCENT"); each instruction is directional (WHAT happens) not prescriptive (HOW to write it)
+- character triggers: rich keyword set — name, name variants, pronouns, role titles, any descriptive handles that would naturally appear in beat text
+- Everything must feel specific to THIS story, never generic template filler
+
+Return ONLY valid JSON. No markdown fences. No explanation outside the JSON.`;
+
+async function callLLM(systemPrompt, userPrompt, maxTokens) {
+  _abortController = new AbortController();
+  const resp = await fetch(`${S.config.serverUrl}/chat/completions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer none' },
+    signal: _abortController.signal,
+    body: JSON.stringify({
+      model: S.config.model,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user',   content: userPrompt }
+      ],
+      temperature: 0.7,
+      max_tokens: maxTokens || 4096
+    })
+  });
+  if (!resp.ok) {
+    const body = await resp.text().catch(() => '');
+    throw new Error(`HTTP ${resp.status}: ${body.slice(0, 200)}`);
+  }
+  const data = await resp.json();
+  let raw = (data.choices?.[0]?.message?.content || '').trim();
+  // Strip markdown fences
+  raw = raw.replace(/^```[a-z]*\n?/, '').replace(/\n?```$/, '').trim();
+  return raw;
+}
+
+function parseJSON(raw) {
+  try { return JSON.parse(raw); } catch(e) {}
+  // Try extracting JSON from surrounding text
+  const m = raw.match(/\{[\s\S]*\}/);
+  if (m) try { return JSON.parse(m[0]); } catch(e2) {}
+  throw new Error('Could not parse JSON from LLM response');
+}
+
+async function runGeneration() {
+  try {
+    const raw = await callLLM(SYSTEM_FULL, buildFullPrompt(S.interview), 4096);
+    clearInterval(_elapsedTimer);
+    const gen = parseJSON(raw);
+
+    S.generated = gen;
+    S.beats = (gen.beats || []).map(b => ({
+      title: (b.title || 'BEAT').toUpperCase(),
+      instruction: b.instruction || '',
+      pause: !!b.pause
+    }));
+    S.voice = {
+      narratorPrompt: gen.narrator_prompt || '',
+      writingStyle:   gen.writing_style   || ''
+    };
+    S.triggers = (gen.characters || []).map(c => ({
+      name: c.name || '',
+      triggers: c.triggers || ''
+    }));
+    S.context = {
+      title:     S.interview.title,
+      scenario:  S.interview.scenario,
+      world_info: gen.world_info || ''
+    };
+    saveState();
+    goPhase('review_beats');
+  } catch(e) {
+    clearInterval(_elapsedTimer);
+    if (e.name === 'AbortError') return;
+    document.getElementById('gen-spinner-area').style.display = 'none';
+    const box = document.getElementById('gen-error-box');
+    box.style.display = 'block';
+    document.getElementById('gen-error-title').textContent = 'Generation failed';
+    document.getElementById('gen-error-msg').textContent = e.message || String(e);
+    const rawEl = document.getElementById('gen-error-raw');
+    rawEl.textContent = e.rawResponse || '';
+    rawEl.style.display = e.rawResponse ? 'block' : 'none';
+  }
+}
+
+
+// ── Scene Details panel ───────────────────────────────────────────────────────
+
+function renderDetails() {
+  const iv  = S.interview;
+  const gen = S.generated || {};
+  const setup = gen.scene_setup || {};
+
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
+  set('d-title',   iv.title);
+  set('d-output',  iv.outputFile);
+  set('d-length',  iv.targetLength || 3500);
+  set('d-world-info',           gen.world_info || '');
+  set('d-location',             setup.location || '');
+  set('d-time',                 setup.time || '');
+  set('d-atmosphere',           setup.atmosphere || '');
+  set('d-scenario',             iv.scenario || '');
+  set('d-author-note',          gen.author_note_content || '');
+  set('d-writing-instructions', gen.writing_instructions || '');
+
+  const povEl = document.getElementById('d-pov');
+  if (povEl) povEl.value = iv.pov || 'third-person';
+  const modeEl = document.getElementById('d-mode');
+  if (modeEl) modeEl.value = iv.mode || 'autonomous';
+  const nsfwEl = document.getElementById('d-nsfw');
+  if (nsfwEl) nsfwEl.checked = !!S.config.nsfw;
+}
+
+function onDetailsChange() {
+  const get = id => { const el = document.getElementById(id); return el ? el.value : ''; };
+
+  S.interview.title       = get('d-title');
+  S.interview.outputFile  = get('d-output');
+  S.interview.pov         = get('d-pov');
+  S.interview.mode        = get('d-mode');
+  S.interview.targetLength = parseInt(get('d-length')) || 3500;
+  S.interview.scenario    = get('d-scenario');
+  S.config.nsfw           = document.getElementById('d-nsfw')?.checked || false;
+
+  if (!S.generated) S.generated = {};
+  const gen = S.generated;
+  gen.world_info            = get('d-world-info');
+  gen.author_note_content   = get('d-author-note');
+  gen.writing_instructions  = get('d-writing-instructions');
+  gen.scene_setup = gen.scene_setup || {};
+  gen.scene_setup.location  = get('d-location');
+  gen.scene_setup.time      = get('d-time');
+  gen.scene_setup.atmosphere = get('d-atmosphere');
+
+  // Keep interview title fields in sync
+  const titleEl = document.getElementById('f-title');
+  if (titleEl) titleEl.value = S.interview.title;
+  const outEl = document.getElementById('f-output');
+  if (outEl) outEl.value = S.interview.outputFile;
+
+  scheduleSave();
+}
+
+// Also expand the summary arrow when opened
+document.addEventListener('toggle', e => {
+  if (e.target.id === 'scene-details') {
+    const summary = e.target.querySelector('summary span');
+    if (summary) summary.textContent = e.target.open
+      ? '▾ Scene Details — meta, world, setup, author note'
+      : '▸ Scene Details — meta, world, setup, author note';
+  }
+}, true);
+
+
+// ── Beat Review ───────────────────────────────────────────────────────────────
+
+function renderBeats() {
+  const list = document.getElementById('beat-list');
+  list.innerHTML = '';
+  S.beats.forEach((beat, i) => {
+    list.appendChild(makeBeatCard(beat, i));
+  });
+  const lbl = document.getElementById('beats-count-label');
+  if (lbl) lbl.textContent = `${S.beats.length} beat${S.beats.length !== 1 ? 's' : ''}`;
+}
+
+function makeBeatCard(beat, i) {
+  const card = document.createElement('div');
+  card.className = 'beat-card';
+  card.id = `beat-card-${i}`;
+
+  card.innerHTML = `
+    <div class="beat-card-header">
+      <span class="beat-num">${i + 1}</span>
+      <input class="beat-title-input" value="${escHtml(beat.title)}"
+        oninput="updateBeatTitle(${i}, this.value)" placeholder="BEAT TITLE">
+      <div class="beat-controls">
+        <span class="pause-badge ${beat.pause ? 'on' : ''}" onclick="togglePause(${i})"
+          title="Toggle [pause] marker">[pause]</span>
+        <button class="btn btn-icon btn-sm" onclick="rewriteOpen(${i})" title="Rewrite with AI">✦</button>
+        <button class="btn btn-icon btn-sm" onclick="moveBeat(${i}, -1)" ${i === 0 ? 'disabled' : ''} title="Move up">▲</button>
+        <button class="btn btn-icon btn-sm" onclick="moveBeat(${i}, 1)" ${i === S.beats.length - 1 ? 'disabled' : ''} title="Move down">▼</button>
+        <button class="btn btn-icon btn-sm" style="color:var(--red)" onclick="removeBeat(${i})" title="Remove beat">✕</button>
+      </div>
+    </div>
+    <div class="beat-card-body">
+      <textarea class="beat-instruction" rows="3"
+        oninput="updateBeatInstruction(${i}, this.value)">${escHtml(beat.instruction)}</textarea>
+    </div>
+    <div class="beat-rewrite-area" id="rewrite-area-${i}">
+      <div style="font-size:12px; color:var(--yellow); margin-bottom:6px;">Describe how to change this beat:</div>
+      <textarea rows="2" id="rewrite-direction-${i}" placeholder="Make it more tense, focus on her internal reaction…"></textarea>
+      <div class="beat-rewrite-row">
+        <button class="btn btn-primary btn-sm" onclick="rewriteBeat(${i})">Rewrite</button>
+        <div id="rewrite-spinner-${i}" style="display:none"><span class="inline-spinner"></span> Rewriting…</div>
+        <button class="btn btn-secondary btn-sm" onclick="rewriteClose(${i})">Cancel</button>
+      </div>
+      <div id="rewrite-result-${i}" style="display:none; margin-top:10px;">
+        <div style="font-size:12px; color:var(--muted); margin-bottom:4px;">New version:</div>
+        <div style="background:var(--bg); border:1px solid var(--border); border-radius:4px; padding:8px; margin-bottom:8px;">
+          <strong id="rewrite-new-title-${i}" style="color:var(--accent2); font-size:12px;"></strong>
+          <p id="rewrite-new-instr-${i}" style="font-size:13px; margin-top:4px; white-space:pre-wrap;"></p>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn btn-primary btn-sm" onclick="confirmRewrite(${i})">Accept</button>
+          <button class="btn btn-secondary btn-sm" onclick="discardRewrite(${i})">Discard</button>
+        </div>
+      </div>
+      <div id="rewrite-error-${i}" style="color:var(--red); font-size:12px; margin-top:4px; display:none;"></div>
+    </div>`;
+  return card;
+}
+
+function updateBeatTitle(i, val) {
+  S.beats[i].title = val.toUpperCase();
+  scheduleSave();
+}
+function updateBeatInstruction(i, val) {
+  S.beats[i].instruction = val;
+  scheduleSave();
+}
+function togglePause(i) {
+  S.beats[i].pause = !S.beats[i].pause;
+  scheduleSave();
+  renderBeats();
+}
+function moveBeat(i, dir) {
+  const j = i + dir;
+  if (j < 0 || j >= S.beats.length) return;
+  [S.beats[i], S.beats[j]] = [S.beats[j], S.beats[i]];
+  scheduleSave();
+  renderBeats();
+}
+function removeBeat(i) {
+  if (S.beats.length <= 1) return;
+  S.beats.splice(i, 1);
+  scheduleSave();
+  renderBeats();
+}
+function addManualBeat() {
+  if (S.beats.length >= 10) { alert('Maximum 10 beats.'); return; }
+  S.beats.push({ title: `BEAT ${S.beats.length + 1}`, instruction: '', pause: false });
+  scheduleSave();
+  renderBeats();
+  // Scroll to new beat and focus
+  setTimeout(() => {
+    const cards = document.querySelectorAll('.beat-card');
+    if (cards.length) cards[cards.length-1].scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, 50);
+}
+
+function rewriteOpen(i) {
+  document.getElementById(`rewrite-area-${i}`).classList.add('open');
+  document.getElementById(`beat-card-${i}`).classList.add('rewriting');
+  document.getElementById(`rewrite-direction-${i}`).focus();
+}
+function rewriteClose(i) {
+  document.getElementById(`rewrite-area-${i}`).classList.remove('open');
+  document.getElementById(`beat-card-${i}`).classList.remove('rewriting');
+  document.getElementById(`rewrite-result-${i}`).style.display = 'none';
+  document.getElementById(`rewrite-error-${i}`).style.display = 'none';
+}
+
+const SYSTEM_BEAT = `You are a story beat editor. You make targeted edits to individual scene beats.
+Return ONLY valid JSON. No markdown fences. No explanation.`;
+
+async function rewriteBeat(i) {
+  const direction = document.getElementById(`rewrite-direction-${i}`).value.trim();
+  if (!direction) return;
+  const beat = S.beats[i];
+  const spinner = document.getElementById(`rewrite-spinner-${i}`);
+  const errEl   = document.getElementById(`rewrite-error-${i}`);
+  const resEl   = document.getElementById(`rewrite-result-${i}`);
+  spinner.style.display = 'inline-block';
+  errEl.style.display   = 'none';
+  resEl.style.display   = 'none';
+
+  const prompt = `Rewrite the following story beat based on the requested changes.
+
+CURRENT BEAT:
+Title: ${beat.title}
+Instruction: ${beat.instruction}
+
+REQUESTED CHANGES:
+${direction}
+
+STORY CONTEXT:
+Title: ${S.context.title || ''}
+Scenario: ${S.context.scenario || ''}
+World: ${S.context.world_info || ''}
+
+Return ONLY this JSON:
+{
+  "title": "SHORT EVOCATIVE TITLE",
+  "instruction": "2-4 sentences of directional beat guidance"
+}`;
+
+  try {
+    const raw = await callLLM(SYSTEM_BEAT, prompt, 512);
+    const result = parseJSON(raw);
+    spinner.style.display = 'none';
+    document.getElementById(`rewrite-new-title-${i}`).textContent = result.title || '';
+    document.getElementById(`rewrite-new-instr-${i}`).textContent = result.instruction || '';
+    resEl.style.display = 'block';
+    resEl._pending = result;
+  } catch(e) {
+    spinner.style.display = 'none';
+    errEl.textContent = 'Rewrite failed: ' + (e.message || String(e));
+    errEl.style.display = 'block';
+  }
+}
+
+function confirmRewrite(i) {
+  const resEl = document.getElementById(`rewrite-result-${i}`);
+  if (!resEl._pending) return;
+  const r = resEl._pending;
+  S.beats[i].title = (r.title || S.beats[i].title).toUpperCase();
+  S.beats[i].instruction = r.instruction || S.beats[i].instruction;
+  S.beats[i].pause = S.beats[i].pause; // preserve
+  scheduleSave();
+  rewriteClose(i);
+  renderBeats();
+}
+function discardRewrite(i) {
+  rewriteClose(i);
+}
+
+// Extend
+function toggleExtend() {
+  const area = document.getElementById('extend-area');
+  area.classList.toggle('open');
+  if (area.classList.contains('open')) {
+    document.getElementById('extend-direction').focus();
+    document.getElementById('extend-preview').style.display = 'none';
+    document.getElementById('extend-error').style.display = 'none';
+  }
+}
+
+const SYSTEM_EXTEND = `You are a story structure assistant. You extend an existing beat arc with new beats.
+Beat titles must be SHORT and evocative. Instructions are directional (WHAT happens), not prescriptive (HOW to write it). Return ONLY valid JSON. No markdown fences.`;
+
+async function extendBeats() {
+  const direction = document.getElementById('extend-direction').value.trim();
+  const count = parseInt(document.getElementById('extend-count').value) || 2;
+  if (!direction) return;
+  const remaining = 10 - S.beats.length;
+  if (remaining <= 0) { alert('Already at maximum 10 beats.'); return; }
+  const addCount = Math.min(count, remaining);
+
+  const spinner = document.getElementById('extend-spinner');
+  const errEl   = document.getElementById('extend-error');
+  const prevEl  = document.getElementById('extend-preview');
+  document.getElementById('btn-extend-go').disabled = true;
+  spinner.style.display = 'inline-flex';
+  errEl.style.display   = 'none';
+  prevEl.style.display  = 'none';
+
+  const existing = S.beats.map((b, i) => `${i+1}. ${b.title}: ${b.instruction}`).join('\n');
+  const prompt = `Extend this story beat arc with ${addCount} new beat(s).
+
+EXISTING BEATS:
+${existing}
+
+STORY CONTEXT:
+Title: ${S.context.title || ''}
+Scenario: ${S.context.scenario || ''}
+World: ${S.context.world_info || ''}
+
+DIRECTION FOR NEW BEATS:
+${direction}
+
+Return ONLY a JSON array of ${addCount} new beat(s):
+[
+  {
+    "title": "SHORT EVOCATIVE TITLE",
+    "instruction": "2-4 sentences of directional beat guidance",
+    "pause": false
+  }
+]`;
+
+  try {
+    const raw = await callLLM(SYSTEM_EXTEND, prompt, 1024);
+    spinner.style.display = 'none';
+    document.getElementById('btn-extend-go').disabled = false;
+    let result = parseJSON(raw);
+    if (!Array.isArray(result)) result = [result];
+    _pendingExtendBeats = result;
+
+    const pl = document.getElementById('extend-preview-list');
+    pl.innerHTML = result.map((b, i) => `
+      <div style="background:var(--bg); border:1px solid var(--border); border-radius:4px; padding:8px; margin-bottom:6px;">
+        <strong style="color:var(--accent2); font-size:12px;">${escHtml((b.title||'').toUpperCase())}</strong>
+        <p style="font-size:13px; margin-top:4px;">${escHtml(b.instruction||'')}</p>
+      </div>`).join('');
+    prevEl.style.display = 'block';
+  } catch(e) {
+    spinner.style.display = 'none';
+    document.getElementById('btn-extend-go').disabled = false;
+    errEl.textContent = 'Failed: ' + (e.message || String(e));
+    errEl.style.display = 'block';
+  }
+}
+
+function confirmExtend() {
+  if (!_pendingExtendBeats) return;
+  _pendingExtendBeats.forEach(b => {
+    S.beats.push({
+      title: (b.title || 'NEW BEAT').toUpperCase(),
+      instruction: b.instruction || '',
+      pause: !!b.pause
+    });
+  });
+  _pendingExtendBeats = null;
+  scheduleSave();
+  toggleExtend();
+  renderBeats();
+}
+function discardExtend() {
+  _pendingExtendBeats = null;
+  document.getElementById('extend-preview').style.display = 'none';
+}
+
+
+// ── Voice & Style ─────────────────────────────────────────────────────────────
+
+function renderVoice() {
+  document.getElementById('f-narrator-prompt').value = S.voice.narratorPrompt || '';
+  document.getElementById('f-writing-style').value   = S.voice.writingStyle   || '';
+}
+function onVoiceChange() {
+  S.voice.narratorPrompt = document.getElementById('f-narrator-prompt').value;
+  S.voice.writingStyle   = document.getElementById('f-writing-style').value;
+  scheduleSave();
+}
+
+
+// ── Triggers ──────────────────────────────────────────────────────────────────
+
+function renderTriggers() {
+  const list = document.getElementById('trigger-list');
+  list.innerHTML = '';
+  S.triggers.forEach((t, i) => {
+    const card = document.createElement('div');
+    card.className = 'trigger-card';
+    card.innerHTML = `
+      <div class="char-name">${escHtml(t.name)}</div>
+      <textarea rows="2"
+        placeholder="name, pronouns, titles, descriptive handles — e.g. Karna, he, him, the warrior, the giver, the sun's son"
+        oninput="updateTrigger(${i}, this.value)">${escHtml(t.triggers)}</textarea>`;
+    list.appendChild(card);
+  });
+}
+function updateTrigger(i, val) {
+  S.triggers[i].triggers = val;
+  scheduleSave();
+}
+
+
+// ── Preview & Serializer ──────────────────────────────────────────────────────
+
+function renderPreview() {
+  const md = serializeToMd();
+  document.getElementById('preview-output').value = md;
+  const words = md.trim().split(/\s+/).length;
+  const lines = md.split('\n').length;
+  document.getElementById('preview-stats').textContent =
+    `${lines} lines · ${words} words · ${md.length} chars`;
+}
+
+function serializeToMd() {
+  const iv  = S.interview;
+  const gen = S.generated || {};
+  const parts = [];
+
+  // ── [meta]
+  parts.push([
+    '[meta]',
+    `title: ${iv.title || 'Untitled'}`,
+    'version: 1.0',
+    `mode: ${iv.mode || 'autonomous'}`,
+    'pause_at: beat',
+    `output_file: ${iv.outputFile || 'output/scene.md'}`,
+    'output_format: prose',
+    `pov: ${iv.pov || 'third-person'}`,
+    `target_length: ${iv.targetLength || 3500}`,
+    'language: en',
+    `nsfw: ${S.config.nsfw ? 'true' : 'false'}`,
+  ].join('\n'));
+
+  // ── [narrator-prompt]
+  parts.push(`[narrator-prompt]\n${(S.voice.narratorPrompt || gen.narrator_prompt || '').trim()}`);
+
+  // ── [writing-style]
+  parts.push(`[writing-style]\n${(S.voice.writingStyle || gen.writing_style || '').trim()}`);
+
+  // ── [author-note]
+  const anContent = (gen.author_note_content || '').trim();
+  if (anContent) {
+    const depth = Math.min(5, S.beats.length);
+    const bulletLines = anContent.split('\n')
+      .map(l => l.trim())
+      .filter(l => l)
+      .map(l => (l.startsWith('-') || l.startsWith('*') || l.startsWith('#')) ? l : `- ${l}`)
+      .join('\n');
+    parts.push(`[author-note]\ndepth: ${depth}\ncontent: ${bulletLines}`);
+  }
+
+  // ── [world-info]
+  parts.push(`[world-info]\n${(gen.world_info || '').trim()}`);
+
+  // ── [character-N]
+  const chars = gen.characters || [];
+  // Merge updated triggers back
+  chars.forEach((char, i) => {
+    const t = S.triggers[i];
+    if (t) char.triggers = t.triggers;
+  });
+  chars.forEach((char, i) => {
+    parts.push(formatCharBlock(i + 1, char));
+  });
+
+  // ── [scene-setup]
+  const setup = gen.scene_setup || {};
+  parts.push([
+    '[scene-setup]',
+    `location: ${setup.location || ''}`,
+    `time: ${setup.time || ''}`,
+    `atmosphere: ${setup.atmosphere || ''}`,
+  ].join('\n'));
+
+  // ── [scenario]
+  parts.push(`[scenario]\n${(iv.scenario || '').trim()}`);
+
+  // ── [scene-beats]
+  parts.push(`[scene-beats]\n${formatBeats(S.beats)}`);
+
+  // ── [writing-instructions]
+  const wi = (gen.writing_instructions || '').trim();
+  if (wi) parts.push(`[writing-instructions]\n${wi}`);
+
+  return parts.join('\n\n\n');
+}
+
+function formatCharBlock(n, char) {
+  const lines = [
+    `[character-${n}]`,
+    `name: ${char.name || ''}`,
+    `role: ${char.role || 'npc'}`,
+    `triggers: ${char.triggers || ''}`,
+  ];
+  // description: always use > folded block
+  lines.push('description: >');
+  lines.push(`  ${(char.description || '').replace(/\n/g, ' ')}`);
+  lines.push(`personality: ${(char.personality || '').replace(/\n/g, ' ')}`);
+  if ((char.backstory || '').trim()) {
+    lines.push('backstory: >');
+    lines.push(`  ${char.backstory.replace(/\n/g, ' ')}`);
+  }
+  if ((char.speech_style || '').trim()) {
+    lines.push(`speech_style: ${char.speech_style.replace(/\n/g, ' ')}`);
+  }
+  return lines.join('\n');
+}
+
+function formatBeats(beats) {
+  return beats.map((beat, i) => {
+    const title = beat.title || `BEAT ${i + 1}`;
+    const instr = (beat.instruction || '').trim();
+    let line = `${i + 1}. **${title}** — ${instr}`;
+    if (beat.pause) line += '\n [pause]';
+    return line;
+  }).join('\n');
+}
+
+
+// ── Download ──────────────────────────────────────────────────────────────────
+
+function downloadFile() {
+  const md = serializeToMd();
+  const filename = slugify(S.interview.title || 'scene') + '.md';
+  const blob = new Blob([md], { type: 'text/plain;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+
+// ── Load existing file ────────────────────────────────────────────────────────
+
+function loadFile(input) {
+  const file = input.files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const { userData, generated } = parseSceneFile(e.target.result);
+      // Merge into state
+      S.interview.title      = userData.title;
+      S.interview.outputFile = userData.outputFile;
+      S.interview.pov        = userData.pov;
+      S.interview.mode       = userData.mode;
+      S.interview.targetLength = userData.targetLength;
+      S.interview.scenario   = userData.scenario;
+      S.interview.characters = ['(loaded from file)'];
+      S.generated            = generated;
+      S.beats                = generated.beats;
+      S.voice                = { narratorPrompt: generated.narrator_prompt, writingStyle: generated.writing_style };
+      S.triggers             = (generated.characters || []).map(c => ({ name: c.name, triggers: c.triggers }));
+      S.context              = { title: userData.title, scenario: userData.scenario, world_info: generated.world_info };
+      saveState();
+      goPhase('review_beats');
+    } catch(err) {
+      alert('Could not parse scene file: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+function parseSceneFile(text) {
+  const sectionRe = /^\[([a-z][a-z0-9_-]*)\]\s*$/gm;
+  const matches = [...text.matchAll(sectionRe)];
+  if (!matches.length) throw new Error('No [section] markers found.');
+
+  const sections = {};
+  matches.forEach((m, i) => {
+    const name  = m[1];
+    const start = m.index + m[0].length;
+    const end   = i + 1 < matches.length ? matches[i+1].index : text.length;
+    sections[name] = text.slice(start, end).trim();
+  });
+
+  // Parse key:value blocks
+  const parseKV = txt => {
+    const result = {};
+    let key = null, lines = [];
+    for (const line of txt.split('\n')) {
+      const kv = line.match(/^([a-z_]+)\s*:\s*(.*)/);
+      if (kv) {
+        if (key) result[key] = lines.join(' ').trim();
+        key = kv[1]; lines = kv[2].trim() === '>' ? [] : [kv[2].trim()];
+      } else if (key && line.trim()) {
+        lines.push(line.trim());
+      }
+    }
+    if (key) result[key] = lines.join(' ').trim();
+    return result;
+  };
+
+  const meta = parseKV(sections['meta'] || '');
+  const setup = parseKV(sections['scene-setup'] || '');
+
+  // Parse beats
+  const beatsText = sections['scene-beats'] || '';
+  const beatMatches = [...beatsText.matchAll(/^(\d+)\.\s+/gm)];
+  const beats = beatMatches.map((m, i) => {
+    const start = m.index + m[0].length;
+    const end = i + 1 < beatMatches.length ? beatMatches[i+1].index : beatsText.length;
+    const raw = beatsText.slice(start, end).trim();
+    const hasPause = raw.includes('[pause]');
+    let instruction = raw.replace(/\[pause\]/g, '').replace(/\s+/g, ' ').trim();
+    // Strip leading **TITLE** — if present
+    const titleMatch = instruction.match(/^\*\*([^*]+)\*\*\s*[—-]\s*(.*)/s);
+    let title = `BEAT ${m[1]}`;
+    if (titleMatch) { title = titleMatch[1].trim(); instruction = titleMatch[2].trim(); }
+    return { title: title.toUpperCase(), instruction, pause: hasPause };
+  });
+
+  // Parse characters
+  const charKeys = Object.keys(sections).filter(k => k.startsWith('character-'))
+    .sort((a,b) => parseInt(a.split('-')[1]) - parseInt(b.split('-')[1]));
+  const characters = charKeys.map(k => {
+    const kv = parseKV(sections[k]);
+    return { name: kv.name||'', role: kv.role||'npc', triggers: kv.triggers||'',
+             description: kv.description||'', personality: kv.personality||'',
+             backstory: kv.backstory||'', speech_style: kv.speech_style||'' };
+  });
+
+  const authorNote = parseKV(sections['author-note'] || '');
+
+  const userData = {
+    title: meta.title || '', outputFile: meta.output_file || '',
+    pov: meta.pov || 'third-person', mode: meta.mode || 'autonomous',
+    targetLength: parseInt(meta.target_length || '3500'),
+    scenario: sections['scenario'] || ''
+  };
+  const generated = {
+    narrator_prompt: sections['narrator-prompt'] || '',
+    writing_style:   sections['writing-style']   || '',
+    author_note_content: authorNote.content || '',
+    world_info:      sections['world-info']  || '',
+    scene_setup:     { location: setup.location||'', time: setup.time||'', atmosphere: setup.atmosphere||'' },
+    characters,
+    beats,
+    writing_instructions: sections['writing-instructions'] || ''
+  };
+
+  return { userData, generated };
+}
+
+
+// ── Validation ────────────────────────────────────────────────────────────────
+
+function validateScene() {
+  const errors = [];
+  const warnings = [];
+  const iv  = S.interview;
+  const gen = S.generated || {};
+  const setup = gen.scene_setup || {};
+
+  // Meta
+  if (!iv.title?.trim())       errors.push('Title is empty');
+  if (!iv.outputFile?.trim())  errors.push('Output file path is empty');
+  if (!iv.pov?.trim())         errors.push('POV is not set');
+
+  // Narrator / style
+  const np = (S.voice?.narratorPrompt || gen.narrator_prompt || '').trim();
+  const ws = (S.voice?.writingStyle   || gen.writing_style   || '').trim();
+  if (!np) errors.push('Narrator prompt is empty');
+  if (!ws) errors.push('Writing style is empty');
+
+  // World info
+  const wi = (gen.world_info || '').trim();
+  if (!wi) errors.push('World info is empty');
+  else {
+    const wc = wi.split(/\s+/).length;
+    if (wc > 300) warnings.push(`World info is ${wc} words — keep under 300 (injected every beat)`);
+  }
+
+  // Scene setup
+  if (!setup.location?.trim())   warnings.push('Scene setup: location is empty');
+  if (!setup.time?.trim())       warnings.push('Scene setup: time is empty');
+  if (!setup.atmosphere?.trim()) warnings.push('Scene setup: atmosphere is empty');
+
+  // Scenario
+  if (!iv.scenario?.trim()) errors.push('Scenario is empty');
+
+  // Characters
+  const chars = gen.characters || [];
+  if (!chars.length) {
+    errors.push('No characters defined');
+  } else {
+    chars.forEach((c, i) => {
+      const n = i + 1;
+      if (!c.name?.trim())        errors.push(`Character ${n}: name is empty`);
+      if (!c.role?.trim())        errors.push(`Character ${n} (${c.name||'?'}): role is empty`);
+      if (!c.description?.trim()) errors.push(`Character ${n} (${c.name||'?'}): description is empty`);
+      if (!c.personality?.trim()) errors.push(`Character ${n} (${c.name||'?'}): personality is empty`);
+      const triggers = (S.triggers?.[i]?.triggers || c.triggers || '').split(',').map(t => t.trim()).filter(Boolean);
+      if (triggers.length < 2)    warnings.push(`Character ${n} (${c.name||'?'}): only ${triggers.length} trigger keyword(s) — add pronouns/titles`);
+    });
+  }
+
+  // Beats
+  if (!S.beats?.length) {
+    errors.push('No beats defined');
+  } else {
+    if (S.beats.length < 3)  errors.push(`Only ${S.beats.length} beat(s) — minimum is 3`);
+    if (S.beats.length > 10) errors.push(`${S.beats.length} beats — maximum is 10`);
+    S.beats.forEach((b, i) => {
+      if (!b.title?.trim())       warnings.push(`Beat ${i+1}: title is empty`);
+      if (!b.instruction?.trim()) errors.push(`Beat ${i+1}: instruction is empty`);
+      else if (b.instruction.trim().split(/\s+/).length < 8)
+        warnings.push(`Beat ${i+1}: instruction is very short — add more directional detail`);
+    });
+  }
+
+  // Render results
+  const box = document.getElementById('validation-results');
+  if (!errors.length && !warnings.length) {
+    box.style.display = 'block';
+    box.innerHTML = `<div style="background:rgba(76,175,125,0.1); border:1px solid var(--green); border-radius:var(--radius); padding:12px; color:var(--green); font-size:13px; font-weight:600;">
+      ✓ All checks passed — scene looks good to go.
+    </div>`;
+    return;
+  }
+
+  let html = '';
+  if (errors.length) {
+    html += `<div style="background:rgba(224,90,90,0.08); border:1px solid var(--red); border-radius:var(--radius); padding:12px; margin-bottom:8px;">
+      <div style="font-weight:700; color:var(--red); margin-bottom:8px;">✗ ${errors.length} error${errors.length>1?'s':''}</div>
+      ${errors.map(e => `<div style="font-size:13px; color:var(--text); padding:2px 0;">• ${escHtml(e)}</div>`).join('')}
+    </div>`;
+  }
+  if (warnings.length) {
+    html += `<div style="background:rgba(212,168,67,0.08); border:1px solid var(--yellow); border-radius:var(--radius); padding:12px;">
+      <div style="font-weight:700; color:var(--yellow); margin-bottom:8px;">⚠ ${warnings.length} warning${warnings.length>1?'s':''}</div>
+      ${warnings.map(w => `<div style="font-size:13px; color:var(--text); padding:2px 0;">• ${escHtml(w)}</div>`).join('')}
+    </div>`;
+  }
+  box.style.display = 'block';
+  box.innerHTML = html;
+}
+
+
+// ── Utilities ─────────────────────────────────────────────────────────────────
+
+function slugify(s) {
+  return s.toLowerCase().replace(/[^\w\s-]/g,'').replace(/[\s_-]+/g,'_').replace(/^_+|_+$/g,'');
+}
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function confirmNew() {
+  if (!confirm('Start a new scene? Current progress will be cleared.')) return;
+  localStorage.removeItem(LS_KEY);
+  location.reload();
+}
+
+function clearStorage() {
+  if (!confirm('Clear saved state from localStorage? This cannot be undone.')) return;
+  localStorage.removeItem(LS_KEY);
+  const ind = document.getElementById('save-indicator');
+  if (ind) { ind.textContent = 'Cleared'; ind.style.color = 'var(--yellow)'; }
+  setTimeout(() => { if (ind) { ind.textContent = '—'; ind.style.color = ''; } }, 2000);
+}
+
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+
+// Auto-clear localStorage if the stored session was NSFW-marked.
+// NSFW content should never silently persist across browser sessions.
+(function autoNsfwClear() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return;
+    const stored = JSON.parse(raw);
+    if (stored?.config?.nsfw === true) {
+      localStorage.removeItem(LS_KEY);
+      S = JSON.parse(JSON.stringify(DEFAULT_STATE)); // reset to defaults
+      console.info('[scene-builder] NSFW session cleared on load.');
+    }
+  } catch(e) {}
+})();
+
+// Ensure characters array has at least one entry
+if (!S.interview.characters || !S.interview.characters.length) {
+  S.interview.characters = [''];
+}
+
+loadTheme();
+renderPhase();
+</script>
+</body>
+</html>
