@@ -1897,6 +1897,9 @@ function loadFile(input) {
       S.voice                = { narratorPrompt: generated.narrator_prompt, writingStyle: generated.writing_style };
       S.triggers             = (generated.characters || []).map(c => ({ name: c.name, triggers: c.triggers }));
       S.context              = { title: userData.title, scenario: userData.scenario, world_info: generated.world_info };
+      S.config.nsfw          = userData.nsfw;
+      document.getElementById('config-nsfw').checked = userData.nsfw;
+      const dNsfw = document.getElementById('d-nsfw'); if (dNsfw) dNsfw.checked = userData.nsfw;
       saveState();
       goPhase('review_beats');
     } catch(err) {
@@ -1971,7 +1974,8 @@ function parseSceneFile(text) {
     title: meta.title || '', outputFile: meta.output_file || '',
     pov: meta.pov || 'third-person', mode: meta.mode || 'autonomous',
     targetLength: parseInt(meta.target_length || '3500'),
-    scenario: sections['scenario'] || ''
+    scenario: sections['scenario'] || '',
+    nsfw: meta.nsfw === 'true'
   };
   const generated = {
     narrator_prompt: sections['narrator-prompt'] || '',
