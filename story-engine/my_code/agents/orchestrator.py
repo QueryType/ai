@@ -34,6 +34,8 @@ from my_code.parser import parse_scene_file
 logger = logging.getLogger(__name__)
 
 MAX_RETRIES = 3
+_NARRATOR_RESUME_SUMMARY_WINDOW = 3
+_NARRATOR_RESUME_SUMMARY_MAX_CHARS = 1200
 
 
 # ---------------------------------------------------------------------------
@@ -155,19 +157,16 @@ def run_scene(file_path: str) -> str:
         # --- Serialise characters once for lore injector ---
         characters_json = json.dumps([asdict(c) for c in scene.characters], ensure_ascii=False)
 
-        # --- Replay completed beats into narrator conversation for context ---
+        resume_story_summary = ""
+        resume_context_pending = False
         if checkpoint_beats:
-            for beat in scene.beats:
-                key = str(beat.index)
-                if key in checkpoint_beats:
-                    # Feed the beat instruction + prose as a conversation turn
-                    # so the narrator has context continuity
-                    narrator(
-                        f"[Previously written — beat {beat.index}/{len(scene.beats)}]\n"
-                        f"Instruction: {beat.text}\n\n"
-                        f"Output:\n{checkpoint_beats[key]}"
-                    )
-                    logger.info("Beat %d: restored from checkpoint", beat.index)
+            resume_story_summary = _build_resume_story_summary(prior_summary)
+            resume_context_pending = bool(resume_story_summary)
+            logger.info(
+                "Resume context prepared from checkpoint summary (beats=%d chars=%d)",
+                len(checkpoint_beats),
+                len(resume_story_summary),
+            )
 
         # --- Beat loop ---
         for beat in scene.beats:
@@ -184,7 +183,6 @@ def run_scene(file_path: str) -> str:
             # gc.collect() ensures the previous beat's agent objects are freed
             # before we allocate new ones (relevant on Apple Silicon unified memory).
             gc.collect()
-            evaluator = create_evaluator()
             summariser = create_summariser()
 
             # 1. Lore injection (pure Python — no LLM call)
@@ -203,13 +201,13 @@ def run_scene(file_path: str) -> str:
                 beat_index=beat.index,
                 beat_total=len(scene.beats),
                 author_note=author_note_text,
+                prior_story_summary=resume_story_summary if resume_context_pending else None,
             )
 
             # 3. Narrate + evaluate loop (with retries)
-            prose, retry_count = _narrate_and_evaluate(
-                narrator, evaluator, ctx, scene.writing_style, prior_summary
+            prose, retry_count, last_narrator_in, beat_start_state = _narrate_and_evaluate(
+                narrator, ctx, scene.writing_style, prior_summary
             )
-
 
             if retry_count >= MAX_RETRIES:
                 logger.warning("Beat %d: max retries hit, using best attempt", beat.index)
@@ -218,7 +216,7 @@ def run_scene(file_path: str) -> str:
             action = "continue"
             if mode == "interactive" or (mode == "semi-interactive" and beat.has_pause):
                 action, prose = _handle_human_input(
-                    beat, scene, prose, narrator, evaluator, ctx, prior_summary, checkpoint_beats
+                    beat, scene, prose, narrator, ctx, prior_summary, beat_start_state
                 )
 
             if action == "stop":
@@ -229,12 +227,16 @@ def run_scene(file_path: str) -> str:
                 logger.info("Beat %d: skipped by user", beat.index)
                 continue
 
+            if resume_context_pending:
+                resume_context_pending = False
+
             # 5. Proactive narrator context management.
-            # SummarizingConversationManager only summarizes reactively (on context overflow
-            # from the server). Without this, narrator input grows ~1800 tokens/beat and
-            # exceeds ctx=12288 at beat ~7. We trigger reduction manually once the message
-            # count exceeds preserve_recent_messages so it stays bounded.
-            _trim_narrator_context(narrator)
+            # Uses token-based threshold + direct message deletion to avoid KV cache eviction.
+            # SummarizingConversationManager.reduce_context() makes a separate LLM call that
+            # sends a different prompt to port 8080, destroying all SWA checkpoints and forcing
+            # full context re-processing on every subsequent beat (+80-100s each). Direct
+            # deletion accepts a one-time cache miss only when actually approaching ctx=12288.
+            _trim_narrator_context(narrator, last_narrator_in)
 
             # 6. Summarise beat for coherence tracking, then save checkpoint
             checkpoint_beats[key] = prose
@@ -262,33 +264,56 @@ def run_scene(file_path: str) -> str:
 # Sub-agent call helpers
 # ---------------------------------------------------------------------------
 
-def _trim_narrator_context(narrator) -> None:
-    """Proactively reduce narrator conversation history when it exceeds the keep limit.
+_NARRATOR_TRIM_TOKEN_THRESHOLD = 10500  # ~85% of ctx=12288; trim only when actually close
 
-    SummarizingConversationManager only triggers on a ContextWindowOverflowException
-    from the server — it never summarizes proactively. Without this, narrator input
-    grows ~1800 tokens/beat and exceeds ctx=12288 around beat 7.
+def _trim_narrator_context(narrator, last_input_tokens: int) -> None:
+    """Trim narrator conversation by direct message deletion when approaching ctx=12288.
 
-    We call reduce_context manually once message count exceeds preserve_recent_messages.
-    The manager will summarize the oldest (summary_ratio × N) messages while keeping
-    the most recent preserve_recent_messages untouched.
+    IMPORTANT: Do NOT call SummarizingConversationManager.reduce_context() here.
+    reduce_context() makes a hidden LLM API call to port 8080 with a different prompt
+    structure (summarization request). Due to Gemma 4 SWA, this destroys ALL cached
+    KV checkpoints and forces full context re-processing on every subsequent beat
+    (+80-100s per beat). Direct deletion is instant and only breaks the cache ONCE,
+    at the moment trim fires.
+
+    Only fires when last_input_tokens exceeds the threshold — for short scenes this
+    never triggers, preserving perfect KV cache continuity throughout.
     """
-    cm = narrator.conversation_manager
+    if last_input_tokens < _NARRATOR_TRIM_TOKEN_THRESHOLD:
+        return
+
     msg_count = len(narrator.messages)
-    limit = cm.preserve_recent_messages
-    if msg_count > limit:
-        logger.debug(
-            "Narrator context: %d messages > limit=%d — triggering proactive reduction",
-            msg_count, limit,
-        )
-        try:
-            cm.reduce_context(narrator)
-            logger.info(
-                "Narrator context trimmed: %d → %d messages",
-                msg_count, len(narrator.messages),
-            )
-        except Exception as exc:
-            logger.warning("Narrator context reduction failed (%s) — continuing", type(exc).__name__)
+    preserve = narrator.conversation_manager.preserve_recent_messages
+
+    # Separate system messages (fixed prefix) from conversation turns
+    system_msgs = [m for m in narrator.messages if _msg_role(m) == "system"]
+    other_msgs  = [m for m in narrator.messages if _msg_role(m) != "system"]
+
+    if len(other_msgs) <= preserve:
+        return
+
+    narrator.messages[:] = system_msgs + other_msgs[-preserve:]
+    logger.info(
+        "Narrator context trimmed: %d → %d messages (input_tokens=%d)",
+        msg_count, len(narrator.messages), last_input_tokens,
+    )
+
+
+def _snapshot_narrator_state(narrator):
+    """Capture narrator conversation length so rejected drafts can be rolled back."""
+    return len(narrator.messages)
+
+
+def _restore_narrator_state(narrator, snapshot) -> None:
+    """Restore narrator conversation state after a rejected or skipped attempt."""
+    del narrator.messages[snapshot:]
+
+
+def _msg_role(msg) -> str:
+    """Extract role from a Strands message regardless of whether it's a dict or object."""
+    if isinstance(msg, dict):
+        return msg.get("role", "")
+    return getattr(msg, "role", "")
 
 
 def _call_lore_injector(
@@ -306,14 +331,19 @@ def _call_lore_injector(
         card = get_character_card(name, characters_json)
         if not card.startswith("Character not found"):
             cards.append(card)
-    return build_lore_block(world_info, json.dumps(cards))
+    return build_lore_block(json.dumps(cards))
 
 
-def _call_narrator(agent, ctx: NarratorContext) -> str:
+def _call_narrator(agent, ctx: NarratorContext) -> tuple[str, int]:
     """Call the NarratorAgent to write prose for a beat."""
     parts = [f"Write prose for beat {ctx.beat_index}/{ctx.beat_total}.\n"]
+
+    if ctx.prior_story_summary:
+        parts.append(f"## Story So Far\n{ctx.prior_story_summary}\n")
+
     parts.append(f"## Beat Instruction\n{ctx.beat_instruction}\n")
-    parts.append(f"## Lore Context\n{ctx.lore_context}\n")
+    if ctx.lore_context:
+        parts.append(f"## Lore Context\n{ctx.lore_context}\n")
 
     if ctx.author_note:
         parts.append(f"## Author Note (reminder)\n{ctx.author_note}\n")
@@ -323,10 +353,11 @@ def _call_narrator(agent, ctx: NarratorContext) -> str:
 
     prompt = "\n".join(parts)
     logger.debug(
-        "Beat %d/%d: narrator prompt chars=%d (instruction=%d lore=%d author_note=%d redirect=%d)",
+        "Beat %d/%d: narrator prompt chars=%d (resume=%d instruction=%d lore=%d author_note=%d redirect=%d)",
         ctx.beat_index,
         ctx.beat_total,
         len(prompt),
+        len(ctx.prior_story_summary or ""),
         len(ctx.beat_instruction),
         len(ctx.lore_context),
         len(ctx.author_note or ""),
@@ -353,7 +384,7 @@ def _call_narrator(agent, ctx: NarratorContext) -> str:
         result.stop_reason,
         len(agent.messages),
     )
-    return str(result)
+    return str(result), beat_in
 
 
 _EVALUATOR_PRIOR_SUMMARY_WINDOW = 10  # Keep only the last N beat summaries
@@ -361,6 +392,12 @@ _EVALUATOR_PRIOR_SUMMARY_MAX_CHARS = 4500  # Secondary hard cap after window tri
 _SUMMARY_MAX_BULLETS = 5
 _SUMMARY_MAX_BULLET_CHARS = 220
 _SUMMARY_MAX_TOTAL_CHARS = 1000
+
+
+def _build_resume_story_summary(prior_summary: str) -> str:
+    """Build a compact narrator seed for the first beat after checkpoint resume."""
+    trimmed = _trim_prior_summary(prior_summary, window=_NARRATOR_RESUME_SUMMARY_WINDOW)
+    return _cap_prior_summary_chars(trimmed, max_chars=_NARRATOR_RESUME_SUMMARY_MAX_CHARS)
 
 
 def _trim_prior_summary(prior_summary: str, window: int = _EVALUATOR_PRIOR_SUMMARY_WINDOW) -> str:
@@ -474,6 +511,7 @@ def _call_evaluator(
             return EvalResult(
                 result="pass", score=1.0, reason="Evaluator fallback: max_tokens",
                 beat_coverage=True, style_compliant=True, coherent=True,
+                evaluated=False, fallback_reason="max_tokens",
             )
     except Exception as exc:
         logger.warning(
@@ -483,6 +521,7 @@ def _call_evaluator(
         return EvalResult(
             result="pass", score=1.0, reason=f"Evaluator fallback: {type(exc).__name__}",
             beat_coverage=True, style_compliant=True, coherent=True,
+            evaluated=False, fallback_reason=type(exc).__name__,
         )
 
     # Try to extract JSON from the response
@@ -498,6 +537,8 @@ def _call_evaluator(
                 beat_coverage=data.get("beat_coverage", True),
                 style_compliant=data.get("style_compliant", True),
                 coherent=data.get("coherent", True),
+                evaluated=True,
+                fallback_reason=None,
                 issues=data.get("issues", []),
             )
     except (json.JSONDecodeError, KeyError):
@@ -507,6 +548,7 @@ def _call_evaluator(
     return EvalResult(
         result="pass", score=1.0, reason="Evaluator fallback: JSON parse failed",
         beat_coverage=True, style_compliant=True, coherent=True,
+        evaluated=False, fallback_reason="json_parse_failed",
     )
 
 
@@ -515,41 +557,56 @@ def _call_evaluator(
 # ---------------------------------------------------------------------------
 
 def _narrate_and_evaluate(
-    narrator, evaluator, ctx: NarratorContext, writing_style: str, prior_summary: str
-) -> tuple[str, int]:
-    """Run the narrator → evaluator loop with retries. Returns (prose, retry_count)."""
+    narrator, ctx: NarratorContext, writing_style: str, prior_summary: str
+) -> tuple[str, int, int, list]:
+    """Run the narrator → evaluator loop with retries.
+
+    Returns (prose, retry_count, last_narrator_input_tokens, beat_start_state).
+    """
     retry_count = 0
+    beat_start_state = _snapshot_narrator_state(narrator)
     logger.info("Beat %d/%d: → narrator (attempt 1)", ctx.beat_index, ctx.beat_total)
-    prose = _call_narrator(narrator, ctx)
+    prose, last_narrator_in = _call_narrator(narrator, ctx)
     logger.info("Beat %d/%d: ← narrator (%d words)", ctx.beat_index, ctx.beat_total, len(prose.split()))
 
     while retry_count < MAX_RETRIES:
         logger.info("Beat %d/%d: → evaluator", ctx.beat_index, ctx.beat_total)
+        gc.collect()
+        evaluator = create_evaluator()
         eval_result = _call_evaluator(evaluator, ctx.beat_instruction, prose, writing_style, prior_summary)
-        logger.info(
-            "Beat %d/%d: ← evaluator %s score=%.2f | %s",
-            ctx.beat_index, ctx.beat_total,
-            eval_result.result, eval_result.score, eval_result.reason,
-        )
+        if eval_result.evaluated:
+            logger.info(
+                "Beat %d/%d: ← evaluator %s score=%.2f | %s",
+                ctx.beat_index, ctx.beat_total,
+                eval_result.result, eval_result.score, eval_result.reason,
+            )
+        else:
+            logger.warning(
+                "Beat %d/%d: ← evaluator fallback accepted output (%s)",
+                ctx.beat_index,
+                ctx.beat_total,
+                eval_result.fallback_reason,
+            )
 
         if eval_result.result == "pass":
             break
 
         retry_count += 1
         if retry_count < MAX_RETRIES:
+            _restore_narrator_state(narrator, beat_start_state)
             logger.info(
                 "Beat %d/%d: → narrator (retry %d/%d)",
                 ctx.beat_index, ctx.beat_total, retry_count + 1, MAX_RETRIES,
             )
             # Append evaluator feedback to context for the retry
             ctx.redirect_instruction = f"[Evaluator feedback — please address]: {eval_result.reason}"
-            prose = _call_narrator(narrator, ctx)
+            prose, last_narrator_in = _call_narrator(narrator, ctx)
             logger.info(
                 "Beat %d/%d: ← narrator (%d words)",
                 ctx.beat_index, ctx.beat_total, len(prose.split()),
             )
 
-    return prose, retry_count
+    return prose, retry_count, last_narrator_in, beat_start_state
 
 
 # ---------------------------------------------------------------------------
@@ -557,7 +614,7 @@ def _narrate_and_evaluate(
 # ---------------------------------------------------------------------------
 
 def _handle_human_input(
-    beat, scene, prose, narrator, evaluator, ctx, prior_summary, completed_beats
+    beat, scene, prose, narrator, ctx, prior_summary, beat_start_state
 ) -> tuple[str, str]:
     """Handle human input pause. Returns (action, final_prose)."""
     while True:
@@ -569,29 +626,41 @@ def _handle_human_input(
             return "continue", prose
 
         elif human.action == "stop":
+            _restore_narrator_state(narrator, beat_start_state)
             return "stop", prose
 
         elif human.action == "skip":
+            _restore_narrator_state(narrator, beat_start_state)
             return "skip", prose
 
         elif human.action == "retry":
+            _restore_narrator_state(narrator, beat_start_state)
             ctx.redirect_instruction = None
             logger.info("Beat %d/%d: → narrator (human retry)", beat.index, len(scene.beats))
-            prose = _call_narrator(narrator, ctx)
+            prose, _ = _call_narrator(narrator, ctx)
             logger.info("Beat %d/%d: ← narrator (%d words)", beat.index, len(scene.beats), len(prose.split()))
             logger.info("Beat %d/%d: → evaluator (human retry)", beat.index, len(scene.beats))
-            eval_result = _call_evaluator(evaluator, ctx.beat_instruction, prose, scene.writing_style, prior_summary)
-            logger.info("Beat %d/%d: ← evaluator %s score=%.2f", beat.index, len(scene.beats), eval_result.result, eval_result.score)
+            gc.collect()
+            eval_result = _call_evaluator(create_evaluator(), ctx.beat_instruction, prose, scene.writing_style, prior_summary)
+            if eval_result.evaluated:
+                logger.info("Beat %d/%d: ← evaluator %s score=%.2f", beat.index, len(scene.beats), eval_result.result, eval_result.score)
+            else:
+                logger.warning("Beat %d/%d: ← evaluator fallback accepted output (%s)", beat.index, len(scene.beats), eval_result.fallback_reason)
             continue  # Show to human again
 
         elif human.action == "redirect":
+            _restore_narrator_state(narrator, beat_start_state)
             ctx.redirect_instruction = human.text
             logger.info("Beat %d/%d: → narrator (human redirect)", beat.index, len(scene.beats))
-            prose = _call_narrator(narrator, ctx)
+            prose, _ = _call_narrator(narrator, ctx)
             logger.info("Beat %d/%d: ← narrator (%d words)", beat.index, len(scene.beats), len(prose.split()))
             logger.info("Beat %d/%d: → evaluator (human redirect)", beat.index, len(scene.beats))
-            eval_result = _call_evaluator(evaluator, ctx.beat_instruction, prose, scene.writing_style, prior_summary)
-            logger.info("Beat %d/%d: ← evaluator %s score=%.2f", beat.index, len(scene.beats), eval_result.result, eval_result.score)
+            gc.collect()
+            eval_result = _call_evaluator(create_evaluator(), ctx.beat_instruction, prose, scene.writing_style, prior_summary)
+            if eval_result.evaluated:
+                logger.info("Beat %d/%d: ← evaluator %s score=%.2f", beat.index, len(scene.beats), eval_result.result, eval_result.score)
+            else:
+                logger.warning("Beat %d/%d: ← evaluator fallback accepted output (%s)", beat.index, len(scene.beats), eval_result.fallback_reason)
             continue  # Show to human again
 
     return "continue", prose
