@@ -113,6 +113,8 @@ See [docs/USER_GUIDE.md](docs/USER_GUIDE.md) for full schema reference and examp
 - **Quality gate** — Evaluator checks beat coverage, style, and coherence; auto-retries on failure
 - **Human steering** — redirect the narrator with free text, retry beats, or skip ahead
 - **Model-agnostic** — swap provider and model in one config line
+- **Scene Builder** — interactive CLI to generate a scene file from scratch via an 8-question interview
+- **Story Importer** — convert any prose `.txt` into a scene file; LLM extracts characters, world-building, and beats automatically
 
 ---
 
@@ -130,12 +132,20 @@ story-engine/
 │   ├── models/
 │   │   ├── provider.py         ← model factory (reads .env)
 │   │   └── data_models.py      ← shared dataclasses
+│   ├── importers/
+│   │   ├── base.py             ← StoryAnalyser ABC, config, LLM helper, factory
+│   │   ├── single_pass.py      ← single-call extraction (≤ 6k words)
+│   │   └── chunked.py          ← multi-pass stub (not yet implemented)
 │   ├── parser.py               ← scene file parser
+│   ├── scene_builder.py        ← interactive scene builder CLI
+│   ├── story_importer.py       ← prose → scene file importer CLI
 │   └── __main__.py             ← CLI entry point
 ├── examples/
 │   └── ashenveil_scene1.md     ← working example scene
 ├── docs/
-│   └── USER_GUIDE.md           ← full documentation
+│   ├── USER_GUIDE.md           ← full scene file reference and engine docs
+│   ├── SCENE_BUILDER.md        ← scene builder usage guide
+│   └── STORY_IMPORTER.md       ← story importer usage guide
 ├── output/                     ← generated stories
 ├── .env.example                ← config template
 └── requirements.txt
@@ -148,6 +158,10 @@ story-engine/
 Full user guide: **[docs/USER_GUIDE.md](docs/USER_GUIDE.md)**
 
 Agent architecture and workflow: **[docs/AGENT_WORKFLOW.md](docs/AGENT_WORKFLOW.md)**
+
+Scene Builder guide: **[docs/SCENE_BUILDER.md](docs/SCENE_BUILDER.md)**
+
+Story Importer guide: **[docs/STORY_IMPORTER.md](docs/STORY_IMPORTER.md)**
 
 Covers: scene file reference, all section options, execution modes, interactive commands, output formats, stitching multi-scene stories, resume/checkpoints, and troubleshooting.
 
