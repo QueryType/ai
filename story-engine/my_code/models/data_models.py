@@ -79,6 +79,7 @@ class NarratorContext:
     beat_index: int  # 1-based
     beat_total: int
     author_note: str | None = None
+    prior_story_summary: str | None = None
     redirect_instruction: str | None = None
 
 
@@ -98,6 +99,8 @@ class EvalResult:
     beat_coverage: bool
     style_compliant: bool
     coherent: bool
+    evaluated: bool = True
+    fallback_reason: str | None = None
     issues: list[str] = field(default_factory=list)
 
 

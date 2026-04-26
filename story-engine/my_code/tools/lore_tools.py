@@ -66,23 +66,23 @@ def get_character_card(character_name: str, characters_json: str) -> str:
 
 
 @tool
-def build_lore_block(world_info: str, matched_cards_json: str) -> str:
-    """Assemble a lore injection block from world info and matched character cards.
+def build_lore_block(matched_cards_json: str) -> str:
+    """Assemble a compact lore injection block from matched character cards.
 
     Args:
-        world_info: The global world-info content.
         matched_cards_json: JSON array of pre-formatted character card strings.
 
     Returns:
-        Complete lore context string ready for narrator prompt injection.
+        Character-focused lore context string ready for narrator prompt injection.
     """
     matched_cards = json.loads(matched_cards_json)
 
-    parts = ["## World\n", world_info]
+    if not matched_cards:
+        return ""
 
-    if matched_cards:
-        parts.append("\n\n## Characters in Scene\n")
-        for card in matched_cards:
-            parts.append(f"\n{card}\n")
+    parts = ["## Characters in Scene\n"]
+
+    for card in matched_cards:
+        parts.append(f"\n{card}\n")
 
     return "".join(parts)
