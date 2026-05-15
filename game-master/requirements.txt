@@ -1,0 +1,5 @@
+strands-agents>=1.33.0
+openai>=1.0.0
+python-dotenv
+rich
+textual>=0.61.0
