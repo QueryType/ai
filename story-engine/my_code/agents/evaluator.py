@@ -57,6 +57,34 @@ You receive a beat instruction (what should happen) and the prose output
 """
 
 
+EVALUATOR_SINGLE_PASS_SYSTEM_PROMPT = """\
+You are the Evaluator — a quality gate for a story engine.
+
+You receive a beat instruction, prose output, writing style directives, and prior
+beat summaries. Evaluate using the same rubric:
+
+1. Beat coverage (strict): the core event in the beat instruction must happen.
+2. Style compliance (moderate): flag clear directive violations only.
+3. Coherence (strict with prior context): flag real contradictions only.
+
+Return ONLY valid JSON (no markdown, no extra text) with this exact schema:
+{
+   "result": "pass" | "retry",
+   "score": number,
+   "reason": string,
+   "beat_coverage": boolean,
+   "style_compliant": boolean,
+   "coherent": boolean,
+   "issues": string[]
+}
+
+Rules:
+- score must be in [0.0, 1.0] and should reflect the three booleans.
+- result must be "pass" only if all three booleans are true; otherwise "retry".
+- issues should contain specific, concise problems. Use [] when all checks pass.
+"""
+
+
 def create_evaluator() -> Agent:
     """Create a fresh EvaluatorAgent instance."""
     return Agent(
@@ -66,3 +94,18 @@ def create_evaluator() -> Agent:
         model=get_model("evaluator"),
         conversation_manager=NullConversationManager(),
     )
+
+
+def create_evaluator_single_pass() -> Agent:
+   """Create evaluator variant that returns final JSON directly without tools.
+
+   Used as a fallback when tool-calling loops inflate context and trigger
+   provider-side prompt-length errors.
+   """
+   return Agent(
+      name="EvaluatorSinglePass",
+      system_prompt=system_prompt_suffix(EVALUATOR_SINGLE_PASS_SYSTEM_PROMPT),
+      tools=[],
+      model=get_model("evaluator"),
+      conversation_manager=NullConversationManager(),
+   )

@@ -56,16 +56,48 @@ Field rules:
 - title             : short, evocative; infer from the story or invent if free mode
 - pov               : infer from the narrative voice (third-person / first-person / second-person / third-person-limited)
 - target_length     : estimate total desired output words — use 1500 / 3500 / 6000 / 9000
-- scenario          : 2–4 paragraphs orienting the narrator to what is active at scene open; read once only
-- narrator_prompt   : who the narrator is, tense, POV control rules, what it must/must not do
-- writing_style     : sentence rhythm, dialogue format, sensory emphasis — the HOW of the prose
+- scenario          : 2–4 paragraphs describing the SITUATION BEFORE THE SCENE OPENS — who the characters
+                      are, why they are where they are, what each character wants or fears, and what
+                      led them to this moment; do NOT describe events from the prose itself; this is
+                      read once by the narrator before beat 1 to understand context and motivation
+- narrator_prompt   : written as direct instructions to the narrator; must state POV and tense; must
+                      name which characters the narrator controls vs does not (e.g. "you control all
+                      characters except the player character"); must include at least one prohibition
+                      ("never summarise", "do not break character", "do not make decisions for the player");
+                      capture any distinctive voice or thematic framing evident in the prose; aim for
+                      60–120 words
+- writing_style     : the HOW of the prose — sentence rhythm (short/percussive vs long/flowing), dialogue
+                      format (quotes? italics?), sensory emphasis (which senses dominate), pacing cues,
+                      show-don't-tell rules, and any distinctive stylistic choices visible in the source;
+                      aim for 60–120 words
 - author_note_content : one persistent thematic reminder, 1–2 sentences max
-- world_info        : STRICTLY under 300 words — setting, lore, rules that create pressure; injected every beat
+- world_info        : STRICTLY under 300 words — be comprehensive: include ALL named factions, locations,
+                      supernatural/divine rules, social hierarchies, and world-specific lore visible in the
+                      source; aim for 100–250 words; injected every beat so keep it dense and specific
 - scene_setup       : specific, sensory — location, time of day/season, emotional atmosphere
-- characters        : every named or clearly distinct character; triggers must cover name variants, pronouns, role titles
+- characters        : every named or clearly distinct character;
+                      triggers are comma-separated keywords used to MATCH MENTIONS OF THIS CHARACTER
+                      IN PROSE — include: full name, surname or short name, epithets and titles from the
+                      prose (e.g. "the sun's son", "the charioteer's son", "the archer"), pronouns
+                      (she/he/they/her/him), and role descriptors — aim for 6–12 triggers per character
+                      (e.g. "Lyra, Voss, she, her, the scout, the woman, the deserter") —
+                      do NOT include personality traits, objects, or abstract concepts;
+                      description must include physical appearance (age, build, clothing, weapons/tools);
+                      personality minimum 20 words describing traits and drives;
+                      backstory minimum 20 words on history relevant to this scene;
+                      speech_style must describe HOW they speak (cadence, habit, tone), not what they say
 - beats             : exactly {beat_count} beats; title SHORT ALL-CAPS (e.g. THE DESCENT); instruction is
-                      directional — WHAT happens in this beat, not HOW to write it; 2–4 sentences each
-- writing_instructions : scene-specific creative direction read once at scene start; where to open, what to avoid
+                      directional — WHAT happens in this beat (who does what, what changes, what is at
+                      stake), not HOW to write it; 3–5 sentences, 25–60 words each — do not abbreviate;
+                      set pause:true for beats that are natural player-agency moments: first direct contact
+                      between characters, any beat where a decision must be made, a confrontation or
+                      standoff, a moment of revelation the player must respond to — typically 2–3 beats
+                      in a 5-beat scene will have pause:true
+- writing_instructions : scene-specific creative direction read once at scene start; be comprehensive —
+                      extract ALL creative directives visible in the prose's execution; must include
+                      (1) where and how to open the scene, (2) at least one explicit avoidance directive
+                      ("avoid X", "don't Y", "never Z"), and (3) any character-specific or beat-specific
+                      writing rules; aim for 80–200 words
 
 Return ONLY valid JSON. No markdown fences. No explanation outside the JSON."""
 

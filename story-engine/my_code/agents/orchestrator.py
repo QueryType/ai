@@ -19,7 +19,7 @@ from pathlib import Path
 
 from strands.types.exceptions import MaxTokensReachedException
 
-from my_code.agents.evaluator import create_evaluator
+from my_code.agents.evaluator import create_evaluator, create_evaluator_single_pass
 from my_code.agents.narrator import create_narrator
 from my_code.agents.summariser import create_summariser
 from my_code.tools.lore_tools import build_lore_block, get_character_card, scan_for_triggers
@@ -389,6 +389,8 @@ def _call_narrator(agent, ctx: NarratorContext) -> tuple[str, int]:
 
 _EVALUATOR_PRIOR_SUMMARY_WINDOW = 10  # Keep only the last N beat summaries
 _EVALUATOR_PRIOR_SUMMARY_MAX_CHARS = 4500  # Secondary hard cap after window trim
+_EVALUATOR_SINGLE_PASS_PRIOR_SUMMARY_MAX_CHARS = 1800
+_EVALUATOR_SINGLE_PASS_PROSE_MAX_CHARS = 4200
 _SUMMARY_MAX_BULLETS = 5
 _SUMMARY_MAX_BULLET_CHARS = 220
 _SUMMARY_MAX_TOTAL_CHARS = 1000
@@ -467,6 +469,73 @@ def _normalize_summary_for_budget(summary_text: str) -> str:
     return normalized[: _SUMMARY_MAX_TOTAL_CHARS - 3].rstrip() + "..."
 
 
+def _truncate_middle(text: str, max_chars: int) -> str:
+    """Truncate long text by preserving both the beginning and end segments."""
+    if not text or len(text) <= max_chars:
+        return text
+    if max_chars <= 5:
+        return text[:max_chars]
+    head = int(max_chars * 0.65)
+    tail = max_chars - head - 5
+    return f"{text[:head].rstrip()}\n...\n{text[-tail:].lstrip()}"
+
+
+def _call_evaluator_single_pass(
+    beat_instruction: str, prose: str, writing_style: str, prior_summary: str
+) -> EvalResult | None:
+    """Fallback evaluator path with no tool-calling to avoid recursive tool loops."""
+    trimmed_summary = _trim_prior_summary(prior_summary)
+    capped_summary = _cap_prior_summary_chars(
+        trimmed_summary,
+        max_chars=_EVALUATOR_SINGLE_PASS_PRIOR_SUMMARY_MAX_CHARS,
+    )
+    compact_prose = _truncate_middle(prose, _EVALUATOR_SINGLE_PASS_PROSE_MAX_CHARS)
+    prompt = (
+        "Evaluate this beat's prose and return strict JSON only.\n\n"
+        f"## Beat Instruction\n{beat_instruction}\n\n"
+        f"## Prose Output\n{compact_prose}\n\n"
+        f"## Writing Style\n{writing_style}\n\n"
+        f"## Prior Beats Summary\n{capped_summary if capped_summary else '(first beat — no prior context)'}"
+    )
+
+    logger.warning(
+        "EVALUATOR RECOVERY: switching to single-pass mode (prompt chars=%d, prose chars=%d)",
+        len(prompt),
+        len(compact_prose),
+    )
+
+    try:
+        result = create_evaluator_single_pass()(prompt)
+        raw = str(result)
+    except Exception as exc:
+        logger.warning(
+            "EVALUATOR RECOVERY FAILED: %s in single-pass mode",
+            type(exc).__name__,
+        )
+        return None
+
+    try:
+        json_start = raw.find("{")
+        json_end = raw.rfind("}") + 1
+        if json_start >= 0 and json_end > json_start:
+            data = json.loads(raw[json_start:json_end])
+            return EvalResult(
+                result=data.get("result", "pass"),
+                score=data.get("score", 1.0),
+                reason=data.get("reason", ""),
+                beat_coverage=data.get("beat_coverage", True),
+                style_compliant=data.get("style_compliant", True),
+                coherent=data.get("coherent", True),
+                evaluated=True,
+                fallback_reason=None,
+                issues=data.get("issues", []),
+            )
+    except (json.JSONDecodeError, KeyError):
+        logger.warning("EVALUATOR RECOVERY FAILED: single-pass JSON parse failed")
+
+    return None
+
+
 def _call_evaluator(
     agent, beat_instruction: str, prose: str, writing_style: str, prior_summary: str
 ) -> EvalResult:
@@ -508,6 +577,14 @@ def _call_evaluator(
                 "Prompt chars=%d; consider reducing ctx or trimming input.",
                 len(prompt),
             )
+            recovered = _call_evaluator_single_pass(
+                beat_instruction,
+                prose,
+                writing_style,
+                prior_summary,
+            )
+            if recovered is not None:
+                return recovered
             return EvalResult(
                 result="pass", score=1.0, reason="Evaluator fallback: max_tokens",
                 beat_coverage=True, style_compliant=True, coherent=True,
@@ -518,6 +595,14 @@ def _call_evaluator(
             "EVALUATOR FALLBACK: %s raised mid-call — defaulting to pass",
             type(exc).__name__,
         )
+        recovered = _call_evaluator_single_pass(
+            beat_instruction,
+            prose,
+            writing_style,
+            prior_summary,
+        )
+        if recovered is not None:
+            return recovered
         return EvalResult(
             result="pass", score=1.0, reason=f"Evaluator fallback: {type(exc).__name__}",
             beat_coverage=True, style_compliant=True, coherent=True,
@@ -543,6 +628,14 @@ def _call_evaluator(
             )
     except (json.JSONDecodeError, KeyError):
         logger.warning("EVALUATOR FALLBACK: JSON parse failed — defaulting to pass. raw=%r", raw[:200])
+        recovered = _call_evaluator_single_pass(
+            beat_instruction,
+            prose,
+            writing_style,
+            prior_summary,
+        )
+        if recovered is not None:
+            return recovered
 
     # Default to pass if parsing fails
     return EvalResult(
