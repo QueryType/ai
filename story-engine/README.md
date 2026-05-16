@@ -115,6 +115,7 @@ See [docs/USER_GUIDE.md](docs/USER_GUIDE.md) for full schema reference and examp
 - **Model-agnostic** — swap provider and model in one config line
 - **Scene Builder** — interactive CLI to generate a scene file from scratch via an 8-question interview
 - **Story Importer** — convert any prose `.txt` into a scene file; LLM extracts characters, world-building, and beats automatically
+- **Story Translator** — translate any large story file paragraph-by-paragraph with rolling context for name and tone continuity; supports any language and custom script/style hints
 
 ---
 
@@ -127,7 +128,8 @@ story-engine/
 │   │   ├── orchestrator.py     ← main loop, mode logic, checkpoint/resume
 │   │   ├── narrator.py         ← writes prose per beat
 │   │   ├── lore_injector.py    ← keyword-triggered context assembly
-│   │   └── evaluator.py        ← quality gate, pass/retry verdict
+│   │   ├── evaluator.py        ← quality gate, pass/retry verdict
+│   │   └── translator.py       ← TranslatorAgent factory for the translate tool
 │   ├── tools/                  ← @tool functions for each agent
 │   ├── models/
 │   │   ├── provider.py         ← model factory (reads .env)
@@ -139,13 +141,15 @@ story-engine/
 │   ├── parser.py               ← scene file parser
 │   ├── scene_builder.py        ← interactive scene builder CLI
 │   ├── story_importer.py       ← prose → scene file importer CLI
+│   ├── translate.py            ← story translation CLI
 │   └── __main__.py             ← CLI entry point
 ├── examples/
 │   └── ashenveil_scene1.md     ← working example scene
 ├── docs/
 │   ├── USER_GUIDE.md           ← full scene file reference and engine docs
 │   ├── SCENE_BUILDER.md        ← scene builder usage guide
-│   └── STORY_IMPORTER.md       ← story importer usage guide
+│   ├── STORY_IMPORTER.md       ← story importer usage guide
+│   └── TRANSLATOR.md           ← story translator usage guide
 ├── output/                     ← generated stories
 ├── .env.example                ← config template
 └── requirements.txt
@@ -162,6 +166,8 @@ Agent architecture and workflow: **[docs/AGENT_WORKFLOW.md](docs/AGENT_WORKFLOW.
 Scene Builder guide: **[docs/SCENE_BUILDER.md](docs/SCENE_BUILDER.md)**
 
 Story Importer guide: **[docs/STORY_IMPORTER.md](docs/STORY_IMPORTER.md)**
+
+Story Translator guide: **[docs/TRANSLATOR.md](docs/TRANSLATOR.md)**
 
 Covers: scene file reference, all section options, execution modes, interactive commands, output formats, stitching multi-scene stories, resume/checkpoints, and troubleshooting.
 
