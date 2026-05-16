@@ -15,7 +15,8 @@ A multi-agent story generation engine that reads structured scene files and prod
 7. [Output Formats](#7-output-formats)
 8. [Stitching a Full Story](#8-stitching-a-full-story)
 9. [Resume & Checkpoints](#9-resume--checkpoints)
-10. [Troubleshooting](#10-troubleshooting)
+10. [Story Translator](#10-story-translator)
+11. [Troubleshooting](#11-troubleshooting)
 
 ---
 
@@ -554,7 +555,35 @@ rm output/.ashenveil_scene1.checkpoint.json
 
 ---
 
-## 10. Troubleshooting
+## 10. Story Translator
+
+Translate any large story or prose file into another language, paragraph by paragraph, with rolling context to maintain character name consistency, tone, and style.
+
+See **[TRANSLATOR.md](TRANSLATOR.md)** for the full reference. Quick summary:
+
+```bash
+# Auto-detect source language
+python -m my_code.translate story.md --target Hindi
+
+# Explicit source
+python -m my_code.translate story.md --target French --source English
+
+# Custom script or style via --hint
+python -m my_code.translate story.md --target Hinglish \
+  --hint "Write in Roman script (Latin alphabet), not Devanagari"
+
+python -m my_code.translate story.md --target Urdu \
+  --hint "Use Arabic script"
+
+# Custom output path
+python -m my_code.translate story.md --target Hindi --output /tmp/out.md
+```
+
+The translator reuses `STORY_ENGINE_SUMMARISER_BASE_URL` and `STORY_ENGINE_SUMMARISER_MODEL` from `.env` — no extra configuration needed.
+
+---
+
+## 11. Troubleshooting
 
 ### Connection refused / model not responding
 
