@@ -30,22 +30,33 @@ def get_model(role: str):
         A Strands Model instance ready to pass to Agent(model=...).
     """
     provider = os.environ.get("STORY_ENGINE_PROVIDER", "local")
+    role_key = role.upper()
+
+    # Per-role base URL override — if set, always routes to that local endpoint
+    # regardless of the global provider. Allows mixing cloud narrator with local
+    # evaluator/summariser by setting STORY_ENGINE_EVALUATOR_BASE_URL etc.
+    role_base_url = os.environ.get(f"STORY_ENGINE_{role_key}_BASE_URL")
+    if role_base_url:
+        return _build_openai_compat(
+            base_url=role_base_url,
+            model_id=os.environ.get(f"STORY_ENGINE_{role_key}_MODEL", _DEFAULT_LOCAL_MODEL),
+            api_key="not-needed",
+        )
 
     if provider == "local":
         base_url = os.environ.get(
-            f"STORY_ENGINE_{role.upper()}_BASE_URL",
-            os.environ.get("STORY_ENGINE_LOCAL_BASE_URL", "http://localhost:1234/v1"),
+            "STORY_ENGINE_LOCAL_BASE_URL", "http://localhost:1234/v1"
         )
         return _build_openai_compat(
             base_url=base_url,
-            model_id=os.environ.get(f"STORY_ENGINE_{role.upper()}_MODEL", _DEFAULT_LOCAL_MODEL),
+            model_id=os.environ.get(f"STORY_ENGINE_{role_key}_MODEL", _DEFAULT_LOCAL_MODEL),
             api_key="not-needed",
         )
 
     elif provider == "openrouter":
         return _build_openai_compat(
             base_url="https://openrouter.ai/api/v1",
-            model_id=os.environ.get(f"STORY_ENGINE_{role.upper()}_MODEL", "deepseek/deepseek-v3.2"),
+            model_id=os.environ.get(f"STORY_ENGINE_{role_key}_MODEL", "deepseek/deepseek-v3.2"),
             api_key=os.environ["OPENROUTER_API_KEY"],
         )
 
