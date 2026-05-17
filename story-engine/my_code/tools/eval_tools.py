@@ -14,6 +14,20 @@ import json
 
 from strands import tool
 
+# Side-channel: emit_eval_result stores its JSON here so _call_evaluator can
+# retrieve it directly. Local models often wrap the tool output in prose instead
+# of echoing raw JSON in their final message, so str(result) parsing fails.
+# Reading this after agent() returns is reliable regardless of final-text format.
+_last_emit: str | None = None
+
+
+def pop_last_emit() -> str | None:
+    """Return and clear the last emit_eval_result JSON, or None if not called."""
+    global _last_emit
+    val = _last_emit
+    _last_emit = None
+    return val
+
 
 @tool
 def check_beat_coverage(covered: bool, reason: str) -> str:
@@ -82,6 +96,7 @@ def emit_eval_result(beat_coverage: bool, style_compliant: bool, coherent: bool,
     Returns:
         JSON EvalResult with result, score, reason, and per-check booleans.
     """
+    global _last_emit
     issues = json.loads(issues_json) if issues_json else []
     all_pass = beat_coverage and style_compliant and coherent
     score = sum([beat_coverage, style_compliant, coherent]) / 3.0
@@ -95,4 +110,5 @@ def emit_eval_result(beat_coverage: bool, style_compliant: bool, coherent: bool,
         "coherent": coherent,
         "issues": issues,
     }
-    return json.dumps(result)
+    _last_emit = json.dumps(result)
+    return _last_emit
