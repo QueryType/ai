@@ -22,6 +22,7 @@ from strands.types.exceptions import MaxTokensReachedException
 from my_code.agents.evaluator import create_evaluator, create_evaluator_single_pass
 from my_code.agents.narrator import create_narrator
 from my_code.agents.summariser import create_summariser
+from my_code.tools.eval_tools import pop_last_emit
 from my_code.tools.lore_tools import build_lore_block, get_character_card, scan_for_triggers
 from my_code.models.data_models import (
     EvalResult,
@@ -570,6 +571,29 @@ def _call_evaluator(
             usage.get("totalTokens", 0),
             result.stop_reason,
         )
+
+        # Prefer the side-channel JSON from emit_eval_result over str(result).
+        # Local models often wrap the tool output in prose ("I have evaluated...")
+        # rather than echoing raw JSON, so str(result) parsing fails for them.
+        emitted = pop_last_emit()
+        if emitted:
+            try:
+                data = json.loads(emitted)
+                logger.debug("Evaluator: using emit_eval_result side-channel JSON")
+                return EvalResult(
+                    result=data.get("result", "pass"),
+                    score=data.get("score", 1.0),
+                    reason=data.get("reason", ""),
+                    beat_coverage=data.get("beat_coverage", True),
+                    style_compliant=data.get("style_compliant", True),
+                    coherent=data.get("coherent", True),
+                    evaluated=True,
+                    fallback_reason=None,
+                    issues=data.get("issues", []),
+                )
+            except (json.JSONDecodeError, KeyError):
+                logger.warning("Evaluator: side-channel JSON parse failed, falling back to str(result)")
+
         if result.stop_reason == "max_tokens":
             logger.warning(
                 "EVALUATOR FALLBACK: stop_reason=max_tokens — context limit hit, "
