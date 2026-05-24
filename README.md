@@ -1,53 +1,77 @@
 # AI Projects Collection
 
-A collection of AI-powered tools and applications built with Python, focusing on LLMs, computer vision, and semantic search.
+A collection of AI-powered applications and tools built with Python, spanning interactive fiction, conversational AI, image generation, semantic search, and more.
 
-## Projects
+## Interactive Fiction & Storytelling
 
-### 🎨 [BFL Kontext Suite](./bfl)
-A comprehensive Python toolkit for AI image generation and editing using the BFL (Black Forest Labs) Kontext API. Features text-to-image generation, AI-powered image editing, interactive CLI, and programmatic API.
+### [Game Master](./game-master)
+AI-driven text adventure engine replicating KoboldCPP's Adventure mode. Declare actions, the GM narrates consequences in streaming prose with dice rolls and persistent memory. Terminal and web UI. Supports vision-capable models for in-game images.
 
-### 💬 [Dual Agent Chat](./dual-agent-chat)
-A lightweight, configuration-driven system for running conversations between two AI agents with advanced interactive controls. Features memory-efficient architecture with role switching, OpenAI-compatible API support, and interactive conversation control.
+### [Story Engine](./story-engine)
+Multi-agent narrative engine that writes roleplay and adventure fiction from structured scene files. A pipeline of agents (LoreInjector, Narrator, Evaluator, Summariser) generates prose beat-by-beat with quality gating. Autonomous, interactive, and semi-interactive modes.
 
-### 🔍 [Gospel Embeddings](./gospel_embeddings)
-Semantic search system for The Gospel of Sri Ramakrishna using Google's EmbeddingGemma model, ChromaDB vector database, and MCP (Model Context Protocol) integration. Includes 7,862 high-quality text chunks with advanced semantic search capabilities.
+### [Story Summarizer](./story_summarizer)
+Multi-agent workflow for intelligent story summarization. Sequential agents handle character analysis, content/tone analysis, summary generation, and title creation.
 
-### 🖼️ [Llama Server Multimodal](./llama-server-multimodal)
-Multimodal image analyzer and tagger that automatically analyzes images using OpenAI-compatible APIs. Supports multiple tagging styles including simple descriptions, booru-style tags, NSFW classification, artistic analysis, and weather forecast analysis.
+### [Story Chunker](./story_chunker)
+Extract specific topics, themes, or subjects from story files using AI. Useful for researchers and writers working with large text files.
 
-### 🔧 [MCP Tools](./mcp)
-Programs and utilities built on the Model Context Protocol (MCP) for AI agent integration.
+## Conversational AI
 
-### 🕉️ [MymicroGPT](./mymicroGPT)
-A pure Python, zero-dependency GPT that learns Devanagari character patterns from Indian names and generates new, plausible-sounding Sanskrit/Hindi names. Based on Karpathy's microgpt architecture with a custom autograd engine, character-level tokenizer for Devanagari Unicode, and a ~32K name dataset spanning historical figures, mythology, and Sanskrit vocabulary. No pip install required.
+### [Chat Engine](./chat-engine)
+CLI tool for multi-character autonomous conversation. Multiple AI characters share a world and talk to each other. Watch, steer, or step in as any character at any time. Supports rule-based and LLM-driven turn selection.
 
-### 📹 [Real-time Webcam & Screen Capture](./rt_webcam_scr)
-A powerful web-based interface for real-time vision model analysis using webcam or screen capture. Works with any OpenAI-compatible vision API with features like frame skipping, performance metrics, and advanced logging.
+### [Dual Agent Chat](./dual-agent-chat)
+Lightweight system for conversations between two AI agents with role-switching memory optimization. Configuration-driven with OpenAI-compatible API support and interactive controls.
 
-### 📚 [Story Chunker](./story_chunker)
-Extract specific topics, themes, or subjects from story files using AI. Perfect for researchers, writers, and educators working with large text files who need to find and extract specific content based on topics or themes.
+### [Faaltoo Chat](./faaltoo-chat)
+Zero-friction local LLM chat launcher. Pick dimension chips (archetype, mood, talk-type) and jump into a conversation — no character cards or world-building needed. Web and terminal UI.
 
-### 📝 [Story Summarizer](./story_summarizer)
-A sophisticated multi-agent workflow system for intelligent story summarization built with Strands Agents SDK. Uses sequential agents for character analysis, content analysis, summary generation, and title creation.
+## Image Generation & Vision
 
-### 🔊 [TTS Krutrim](./tts_krutrim)
-A simple web application using Krutrim's TTS API to convert text to speech. Built with Gradio, supporting multiple languages (English, Hindi) and speaker voices.
+### [BFL Kontext Suite](./bfl)
+Python toolkit for AI image generation and editing using the Black Forest Labs Kontext API. Text-to-image generation, image editing, interactive CLI, and Gradio web UI.
 
-### 🎥 [YouTube Searcher MCP](./yt_searcher_mcp)
-LLM-powered search pipeline with MCP server that processes user queries through multiple tools. Features intent analysis, Google search, web scraping, YouTube query generation, and YouTube video search.
+### [Llama Server Multimodal](./llama-server-multimodal)
+Image analyzer and tagger using OpenAI-compatible vision APIs. Multiple tagging styles: descriptions, booru-style tags, NSFW classification, artistic analysis.
 
-## Language Distribution
-- Python: 85.4%
-- HTML: 14.6%
+### [Real-time Webcam & Screen Capture](./rt_webcam_scr)
+Web-based interface for real-time vision model analysis using webcam or screen capture. Frame skipping, performance metrics, and advanced logging.
+
+### [HF Inference](./hf_inference)
+Gradio apps for Hugging Face Inference API — text chat (multi-model) and text-to-image generation (FLUX.1).
+
+## Search & Knowledge
+
+### [Gospel Embeddings](./gospel_embeddings)
+Semantic search for The Gospel of Sri Ramakrishna using EmbeddingGemma, ChromaDB, and MCP. 7,862 text chunks with advanced semantic search.
+
+### [YouTube Searcher MCP](./yt_searcher_mcp)
+LLM-powered search pipeline with MCP server. Intent analysis, Google search, web scraping, YouTube query generation, and video search.
+
+### [MCP Tools](./mcp)
+Programs and utilities built on the Model Context Protocol for AI agent integration.
+
+## Language & Audio
+
+### [MymicroGPT](./mymicroGPT)
+Pure Python, zero-dependency GPT that learns Devanagari character patterns from Indian names and generates new Sanskrit/Hindi names. Custom autograd engine, character-level tokenizer, ~32K name dataset.
+
+### [TTS Krutrim](./tts_krutrim)
+Web app using Krutrim's TTS API for text-to-speech. Built with Gradio, supporting English and Hindi with multiple speaker voices.
 
 ## Getting Started
 
-Each project contains its own README with detailed installation and usage instructions. Navigate to the individual project directories to learn more.
+Each project contains its own README with setup and usage instructions. Most projects follow a simple pattern:
+
+```bash
+cd <project>
+pip install -r requirements.txt  # or conda, see project README
+cp .env.example .env             # configure API keys / model endpoints
+```
 
 ## Requirements
 
-Most projects require:
-- Python 3.7+
-- Various API keys (OpenAI, local LLM servers, etc.)
-- Project-specific dependencies (see individual README files)
+- Python 3.10+
+- API keys or local LLM servers depending on the project (see individual READMEs)
+- Project-specific dependencies installed per-project
