@@ -80,3 +80,29 @@ class GameState:
             memory=scene.memory,
             author_note=scene.author_note,
         )
+
+    def snapshot(self) -> dict:
+        """Serialize mutable state for regen/undo. Does not include scene or vision flags."""
+        return {
+            "memory": self.memory,
+            "author_note": self.author_note,
+            "world_info_entries": [
+                {"keyword": e.keyword, "content": e.content}
+                for e in self.world_info_entries
+            ],
+            "story_log": list(self.story_log),
+            "turn_count": self.turn_count,
+            "input_mode": self.input_mode,
+        }
+
+    def restore(self, snap: dict) -> None:
+        """Restore mutable state from a snapshot produced by snapshot()."""
+        self.memory = snap["memory"]
+        self.author_note = snap["author_note"]
+        self.world_info_entries = [
+            WorldInfoEntry(keyword=e["keyword"], content=e["content"])
+            for e in snap["world_info_entries"]
+        ]
+        self.story_log = list(snap["story_log"])
+        self.turn_count = snap["turn_count"]
+        self.input_mode = snap.get("input_mode", self.input_mode)

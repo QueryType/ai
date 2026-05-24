@@ -1,8 +1,8 @@
 # Game Master
 
-An AI-driven text adventure engine that replicates the Adventure mode from [KoboldCPP](https://github.com/lostruins/koboldcpp). A single stateful [Strands Agents](https://strandsagents.com/) agent acts as your Game Master — you declare actions, it narrates the consequences in real-time streaming prose.
+An AI-driven text adventure engine that replicates the Adventure mode from [KoboldCPP](https://github.com/lostruins/koboldcpp). You declare actions, the GM narrates the world's response in real-time streaming prose.
 
-Runs entirely locally against [LM Studio](https://lmstudio.ai/) or [llama.cpp](https://github.com/ggerganov/llama.cpp), or against any OpenAI-compatible endpoint. Vision-capable models (Gemma 4, LLaVA, Llama 3.2 Vision) unlock image support during play.
+Runs entirely locally against [LM Studio](https://lmstudio.ai/) or [llama.cpp](https://github.com/ggerganov/llama.cpp), or against any OpenAI-compatible endpoint (e.g. OpenRouter). Vision-capable models (Gemma 4, LLaVA, Llama 3.2 Vision) unlock image support during play.
 
 ---
 
@@ -12,6 +12,7 @@ Runs entirely locally against [LM Studio](https://lmstudio.ai/) or [llama.cpp](h
 - [Setup](#setup)
 - [Usage](#usage)
   - [Starting a game](#starting-a-game)
+  - [Web UI](#web-ui)
   - [Playing](#playing)
   - [In-game commands](#in-game-commands)
   - [Saving and loading](#saving-and-loading)
@@ -23,7 +24,6 @@ Runs entirely locally against [LM Studio](https://lmstudio.ai/) or [llama.cpp](h
   - [How it works under the hood](#how-it-works-under-the-hood)
 - [Scenarios](#scenarios)
   - [File structure](#file-structure)
-  - [Adding images](#adding-images-to-a-scenario)
   - [Writing your own](#writing-your-own-scenario)
 - [GM tools](#gm-tools)
 - [Providers](#providers)
@@ -72,7 +72,7 @@ STORY_ENGINE_LOCAL_BASE_URL=http://localhost:1234/v1   # LM Studio default
 STORY_ENGINE_GAME_MASTER_MODEL=gemma-3-27b-it          # or your model name
 ```
 
-For llama.cpp, change the port to `8080` (or whichever port you started it on). For cloud providers see [Providers](#providers) below.
+For llama.cpp, change the port to `8080` (or whichever port you started it on). For OpenRouter see [Providers](#providers) below.
 
 ---
 
@@ -87,12 +87,42 @@ python -m my_code
 # Explicit scenario file
 python -m my_code scenarios/ashenveil.md
 
-# Textual TUI — multi-pane terminal UI with story pane, memory sidebar, input bar
-python -m my_code --ui tui
-python -m my_code --ui tui scenarios/ashenveil.md
+# Web UI (browser, served on port 7860)
+python -m my_code --ui web
+python -m my_code --ui web --port 8080   # custom port
 ```
 
-On startup, the engine checks if your model supports vision (see [Vision](#vision--introducing-images)), then streams the opening narration. If the scenario has no `[opening]` section the GM generates one.
+On startup, the engine checks if your model supports vision (see [Using images](#using-images)), then streams the opening narration. If the scenario has no `[opening]` section the GM generates one.
+
+---
+
+### Web UI
+
+The web UI runs as a FastAPI server you connect to from any browser on the same network — useful when your LLM server is on a Mac Mini or desktop and you want to play from a laptop or tablet.
+
+```bash
+# On the machine running the LLM server
+python -m my_code --ui web
+
+# Connect from any browser on the LAN
+http://<host-ip>:7860
+```
+
+**Setup screen** — enter your LLM server URL, optional model override, and tick "Enable vision probe" if using a vision-capable model. The URL can point to a remote machine (`http://192.168.1.x:1234/v1`).
+
+**Themes** — the `◑` button in the header cycles through system (follows OS) → dark → light. Preference is saved in `localStorage`.
+
+**Inline edit** — double-click any GM response to edit it in place. A faint border appears, type your changes, then `Ctrl+Enter` to save or `Esc` to cancel. This updates the conversation history so subsequent GM turns read the edited version.
+
+**Undo** — `↩ Undo` in the header removes the last player action and GM response from the conversation history, returning you to the previous state so you can try something different.
+
+**Regen** — `↺ Regen` replays the same player action and generates a new GM response.
+
+**Image attach** — visible when a vision-capable model is detected. Pick an image file, add a label describing what it represents in the scene, then send your action. A `🖼` note appears in the story showing what the vision model made of the image before the GM responds.
+
+**Author's note** — editable in the sidebar, updates live. The text box is vertically resizable.
+
+---
 
 ### Playing
 
@@ -133,12 +163,14 @@ All commands begin with `/` and are not sent to the GM.
 |---|---|
 | `/save [name]` | Save full game state to `saves/<name>.json`. Auto-names if omitted. |
 | `/load [name]` | Restore a save. Omit name to list available saves. |
+| `/regen` | Regenerate the last GM response — full rollback and re-run with the same player action. |
+| `/edit` | Edit the last GM response inline. Enter replacement text, blank line to confirm, `/cancel` to abort. |
 | `/memory` | Display the current memory block — key facts the GM tracks across turns. |
 | `/note [text]` | Show or update the author's note. This is a tone/style directive injected near the end of the GM's context every N turns. |
 | `/mode` | Toggle between **ACTION** (auto-prefixes "You") and **STORY** (free text) input modes. |
 | `/img <path>` | Attach an image to your next action. Vision models only — see below. |
 | `/export [name]` | Export the story narration as plain text to `exports/<name>.txt`. |
-| `/help` | List all commands (vision commands shown only when vision is enabled). |
+| `/help` | List all commands. |
 | `/quit` | Exit. Prompts to save. |
 
 A silent checkpoint is written to `saves/_checkpoint.json` after every turn automatically.
@@ -147,19 +179,19 @@ A silent checkpoint is written to `saves/_checkpoint.json` after every turn auto
 
 ```
 [ACTION] > /save before-the-confrontation
-  Game saved to before-the-confrontation.json.
+  Saved to before-the-confrontation.json.
 
 [ACTION] > /load before-the-confrontation
-  Loaded save before-the-confrontation (turn 14, 28 messages, 14 story entries restored).
+  Loaded before-the-confrontation (turn 14, 28 messages).
 ```
 
-Saves capture the full GM conversation history, memory block, author's note, world info entries, and story log. The session resumes exactly where it left off, with full context.
+Saves capture the full conversation history, memory block, author's note, world info entries, and story log. The session resumes exactly where it left off, with full context.
 
 ### Exporting the story
 
 ```
 [ACTION] > /export ashenveil-session-1
-  Story exported to ashenveil-session-1.txt (22 turns, 8431 chars).
+  Exported to ashenveil-session-1.txt (22 turns).
 ```
 
 Exports contain only the GM's narration turns — no system blocks, no player input — formatted as a readable prose document.
@@ -351,7 +383,7 @@ Last seen: Red Anchor tavern on the docks.
 
 ## GM tools
 
-The GM agent has access to these tools and calls them autonomously mid-narration:
+The GM has access to these tools and calls them autonomously mid-narration:
 
 | Tool | When the GM uses it |
 |---|---|
@@ -368,18 +400,16 @@ The GM decides when to use these — you do not need to prompt it. You can see t
 
 | Provider | `STORY_ENGINE_PROVIDER` | Notes |
 |---|---|---|
-| LM Studio / llama.cpp | `local` | Default. OpenAI-compat endpoint. Vision probe supported. |
-| OpenRouter | `openrouter` | Requires `OPENROUTER_API_KEY`. Vision probe supported. |
-| Anthropic | `anthropic` | Requires `ANTHROPIC_API_KEY`. Claude models. |
-| Amazon Bedrock | `bedrock` | Uses boto3 default credential chain. |
+| LM Studio / llama.cpp | `local` | Default. OpenAI-compatible endpoint. |
+| OpenRouter | `openrouter` | Requires `OPENROUTER_API_KEY`. |
 
-For the vision probe and `/img` command to work, the provider must use an OpenAI-compatible image format — this applies to `local` and `openrouter`. For `anthropic` and `bedrock`, set `STORY_ENGINE_VISION_CAPABLE=false` to skip the probe (or `true` if you want to attempt it with a supported model).
+Both providers use the OpenAI-compatible chat completions API with streaming and function calling. The vision probe and `/img` command work with both.
 
 **Model recommendations for local play:**
 
 - Any instruction-tuned GGUF model works. Narrative or roleplay fine-tunes give better prose.
 - For vision: load a model with its mmproj in LM Studio (Gemma 4, LLaVA 1.6, Llama 3.2 Vision).
-- Larger context windows (32k+) allow longer sessions before the summarising conversation manager kicks in.
+- Larger context windows (32k+) allow longer sessions without losing early context.
 
 ---
 
@@ -387,9 +417,9 @@ For the vision probe and `/img` command to work, the provider must use an OpenAI
 
 | Variable | Default | Description |
 |---|---|---|
-| `STORY_ENGINE_PROVIDER` | `local` | `local` \| `openrouter` \| `anthropic` \| `bedrock` |
+| `STORY_ENGINE_PROVIDER` | `local` | `local` \| `openrouter` |
 | `STORY_ENGINE_LOCAL_BASE_URL` | `http://localhost:1234/v1` | LM Studio or llama.cpp server URL |
-| `STORY_ENGINE_GAME_MASTER_BASE_URL` | (falls back to LOCAL) | Override base URL for the GM role |
+| `STORY_ENGINE_GAME_MASTER_BASE_URL` | (falls back to LOCAL) | Override base URL for the GM role only |
 | `STORY_ENGINE_GAME_MASTER_MODEL` | `default` | Model name. `default` lets the server choose. |
 | `STORY_ENGINE_SYSTEM_SUFFIX` | (empty) | Text appended to every system prompt |
 | `STORY_ENGINE_VISION_CAPABLE` | (auto-probe) | `true` or `false` to skip the startup vision probe |
@@ -401,24 +431,25 @@ For the vision probe and `/img` command to work, the provider must use an OpenAI
 
 ```
 my_code/
-├── main.py              # Arg parsing → parse_scene_file → run_adventure
+├── main.py              # Arg parsing → parse_scene_file → run_adventure (--ui terminal/web)
 ├── parser.py            # .md scenario file → AdventureScene dataclass
-├── game_loop.py         # Async turn loop: input → message → stream → state sync
+├── game_loop.py         # Owns messages list, tool dispatch, turn loop, /regen, /edit
 ├── agents/
-│   └── game_master.py   # Agent factory, system prompt builder, lore injection, turn message
+│   └── game_master.py   # TOOL_SCHEMAS, system prompt builder, lore injection, turn message
 ├── tools/
 │   ├── dice_tools.py    # roll_dice — standard NdS+M notation
-│   ├── memory_tools.py  # update_memory, update_authors_note, add_world_info_entry
-│   └── lore_tools.py    # Pure Python keyword scanning (World Info)
+│   └── lore_tools.py    # Pure Python keyword scanning helpers
 ├── models/
-│   ├── provider.py      # Model factory — reads .env, returns Strands model
-│   └── data_models.py   # AdventureScene, GameState, CharacterCard, WorldInfoEntry
+│   ├── provider.py      # get_client() → (AsyncOpenAI, model_id)
+│   └── data_models.py   # AdventureScene, GameState (snapshot/restore), CharacterCard, WorldInfoEntry
 ├── vision/
-│   ├── probe.py         # Startup vision capability check via 1×1 pixel PNG probe
-│   └── describer.py     # Image → prose description (one call, image discarded after)
+│   ├── probe.py         # Startup vision capability check
+│   └── describer.py     # Image → prose description (one call, bytes discarded after)
 └── ui/
     ├── terminal.py      # Rich streaming display, prompts, panels
-    └── textual_ui.py    # Optional multi-pane TUI (--ui tui)
+    ├── web.py           # FastAPI app — SSE streaming, session state, REST API
+    └── static/
+        └── index.html   # Single-file browser client (themes, inline edit, undo, image attach)
 ```
 
 **Turn data flow:**
@@ -435,14 +466,17 @@ player input
            [AUTHOR'S NOTE]   ← every N turns
            --- player action
                │
-               └─ gm.stream_async() → streamed prose to terminal
+               └─ _stream_gm() → streamed prose to terminal
                        │
-                       ├─ roll_dice / update_memory / update_authors_note  (tool calls)
-                       └─ _sync_state_from_holder() → GameState updated
+                       ├─ tool calls (roll_dice / update_memory / ...)
+                       │   dispatched inline → GameState updated directly
+                       └─ final text response appended to messages list
 ```
+
+**Conversation history** is a plain `list[dict]` (OpenAI message format) owned entirely by `game_loop.py`. The system prompt is passed separately each call, not stored in the list. This means saves are `json.dumps(messages)` and editing/regen is a list slice — no framework unwrapping required.
+
+**Regen** works by taking a shallow copy of `messages` and `state.snapshot()` before each GM call. `/regen` restores both and re-runs the same turn message, giving a fresh response with full rollback of any tool mutations.
 
 **Lore injection** runs entirely in Python — `_build_world_context()` scans the player's input and the GM's last response for character trigger keywords and custom world info entry keywords, injecting matching cards with no LLM call.
 
-**Context management** uses Strands' `SummarizingConversationManager` — when the context approaches the limit, older turns are summarised automatically and the session continues. You will see a notice when this happens; `/save` beforehand is recommended for long sessions.
-
-**Vision pipeline** — images enter the engine in two ways. Startup images (`scene_image`, `portrait`) are described during `create_game_master()` setup and injected as `## Visual Reference` in the system prompt. Mid-game images (`/img`) are described during the command, stored as `pending_image_context`, injected as `[IMAGE CONTEXT]` in the next turn message, and cleared immediately after. In both cases the GM model receives only prose — never raw image bytes.
+**Vision pipeline** — images enter the engine in two ways. Startup images (`scene_image`, `portrait`) are described once and injected as `## Visual Reference` in the system prompt. Mid-game images (`/img`) are described during the command, injected as `[IMAGE CONTEXT]` in the next turn message, and cleared immediately after. In both cases the GM model receives only prose — never raw image bytes.

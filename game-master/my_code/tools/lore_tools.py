@@ -9,10 +9,7 @@ from __future__ import annotations
 import json
 import re
 
-from strands import tool
 
-
-@tool
 def scan_for_triggers(beat_text: str, characters_json: str) -> str:
     """Scan player input for character trigger keywords.
 
@@ -36,7 +33,6 @@ def scan_for_triggers(beat_text: str, characters_json: str) -> str:
     return json.dumps(matched)
 
 
-@tool
 def get_character_card(character_name: str, characters_json: str) -> str:
     """Retrieve a formatted character card by name.
 
@@ -65,7 +61,6 @@ def get_character_card(character_name: str, characters_json: str) -> str:
     return f"Character not found: {character_name}"
 
 
-@tool
 def build_lore_block(matched_cards_json: str) -> str:
     """Assemble a compact lore injection block from matched character cards.
 
