@@ -32,7 +32,6 @@ def main() -> None:
             "Examples:\n"
             "  python -m my_code                          # run default scenario\n"
             "  python -m my_code scenarios/ashenveil.md  # explicit scenario\n"
-            "  python -m my_code --ui tui                # Textual TUI mode\n"
         ),
     )
     parser.add_argument(
@@ -43,11 +42,34 @@ def main() -> None:
     )
     parser.add_argument(
         "--ui",
-        choices=["terminal", "tui"],
+        choices=["terminal", "web"],
         default="terminal",
-        help="UI mode: terminal (default) or tui (Textual)",
+        help="UI mode: terminal (default) or web (browser, served on port 7860)",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=7860,
+        help="Port for web UI (default: 7860)",
+    )
+    parser.add_argument(
+        "--host",
+        default="0.0.0.0",
+        help="Host/IP to bind for web UI (default: 0.0.0.0)",
     )
     args = parser.parse_args()
+
+    if args.ui == "web":
+        import uvicorn
+        from my_code.ui.web import create_app
+        ui = Terminal()
+        host, port = args.host, args.port
+        ui.system(f"Game Master web UI → [bold]http://{host}:{port}[/bold]")
+        if args.scenario:
+            ui.system(f"Default scenario: [bold]{args.scenario}[/bold]")
+        app = create_app(default_scenario=args.scenario)
+        uvicorn.run(app, host=host, port=port)
+        return
 
     scenario_path = _resolve_scenario(args.scenario)
 
@@ -58,21 +80,12 @@ def main() -> None:
     except ParseError as e:
         sys.exit(f"Scenario parse error — {e}")
 
-    if args.ui == "tui":
-        try:
-            from my_code.ui.textual_ui import TextualUI
-        except ImportError:
-            sys.exit(
-                "Textual is not installed. Run: pip install textual>=0.61.0"
-            )
-        TextualUI().run(scene)
-    else:
-        ui = Terminal()
-        ui.system(f"Loading scenario: [bold]{scenario_path}[/bold]")
-        try:
-            asyncio.run(run_adventure(scene, ui))
-        except KeyboardInterrupt:
-            pass
+    ui = Terminal()
+    ui.system(f"Loading scenario: [bold]{scenario_path}[/bold]")
+    try:
+        asyncio.run(run_adventure(scene, ui))
+    except KeyboardInterrupt:
+        pass
 
 
 if __name__ == "__main__":

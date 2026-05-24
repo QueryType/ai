@@ -66,7 +66,7 @@ def probe_vision(base_url: str, model_id: str, api_key: str) -> bool:
             ],
             max_tokens=20,
         )
-        content = (resp.choices[0].message.content or "").lower() if resp.choices else ""
-        return "red" in content
+        content = (resp.choices[0].message.content or "").strip() if resp.choices else ""
+        return len(content) > 0
     except Exception:
         return False

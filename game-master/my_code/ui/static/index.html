@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="system">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Game Master</title>
+<style>
+/* ── Theme tokens ──────────────────────────────────────────────── */
+:root {
+  --bg:         #0f0f0f;
+  --surface:    #1a1a1a;
+  --border:     #2e2e2e;
+  --text:       #c8b99a;
+  --muted:      #6b5f50;
+  --accent:     #a08060;
+  --player:     #7a9e7e;
+  --sys:        #6a7f9a;
+  --danger:     #9e4a4a;
+  --btn-bg:     #2a2a2a;
+  --btn-hover:  #3a3a3a;
+  --edit-bg:    #151510;
+  --edit-border:#5a4a30;
+}
+[data-theme="light"] {
+  --bg:         #f5f0e8;
+  --surface:    #ede6d8;
+  --border:     #c8bca8;
+  --text:       #2c2418;
+  --muted:      #8a7a68;
+  --accent:     #7a5c38;
+  --player:     #2d5a32;
+  --sys:        #2a4a6a;
+  --danger:     #7a2020;
+  --btn-bg:     #ddd6c8;
+  --btn-hover:  #cec6b8;
+  --edit-bg:    #eae0cc;
+  --edit-border:#a08060;
+}
+@media (prefers-color-scheme: light) {
+  [data-theme="system"] {
+    --bg:         #f5f0e8;
+    --surface:    #ede6d8;
+    --border:     #c8bca8;
+    --text:       #2c2418;
+    --muted:      #8a7a68;
+    --accent:     #7a5c38;
+    --player:     #2d5a32;
+    --sys:        #2a4a6a;
+    --danger:     #7a2020;
+    --btn-bg:     #ddd6c8;
+    --btn-hover:  #cec6b8;
+    --edit-bg:    #eae0cc;
+    --edit-border:#a08060;
+  }
+}
+
+/* ── Reset / base ──────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; background: var(--bg); color: var(--text);
+  font-family: Georgia, 'Times New Roman', serif; font-size: 1rem; }
+
+/* ── Layout ────────────────────────────────────────────────────── */
+#app { display: flex; flex-direction: column; height: 100vh; }
+
+header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 18px; background: var(--surface); border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+header h1 { font-size: 1.05rem; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--accent); }
+.hdr-right { display: flex; gap: 8px; align-items: center; }
+
+.main { display: flex; flex: 1; overflow: hidden; }
+
+/* Story pane */
+#story-pane { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+#story { flex: 1; overflow-y: auto; padding: 24px 28px; scroll-behavior: smooth; }
+#story::-webkit-scrollbar { width: 6px; }
+#story::-webkit-scrollbar-track { background: transparent; }
+#story::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* Input bar */
+#input-bar {
+  display: flex; gap: 8px; padding: 12px 16px;
+  border-top: 1px solid var(--border); background: var(--surface); flex-shrink: 0;
+}
+#action-input {
+  flex: 1; background: var(--bg); border: 1px solid var(--border);
+  color: var(--text); font-family: inherit; font-size: .95rem;
+  padding: 8px 12px; border-radius: 4px; resize: none; height: 44px;
+  line-height: 1.4; outline: none; transition: border-color .15s;
+}
+#action-input:focus { border-color: var(--accent); }
+#action-input:disabled { opacity: .4; cursor: not-allowed; }
+
+/* Sidebar */
+#sidebar {
+  width: 230px; flex-shrink: 0; overflow-y: auto;
+  border-left: 1px solid var(--border); background: var(--surface);
+  padding: 14px 12px; font-size: .82rem;
+}
+#sidebar::-webkit-scrollbar { width: 4px; }
+#sidebar::-webkit-scrollbar-thumb { background: var(--border); }
+.sb-section { margin-bottom: 16px; }
+.sb-label { color: var(--muted); text-transform: uppercase; letter-spacing: .1em;
+  font-size: .72rem; margin-bottom: 4px; }
+.sb-value {
+  color: var(--text); line-height: 1.4; word-break: break-word;
+  max-height: 120px; overflow-y: auto; display: block;
+}
+.sb-value::-webkit-scrollbar { width: 4px; }
+.sb-value::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.sb-note { font-style: italic; color: var(--accent); }
+
+/* ── Story entries ─────────────────────────────────────────────── */
+.entry { margin-bottom: 20px; line-height: 1.75; }
+.entry-gm { color: var(--text); white-space: pre-wrap; }
+.entry-player { color: var(--player); font-style: italic; opacity: .85; }
+.entry-sys { color: var(--sys); font-size: .82rem; }
+.entry-img-desc {
+  color: var(--muted); font-size: .78rem; font-style: italic;
+  border-left: 2px solid var(--border); padding-left: 8px; margin-bottom: 12px;
+}
+#streaming-cursor {
+  display: inline-block; width: .55em; height: 1em;
+  background: var(--accent); vertical-align: text-bottom;
+  animation: blink .9s step-end infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
+
+/* ── Inline edit ───────────────────────────────────────────────── */
+.entry-gm[contenteditable="true"] {
+  outline: none;
+  border: 1px solid var(--edit-border);
+  background: var(--edit-bg);
+  padding: 8px 10px;
+  border-radius: 4px;
+  cursor: text;
+  white-space: pre-wrap;
+}
+.edit-bar { display: flex; gap: 6px; margin-top: 6px; }
+.edit-bar button {
+  padding: 4px 12px; font-size: .8rem; border-radius: 3px; cursor: pointer;
+  border: 1px solid var(--border); font-family: inherit;
+  background: var(--btn-bg); color: var(--text);
+}
+.edit-bar button:hover { background: var(--btn-hover); }
+.edit-save { background: var(--accent) !important; color: var(--bg) !important;
+  border-color: var(--accent) !important; }
+.edit-save:hover { opacity: .85; }
+.edit-hint { font-size: .75rem; color: var(--muted); align-self: center; }
+
+/* ── Buttons ───────────────────────────────────────────────────── */
+button {
+  background: var(--btn-bg); color: var(--text); border: 1px solid var(--border);
+  padding: 7px 14px; font-family: inherit; font-size: .85rem; cursor: pointer;
+  border-radius: 4px; transition: background .12s;
+}
+button:hover { background: var(--btn-hover); }
+button:disabled { opacity: .4; cursor: not-allowed; }
+.btn-icon { padding: 6px 10px; font-size: 1rem; line-height: 1; }
+.btn-send { background: var(--accent); color: var(--bg);
+  border-color: var(--accent); padding: 8px 18px; }
+.btn-send:hover { opacity: .85; }
+
+/* ── Setup screen ──────────────────────────────────────────────── */
+#setup {
+  position: fixed; inset: 0; background: var(--bg);
+  display: flex; align-items: center; justify-content: center; z-index: 10;
+}
+.setup-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 32px 36px; width: 440px; max-width: 95vw;
+}
+.setup-card h2 { color: var(--accent); letter-spacing: .1em;
+  text-transform: uppercase; font-size: 1rem; margin-bottom: 24px; }
+.form-row { margin-bottom: 16px; }
+.form-row label { display: block; font-size: .8rem; color: var(--muted);
+  margin-bottom: 5px; text-transform: uppercase; letter-spacing: .07em; }
+.form-row input, .form-row select {
+  width: 100%; background: var(--bg); border: 1px solid var(--border);
+  color: var(--text); font-family: inherit; font-size: .9rem;
+  padding: 8px 10px; border-radius: 4px; outline: none; transition: border-color .15s;
+}
+.form-row input:focus, .form-row select:focus { border-color: var(--accent); }
+.form-row select option { background: var(--surface); }
+.setup-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 24px; }
+#setup-error { color: var(--danger); font-size: .82rem; margin-top: 10px; min-height: 1.2em; }
+
+/* ── Modal ─────────────────────────────────────────────────────── */
+#modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.6);
+  display: flex; align-items: center; justify-content: center; z-index: 20;
+}
+#modal-overlay.hidden { display: none; }
+.modal-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 6px; padding: 24px 28px; min-width: 280px; max-width: 90vw;
+}
+.modal-card h3 { color: var(--accent); margin-bottom: 14px; font-size: .95rem;
+  text-transform: uppercase; letter-spacing: .08em; }
+#modal-body { margin-bottom: 16px; font-size: .88rem; line-height: 1.5; }
+#modal-body input, #modal-body select {
+  width: 100%; background: var(--bg); border: 1px solid var(--border);
+  color: var(--text); font-family: inherit; font-size: .9rem;
+  padding: 8px 10px; border-radius: 4px; outline: none;
+}
+#modal-body button {
+  display: block; width: 100%; text-align: left; margin-bottom: 6px;
+  background: var(--btn-bg); color: var(--text);
+}
+#modal-body button:hover { background: var(--btn-hover); }
+#modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+/* ── Image attach (collapsed panel above input bar) ────────────── */
+#img-attach {
+  display: flex; gap: 8px; align-items: center;
+  padding: 5px 14px; font-size: .82rem; color: var(--muted);
+  border-top: 1px solid var(--border); background: var(--surface); flex-shrink: 0;
+}
+#img-attach.hidden { display: none; }
+#img-file { display: none; }
+#img-name {
+  font-size: .78rem; color: var(--accent); max-width: 140px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 0;
+}
+#img-label-input {
+  flex: 1; background: var(--bg); border: 1px solid var(--border);
+  color: var(--text); font-family: inherit; font-size: .8rem;
+  padding: 4px 8px; border-radius: 3px; outline: none;
+}
+#img-label-input:focus { border-color: var(--accent); }
+#img-pick-btn { flex-shrink: 0; }
+#img-pick-btn.hidden { display: none; }
+
+#note-input {
+  width: 100%; background: var(--bg); border: 1px solid var(--border);
+  color: var(--text); font-family: inherit; font-size: .8rem;
+  padding: 5px 8px; border-radius: 3px; resize: vertical; min-height: 60px;
+  height: 60px; outline: none; transition: border-color .15s; margin-top: 4px;
+}
+#note-input:focus { border-color: var(--accent); }
+
+/* ── Author's note ──────────────────────────────────────────────── */
+
+/* ── Sidebar image description ─────────────────────────────────── */
+.sb-img-desc { font-style: italic; color: var(--muted); font-size: .78rem; line-height: 1.4; }
+
+.hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- Setup screen -->
+  <div id="setup">
+    <div class="setup-card">
+      <h2>Game Master</h2>
+      <div class="form-row">
+        <label>Scenario</label>
+        <select id="scenario-select"><option value="">Loading…</option></select>
+      </div>
+      <div class="form-row">
+        <label>LLM Server URL</label>
+        <input id="server-url" type="text" placeholder="http://192.168.1.x:1234/v1">
+      </div>
+      <div class="form-row">
+        <label>Model (optional override)</label>
+        <input id="model-input" type="text" placeholder="leave blank for .env default">
+      </div>
+      <div class="form-row" style="display:flex;align-items:center;gap:8px;">
+        <input id="vision-check" type="checkbox" style="width:auto;padding:0;">
+        <label style="margin:0;text-transform:none;letter-spacing:0;">Enable vision probe</label>
+      </div>
+      <div id="setup-error"></div>
+      <div class="setup-actions">
+        <button id="start-btn" class="btn-send">Begin Adventure</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Header -->
+  <header>
+    <h1 id="game-title">Game Master</h1>
+    <div class="hdr-right">
+      <button class="btn-icon" id="theme-btn" title="Toggle theme">◑</button>
+      <button class="btn-icon" id="font-dec-btn" title="Decrease font size">A-</button>
+      <button class="btn-icon" id="font-reset-btn" title="Reset font size">A</button>
+      <button class="btn-icon" id="font-inc-btn" title="Increase font size">A+</button>
+      <button id="mode-btn" title="Toggle action/story mode">Action</button>
+      <button id="undo-btn" disabled title="Undo last turn">↩ Undo</button>
+      <button id="regen-btn" disabled>↺ Regen</button>
+      <button id="save-btn">Save</button>
+      <button id="load-btn">Load</button>
+      <button id="export-btn">Export</button>
+    </div>
+  </header>
+
+  <!-- Main -->
+  <div class="main">
+    <div id="story-pane">
+
+      <div id="story"></div>
+
+      <!-- Hidden file input lives outside any hidden container so click() always works -->
+      <input type="file" id="img-file" accept="image/*" style="display:none">
+
+      <!-- Image attach expansion panel (shown when a file is selected) -->
+      <div id="img-attach" class="hidden">
+        <span>📎</span>
+        <span id="img-name"></span>
+        <input id="img-label-input" type="text" placeholder="Describe this image for the scene…">
+        <button id="img-clear-btn" class="btn-icon" title="Remove image">✕</button>
+      </div>
+
+      <div id="input-bar">
+        <!-- Clip icon: hidden until vision is confirmed capable -->
+        <button class="btn-icon hidden" id="img-pick-btn" title="Attach image">📎</button>
+        <textarea id="action-input" placeholder="Enter action…" rows="1"></textarea>
+        <button id="send-btn" class="btn-send">Send</button>
+      </div>
+    </div>
+
+    <div id="sidebar">
+      <div class="sb-section">
+        <div class="sb-label">Memory</div>
+        <div class="sb-value" id="sb-memory">(empty)</div>
+      </div>
+      <div class="sb-section">
+        <div class="sb-label">Author's Note</div>
+        <div class="sb-value sb-note" id="sb-note-display">(none)</div>
+        <textarea id="note-input" placeholder="Author's note…"></textarea>
+        <button id="note-save-btn" style="margin-top:4px;width:100%;font-size:.78rem;">Update Note</button>
+      </div>
+      <div class="sb-section">
+        <div class="sb-label">Turn</div>
+        <div class="sb-value" id="sb-turn">0</div>
+      </div>
+      <div class="sb-section">
+        <div class="sb-label">Mode</div>
+        <div class="sb-value" id="sb-mode">action</div>
+      </div>
+      <div class="sb-section hidden" id="sb-imgdesc-section">
+        <div class="sb-label">Last Image</div>
+        <div class="sb-value sb-img-desc" id="sb-imgdesc"></div>
+        <button id="sb-imgdesc-clear-btn" style="margin-top:6px;width:100%;font-size:.78rem;">Clear</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal -->
+<div id="modal-overlay" class="hidden">
+  <div class="modal-card">
+    <h3 id="modal-title">Dialog</h3>
+    <div id="modal-body"></div>
+    <div id="modal-actions"></div>
+  </div>
+</div>
+
+<script>
+/* ── Font size ──────────────────────────────────────────────────── */
+const FONT_DEFAULT = 16;
+const FONT_MIN = 11;
+const FONT_MAX = 26;
+const FONT_STEP = 1;
+let fontSize = parseInt(localStorage.getItem('gm-font') || FONT_DEFAULT, 10);
+
+function applyFontSize() {
+  document.documentElement.style.fontSize = fontSize + 'px';
+  localStorage.setItem('gm-font', fontSize);
+}
+applyFontSize();
+
+document.getElementById('font-inc-btn').addEventListener('click', () => {
+  if (fontSize < FONT_MAX) { fontSize += FONT_STEP; applyFontSize(); }
+});
+document.getElementById('font-dec-btn').addEventListener('click', () => {
+  if (fontSize > FONT_MIN) { fontSize -= FONT_STEP; applyFontSize(); }
+});
+document.getElementById('font-reset-btn').addEventListener('click', () => {
+  fontSize = FONT_DEFAULT; applyFontSize();
+});
+
+/* ── Theme cycling ──────────────────────────────────────────────── */
+const THEMES = ['system', 'dark', 'light'];
+const THEME_ICONS = { system: '◑', dark: '🌙', light: '☀' };
+let themeIdx = THEMES.indexOf(localStorage.getItem('gm-theme') || 'system');
+if (themeIdx < 0) themeIdx = 0;
+
+function applyTheme() {
+  const t = THEMES[themeIdx];
+  document.documentElement.setAttribute('data-theme', t);
+  document.getElementById('theme-btn').textContent = THEME_ICONS[t];
+  localStorage.setItem('gm-theme', t);
+}
+applyTheme();
+
+document.getElementById('theme-btn').addEventListener('click', () => {
+  themeIdx = (themeIdx + 1) % THEMES.length;
+  applyTheme();
+});
+
+/* ── State ──────────────────────────────────────────────────────── */
+let busy = false;
+let visionCapable = false;
+let nsfwEnabled = false;
+let pendingImage = null;
+let editingEntry = null;
+
+/* ── Scenario list ─────────────────────────────────────────────── */
+(async function loadScenarios() {
+  try {
+    const r = await fetch('/api/scenarios');
+    const d = await r.json();
+    const sel = document.getElementById('scenario-select');
+    sel.innerHTML = '';
+    if (!d.scenarios.length) {
+      sel.innerHTML = '<option value="">No scenarios found</option>';
+      return;
+    }
+    d.scenarios.forEach(s => {
+      const o = document.createElement('option');
+      o.value = s.path; o.textContent = s.name;
+      if (s.path === d.default) o.selected = true;
+      sel.appendChild(o);
+    });
+    if (d.default && !d.scenarios.find(s => s.path === d.default)) {
+      const o = document.createElement('option');
+      o.value = d.default; o.textContent = d.default; o.selected = true;
+      sel.prepend(o);
+    }
+  } catch {
+    document.getElementById('setup-error').textContent = 'Could not load scenarios.';
+  }
+})();
+
+/* ── Start game ─────────────────────────────────────────────────── */
+document.getElementById('start-btn').addEventListener('click', startGame);
+
+async function startGame() {
+  const scenario  = document.getElementById('scenario-select').value;
+  const serverUrl = document.getElementById('server-url').value.trim();
+  const model     = document.getElementById('model-input').value.trim();
+  const vision    = document.getElementById('vision-check').checked;
+  const errEl     = document.getElementById('setup-error');
+  errEl.textContent = '';
+  if (!scenario) { errEl.textContent = 'Select a scenario.'; return; }
+
+  const startBtn = document.getElementById('start-btn');
+  startBtn.disabled = true;
+  startBtn.textContent = 'Loading…';
+
+  try {
+    const resp = await fetch('/api/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scenario, server_url: serverUrl, model, vision }),
+    });
+    if (!resp.ok) {
+      const d = await resp.json().catch(() => ({}));
+      errEl.textContent = d.error || `Error ${resp.status}`;
+      startBtn.disabled = false; startBtn.textContent = 'Begin Adventure';
+      return;
+    }
+    document.getElementById('setup').classList.add('hidden');
+    setBusy(true);
+
+    await consumeSSE(resp, {
+      chunk(ev) { appendChunk(ev.text); },
+      state(ev) { syncState(ev); },
+      done(ev) {
+        if (ev.title) document.getElementById('game-title').textContent = ev.title;
+        finalizeStream();
+        visionCapable = ev.vision_capable || false;
+        nsfwEnabled = ev.nsfw || false;
+        if (visionCapable) document.getElementById('img-pick-btn').classList.remove('hidden');
+        if (!nsfwEnabled) {
+          document.getElementById('img-label-input').placeholder = 'Describe this image for the scene…';
+        }
+        setBusy(false);
+      },
+      error(ev) { appendSys('Error: ' + ev.message); finalizeStream(); setBusy(false); },
+    });
+  } catch(e) {
+    errEl.textContent = 'Connection failed: ' + e.message;
+    startBtn.disabled = false; startBtn.textContent = 'Begin Adventure';
+  }
+}
+
+/* ── SSE consumer ───────────────────────────────────────────────── */
+async function consumeSSE(response, handlers) {
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = '';
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    const parts = buf.split('\n\n');
+    buf = parts.pop();
+    for (const part of parts) {
+      const line = part.trim();
+      if (!line.startsWith('data: ')) continue;
+      try {
+        const ev = JSON.parse(line.slice(6));
+        const h = handlers[ev.type];
+        if (h) h(ev);
+      } catch {}
+    }
+  }
+}
+
+/* ── Story rendering ────────────────────────────────────────────── */
+const story = document.getElementById('story');
+let streamEl = null;
+let streamText = '';
+
+function appendChunk(text) {
+  if (!streamEl) {
+    const cur = document.getElementById('streaming-cursor');
+    if (cur) cur.remove();
+    streamEl = document.createElement('div');
+    streamEl.className = 'entry entry-gm';
+    streamText = '';
+    story.appendChild(streamEl);
+  }
+  streamText += text;
+  streamEl.textContent = streamText;
+  let cur = document.getElementById('streaming-cursor');
+  if (!cur) { cur = document.createElement('span'); cur.id = 'streaming-cursor'; }
+  streamEl.appendChild(cur);
+  story.scrollTop = story.scrollHeight;
+}
+
+function finalizeStream() {
+  const cur = document.getElementById('streaming-cursor');
+  if (cur) cur.remove();
+  if (streamEl) {
+    // Mark as the last GM entry and wire inline edit
+    story.querySelectorAll('.entry-gm[data-last-gm]').forEach(el => delete el.dataset.lastGm);
+    streamEl.dataset.lastGm = '1';
+    wireEditOnEntry(streamEl);
+    streamEl = null;
+    streamText = '';
+  }
+}
+
+function appendPlayer(text) {
+  const el = document.createElement('div');
+  el.className = 'entry entry-player';
+  el.textContent = '> ' + text;
+  story.appendChild(el);
+  story.scrollTop = story.scrollHeight;
+}
+
+function appendSys(text) {
+  const el = document.createElement('div');
+  el.className = 'entry entry-sys';
+  el.textContent = text;
+  story.appendChild(el);
+  story.scrollTop = story.scrollHeight;
+}
+
+function appendImageDesc(text) {
+  const el = document.createElement('div');
+  el.className = 'entry entry-img-desc';
+  el.textContent = '🖼 ' + text;
+  story.appendChild(el);
+  story.scrollTop = story.scrollHeight;
+  // Mirror latest description into the sidebar
+  document.getElementById('sb-imgdesc').textContent = text;
+  document.getElementById('sb-imgdesc-section').classList.remove('hidden');
+}
+
+/* ── Inline edit ────────────────────────────────────────────────── */
+function wireEditOnEntry(el) {
+  el.title = 'Double-click to edit';
+  el.style.cursor = 'default';
+  el.addEventListener('dblclick', () => { if (!busy) startEdit(el); });
+}
+
+function startEdit(el) {
+  if (editingEntry) return;
+  editingEntry = el;
+  const original = el.textContent;
+
+  el.contentEditable = 'true';
+  el.focus();
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  range.collapse(false);
+  window.getSelection().removeAllRanges();
+  window.getSelection().addRange(range);
+
+  const bar = document.createElement('div');
+  bar.className = 'edit-bar';
+  bar.innerHTML =
+    '<button class="edit-save">✓ Save</button>' +
+    '<button class="edit-cancel">✗ Cancel</button>' +
+    '<span class="edit-hint">Ctrl+Enter · Esc</span>';
+  el.insertAdjacentElement('afterend', bar);
+
+  document.getElementById('action-input').disabled = true;
+  document.getElementById('send-btn').disabled = true;
+
+  function doSave() {
+    const newText = el.innerText.trim();
+    if (!newText) { doCancel(); return; }
+    el.contentEditable = 'false';
+    bar.remove();
+    editingEntry = null;
+    document.getElementById('action-input').disabled = false;
+    if (!busy) document.getElementById('send-btn').disabled = false;
+    el.textContent = newText;
+    callEditApi(newText, el, original);
+  }
+
+  function doCancel() {
+    el.contentEditable = 'false';
+    el.textContent = original;
+    bar.remove();
+    editingEntry = null;
+    document.getElementById('action-input').disabled = false;
+    if (!busy) document.getElementById('send-btn').disabled = false;
+  }
+
+  bar.querySelector('.edit-save').addEventListener('click', doSave);
+  bar.querySelector('.edit-cancel').addEventListener('click', doCancel);
+
+  function kbHandler(e) {
+    if (e.key === 'Escape') { doCancel(); el.removeEventListener('keydown', kbHandler); }
+    if (e.key === 'Enter' && e.ctrlKey) { doSave(); el.removeEventListener('keydown', kbHandler); }
+  }
+  el.addEventListener('keydown', kbHandler);
+}
+
+async function callEditApi(newText, el, original) {
+  try {
+    const r = await fetch('/api/edit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: newText }),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      appendSys('Edit failed: ' + (d.error || r.status));
+      el.textContent = original;
+    } else {
+      appendSys('[edit saved]');
+    }
+  } catch(e) {
+    appendSys('Edit failed: ' + e.message);
+    el.textContent = original;
+  }
+}
+
+/* ── State sync ─────────────────────────────────────────────────── */
+function syncState(d) {
+  if (d.memory !== undefined)
+    document.getElementById('sb-memory').textContent = d.memory || '(empty)';
+  if (d.author_note !== undefined) {
+    document.getElementById('sb-note-display').textContent = d.author_note || '(none)';
+    document.getElementById('note-input').value = d.author_note || '';
+  }
+  if (d.turn_count !== undefined)
+    document.getElementById('sb-turn').textContent = d.turn_count;
+  if (d.input_mode !== undefined) {
+    document.getElementById('sb-mode').textContent = d.input_mode;
+    document.getElementById('mode-btn').textContent =
+      d.input_mode === 'action' ? 'Action' : 'Story';
+    document.getElementById('action-input').placeholder =
+      d.input_mode === 'action' ? 'Enter action…' : 'Write story…';
+  }
+}
+
+function setBusy(b) {
+  busy = b;
+  document.getElementById('action-input').disabled = b || !!editingEntry;
+  document.getElementById('send-btn').disabled = b;
+  document.getElementById('regen-btn').disabled = b;
+  document.getElementById('undo-btn').disabled = b;
+}
+
+/* ── Send action ────────────────────────────────────────────────── */
+document.getElementById('send-btn').addEventListener('click', sendAction);
+document.getElementById('action-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendAction(); }
+});
+
+async function sendAction() {
+  if (busy || editingEntry) return;
+  const inp = document.getElementById('action-input');
+  const text = inp.value.trim();
+  if (!text) return;
+
+  inp.value = '';
+  inp.style.height = '44px';
+  setBusy(true);
+
+  const fd = new FormData();
+  fd.append('text', text);
+  if (pendingImage) {
+    fd.append('image', pendingImage.file);
+    fd.append('image_label', pendingImage.label);
+    pendingImage = null;
+    clearImageAttach();
+  }
+
+  try {
+    const resp = await fetch('/api/action', { method: 'POST', body: fd });
+    if (!resp.ok) {
+      const d = await resp.json().catch(() => ({}));
+      appendSys('Error: ' + (d.error || resp.status));
+      setBusy(false);
+      return;
+    }
+    await consumeSSE(resp, {
+      player(ev)     { appendPlayer(ev.text); },
+      image_desc(ev) { appendImageDesc(ev.text); },
+      chunk(ev)      { appendChunk(ev.text); },
+      state(ev)  { syncState(ev); },
+      done()     { finalizeStream(); setBusy(false);
+                   document.getElementById('regen-btn').disabled = false;
+                   document.getElementById('undo-btn').disabled = false; },
+      error(ev)  { appendSys('Error: ' + ev.message); finalizeStream(); setBusy(false); },
+    });
+  } catch(e) {
+    appendSys('Connection error: ' + e.message);
+    setBusy(false);
+  }
+}
+
+/* ── Undo ───────────────────────────────────────────────────────── */
+document.getElementById('undo-btn').addEventListener('click', async () => {
+  if (busy) return;
+  setBusy(true);
+  try {
+    const r = await fetch('/api/undo', { method: 'POST' });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      appendSys('Undo error: ' + (d.error || r.status));
+      setBusy(false);
+      return;
+    }
+    const d = await r.json();
+    // Remove the last GM entry and the player entry before it from the DOM
+    const entries = story.querySelectorAll('.entry');
+    const arr = Array.from(entries);
+    // Walk back: remove last GM entry
+    for (let i = arr.length - 1; i >= 0; i--) {
+      if (arr[i].classList.contains('entry-gm')) { arr[i].remove(); break; }
+    }
+    // Walk back: remove last player entry
+    const remaining = Array.from(story.querySelectorAll('.entry'));
+    for (let i = remaining.length - 1; i >= 0; i--) {
+      if (remaining[i].classList.contains('entry-player')) { remaining[i].remove(); break; }
+    }
+    // Re-wire edit on the new last GM entry
+    const gmEntries = story.querySelectorAll('.entry-gm');
+    if (gmEntries.length) {
+      story.querySelectorAll('.entry-gm[data-last-gm]').forEach(el => delete el.dataset.lastGm);
+      const last = gmEntries[gmEntries.length - 1];
+      last.dataset.lastGm = '1';
+      wireEditOnEntry(last);
+    }
+    syncState(d);
+    document.getElementById('undo-btn').disabled = d.turn_count === 0;
+    document.getElementById('regen-btn').disabled = true;
+  } catch(e) {
+    appendSys('Connection error: ' + e.message);
+  }
+  setBusy(false);
+});
+
+/* ── Regen ──────────────────────────────────────────────────────── */
+document.getElementById('regen-btn').addEventListener('click', async () => {
+  if (busy) return;
+  setBusy(true);
+  const lastGm = story.querySelector('.entry-gm[data-last-gm]');
+  if (lastGm) lastGm.remove();
+  try {
+    const resp = await fetch('/api/regen', { method: 'POST' });
+    if (!resp.ok) {
+      const d = await resp.json().catch(() => ({}));
+      appendSys('Regen error: ' + (d.error || resp.status));
+      setBusy(false);
+      return;
+    }
+    await consumeSSE(resp, {
+      regen() {},
+      chunk(ev) { appendChunk(ev.text); },
+      state(ev) { syncState(ev); },
+      done()    { finalizeStream(); setBusy(false); },
+      error(ev) { appendSys('Error: ' + ev.message); finalizeStream(); setBusy(false); },
+    });
+  } catch(e) {
+    appendSys('Connection error: ' + e.message);
+    setBusy(false);
+  }
+});
+
+/* ── Mode toggle ────────────────────────────────────────────────── */
+document.getElementById('mode-btn').addEventListener('click', async () => {
+  const r = await fetch('/api/mode', { method: 'POST' });
+  if (r.ok) syncState(await r.json());
+});
+
+
+/* ── Author's note ──────────────────────────────────────────────── */
+document.getElementById('note-save-btn').addEventListener('click', async () => {
+  const r = await fetch('/api/note', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content: document.getElementById('note-input').value }),
+  });
+  if (r.ok) syncState(await r.json());
+});
+
+/* ── Save ───────────────────────────────────────────────────────── */
+document.getElementById('save-btn').addEventListener('click', () => {
+  showModal('Save Game',
+    '<input id="m-save-name" type="text" placeholder="save name (leave blank for auto)">',
+    [
+      { label: 'Save', cls: 'btn-send', action: async () => {
+        const name = document.getElementById('m-save-name').value.trim();
+        const r = await fetch('/api/save', {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ name }),
+        });
+        if (r.ok) { const d = await r.json(); appendSys(`Saved as "${d.name}".`); }
+        closeModal();
+      }},
+      { label: 'Cancel', action: closeModal },
+    ]
+  );
+  setTimeout(() => document.getElementById('m-save-name')?.focus(), 50);
+});
+
+/* ── Load ───────────────────────────────────────────────────────── */
+document.getElementById('load-btn').addEventListener('click', async () => {
+  const r = await fetch('/api/saves');
+  const d = await r.json();
+  if (!d.saves.length) { appendSys('No saves found.'); return; }
+  const list = d.saves.map(s =>
+    `<button onclick="doLoad('${s.name.replace(/'/g,"\\'")}')">📖 ${s.name}</button>`
+  ).join('');
+  showModal('Load Game', list, [{ label: 'Cancel', action: closeModal }]);
+});
+
+async function doLoad(name) {
+  closeModal();
+  const r = await fetch('/api/load', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ name }),
+  });
+  if (!r.ok) { const d = await r.json().catch(()=>({})); appendSys('Load error: '+(d.error||r.status)); return; }
+  const d = await r.json();
+  story.innerHTML = '';
+  (d.story_log || []).forEach((entry, i) => {
+    const el = document.createElement('div');
+    el.className = 'entry entry-gm';
+    el.textContent = entry;
+    if (i === d.story_log.length - 1) { el.dataset.lastGm = '1'; wireEditOnEntry(el); }
+    story.appendChild(el);
+  });
+  syncState(d);
+  appendSys(`Loaded "${name}".`);
+  story.scrollTop = story.scrollHeight;
+  document.getElementById('regen-btn').disabled = false;
+}
+
+/* ── Export ─────────────────────────────────────────────────────── */
+document.getElementById('export-btn').addEventListener('click', () => {
+  window.location.href = '/api/export';
+});
+
+/* ── Image attach ───────────────────────────────────────────────── */
+document.getElementById('img-pick-btn').addEventListener('click', () => {
+  document.getElementById('img-file').click();
+});
+document.getElementById('img-file').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  document.getElementById('img-name').textContent = file.name;
+  document.getElementById('img-label-input').value = '';
+  document.getElementById('img-attach').classList.remove('hidden');
+  pendingImage = { file, label: '' };
+});
+document.getElementById('img-label-input').addEventListener('input', e => {
+  if (pendingImage) pendingImage.label = e.target.value;
+});
+document.getElementById('img-clear-btn').addEventListener('click', clearImageAttach);
+
+function clearImageAttach() {
+  document.getElementById('img-file').value = '';
+  document.getElementById('img-name').textContent = '';
+  document.getElementById('img-label-input').value = '';
+  document.getElementById('img-attach').classList.add('hidden');
+  pendingImage = null;
+}
+
+/* ── Sidebar image description ──────────────────────────────────── */
+document.getElementById('sb-imgdesc-clear-btn').addEventListener('click', () => {
+  document.getElementById('sb-imgdesc').textContent = '';
+  document.getElementById('sb-imgdesc-section').classList.add('hidden');
+});
+
+/* ── Auto-resize textarea ───────────────────────────────────────── */
+document.getElementById('action-input').addEventListener('input', function() {
+  this.style.height = '44px';
+  this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+});
+
+/* ── Modal helpers ──────────────────────────────────────────────── */
+function showModal(title, bodyHtml, buttons) {
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-body').innerHTML = bodyHtml;
+  const acts = document.getElementById('modal-actions');
+  acts.innerHTML = '';
+  buttons.forEach(b => {
+    const btn = document.createElement('button');
+    btn.textContent = b.label;
+    if (b.cls) btn.className = b.cls;
+    btn.addEventListener('click', b.action);
+    acts.appendChild(btn);
+  });
+  document.getElementById('modal-overlay').classList.remove('hidden');
+}
+function closeModal() {
+  document.getElementById('modal-overlay').classList.add('hidden');
+}
+document.getElementById('modal-overlay').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeModal();
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && !editingEntry)
+    document.getElementById('modal-overlay').classList.add('hidden');
+});
+</script>
+</body>
+</html>
