@@ -1,0 +1,2 @@
+strands-agents>=1.33.0
+python-dotenv>=1.0.0

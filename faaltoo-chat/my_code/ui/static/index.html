@@ -1,0 +1,1268 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="system">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>faaltoo chat</title>
+<style>
+/* ── Theme tokens ──────────────────────────────────────────────── */
+:root {
+  --bg:         #0f0f0f;
+  --surface:    #1a1a1a;
+  --border:     #2e2e2e;
+  --text:       #d0d0d0;
+  --muted:      #666;
+  --accent:     #4a9eba;
+  --bot:        #8bcfd8;
+  --user:       #7a9e7e;
+  --sys:        #6a7f9a;
+  --danger:     #9e4a4a;
+  --btn-bg:     #242424;
+  --btn-hover:  #333;
+  --chip-sel:   #1a3a45;
+  --edit-bg:    #101518;
+  --edit-border:#2a5a6a;
+}
+[data-theme="light"] {
+  --bg:         #f4f4f4;
+  --surface:    #ebebeb;
+  --border:     #ccc;
+  --text:       #1a1a1a;
+  --muted:      #888;
+  --accent:     #1e7a96;
+  --bot:        #1e6a7a;
+  --user:       #2d5a32;
+  --sys:        #3a5a7a;
+  --danger:     #8b2020;
+  --btn-bg:     #ddd;
+  --btn-hover:  #ccc;
+  --chip-sel:   #c2e4ef;
+  --edit-bg:    #e8f4f8;
+  --edit-border:#4a9eba;
+}
+@media (prefers-color-scheme: light) {
+  [data-theme="system"] {
+    --bg:         #f4f4f4;
+    --surface:    #ebebeb;
+    --border:     #ccc;
+    --text:       #1a1a1a;
+    --muted:      #888;
+    --accent:     #1e7a96;
+    --bot:        #1e6a7a;
+    --user:       #2d5a32;
+    --sys:        #3a5a7a;
+    --danger:     #8b2020;
+    --btn-bg:     #ddd;
+    --btn-hover:  #ccc;
+    --chip-sel:   #c2e4ef;
+    --edit-bg:    #e8f4f8;
+    --edit-border:#4a9eba;
+  }
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; background: var(--bg); color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 1rem; }
+
+/* ── Layout ────────────────────────────────────────────────────── */
+#app { display: flex; flex-direction: column; height: 100vh; }
+
+header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 16px; background: var(--surface); border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+header h1 { font-size: .95rem; letter-spacing: .08em; color: var(--accent);
+  text-transform: uppercase; }
+.hdr-right { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+
+.main { display: flex; flex: 1; overflow: hidden; }
+
+/* Chat pane */
+#chat-pane { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+#chat { flex: 1; overflow-y: auto; padding: 20px 24px; scroll-behavior: smooth; }
+#chat::-webkit-scrollbar { width: 5px; }
+#chat::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* Input bar */
+#input-bar {
+  display: flex; gap: 8px; padding: 10px 14px;
+  border-top: 1px solid var(--border); background: var(--surface); flex-shrink: 0;
+}
+#chat-input {
+  flex: 1; background: var(--bg); border: 1px solid var(--border);
+  color: var(--text); font-family: inherit; font-size: .9rem;
+  padding: 8px 12px; border-radius: 6px; resize: none; height: 42px;
+  line-height: 1.4; outline: none; transition: border-color .15s;
+}
+#chat-input:focus { border-color: var(--accent); }
+#chat-input:disabled { opacity: .4; cursor: not-allowed; }
+
+/* Sidebar */
+#sidebar {
+  width: 210px; flex-shrink: 0; overflow-y: auto;
+  border-left: 1px solid var(--border); background: var(--surface);
+  padding: 14px 12px; font-size: .82rem;
+}
+.sb-section { margin-bottom: 18px; }
+.sb-label { color: var(--muted); text-transform: uppercase; letter-spacing: .1em;
+  font-size: .7rem; margin-bottom: 6px; }
+.persona-badge {
+  display: inline-block; padding: 2px 8px; border: 1px solid var(--accent);
+  border-radius: 12px; font-size: .72rem; color: var(--accent); margin: 2px 2px 2px 0;
+}
+
+/* ── Chat messages ─────────────────────────────────────────────── */
+.entry { margin-bottom: 16px; line-height: 1.7; }
+.entry-bot { color: var(--bot); white-space: pre-wrap; }
+.entry-user {
+  color: var(--user); font-style: italic; opacity: .85;
+  padding-left: 12px; border-left: 2px solid var(--user);
+}
+.entry-sys { color: var(--sys); font-size: .8rem; }
+.entry-img-desc {
+  color: var(--muted); font-size: .78rem; font-style: italic;
+  border-left: 2px solid var(--border); padding-left: 8px; margin-bottom: 10px;
+}
+#streaming-cursor {
+  display: inline-block; width: .5em; height: 1em;
+  background: var(--accent); vertical-align: text-bottom;
+  animation: blink .9s step-end infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
+
+/* ── Inline edit ───────────────────────────────────────────────── */
+.entry-bot[contenteditable="true"] {
+  outline: none;
+  border: 1px solid var(--edit-border);
+  background: var(--edit-bg);
+  padding: 8px 10px; border-radius: 4px; cursor: text;
+}
+.edit-bar { display: flex; gap: 6px; margin-top: 6px; }
+.edit-bar button {
+  padding: 3px 10px; font-size: .78rem; border-radius: 3px; cursor: pointer;
+  border: 1px solid var(--border); font-family: inherit;
+  background: var(--btn-bg); color: var(--text);
+}
+.edit-save { background: var(--accent) !important; color: var(--bg) !important;
+  border-color: var(--accent) !important; }
+.edit-hint { font-size: .72rem; color: var(--muted); align-self: center; }
+
+/* ── Buttons ───────────────────────────────────────────────────── */
+button {
+  background: var(--btn-bg); color: var(--text); border: 1px solid var(--border);
+  padding: 6px 12px; font-family: inherit; font-size: .82rem; cursor: pointer;
+  border-radius: 5px; transition: background .12s;
+}
+button:hover { background: var(--btn-hover); }
+button:disabled { opacity: .4; cursor: not-allowed; }
+.btn-icon { padding: 5px 9px; font-size: .95rem; line-height: 1; }
+.btn-send { background: var(--accent); color: var(--bg);
+  border-color: var(--accent); padding: 8px 16px; }
+.btn-send:hover { opacity: .85; }
+
+/* ── Image attach ──────────────────────────────────────────────── */
+#img-attach {
+  display: flex; gap: 8px; align-items: center;
+  padding: 4px 14px; font-size: .8rem; color: var(--muted);
+  border-top: 1px solid var(--border); background: var(--surface); flex-shrink: 0;
+}
+#img-attach.hidden { display: none; }
+#img-name { font-size: .75rem; color: var(--accent); max-width: 130px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 0; }
+#img-label-input {
+  flex: 1; background: var(--bg); border: 1px solid var(--border);
+  color: var(--text); font-family: inherit; font-size: .78rem;
+  padding: 4px 8px; border-radius: 3px; outline: none;
+}
+#img-label-input:focus { border-color: var(--accent); }
+
+/* ── Setup screen ──────────────────────────────────────────────── */
+#setup {
+  position: fixed; inset: 0; background: var(--bg);
+  overflow-y: auto; display: flex; justify-content: center;
+  padding: 32px 16px; z-index: 10;
+}
+.setup-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 28px 32px; width: 680px; max-width: 100%;
+  height: fit-content;
+}
+.setup-card h2 { color: var(--accent); letter-spacing: .12em;
+  text-transform: uppercase; font-size: 1.1rem; margin-bottom: 20px; }
+
+/* Presets */
+.preset-strip { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 20px; align-items: center; }
+.preset-btn {
+  padding: 5px 14px; font-size: .82rem; border-radius: 16px;
+  border: 1px solid var(--accent); color: var(--accent);
+  background: transparent; cursor: pointer; transition: all .15s;
+}
+.preset-btn:hover { background: var(--accent); color: var(--bg); }
+
+/* User preset wrapper — button + edit/delete icons inline */
+.user-preset-wrap { display: inline-flex; align-items: center; border-radius: 16px;
+  border: 1px solid var(--border); overflow: hidden; }
+.user-preset-wrap .preset-btn {
+  border: none; border-radius: 0; margin: 0;
+  border-right: 1px solid var(--border);
+}
+.user-preset-wrap .preset-btn:hover { border-right-color: var(--border); }
+.preset-icon-btn {
+  padding: 4px 7px; font-size: .78rem; line-height: 1; background: transparent;
+  border: none; color: var(--muted); cursor: pointer; transition: color .12s;
+}
+.preset-icon-btn:hover { color: var(--accent); background: transparent; }
+.preset-icon-btn.del:hover { color: var(--danger); }
+
+/* Save-as-preset button */
+#save-preset-btn {
+  padding: 5px 12px; font-size: .8rem; border-radius: 14px;
+  border: 1px dashed var(--accent); color: var(--accent); background: transparent;
+}
+#save-preset-btn:hover { background: var(--chip-sel); }
+
+/* ── Preset edit overlay ───────────────────────────────────────── */
+#preset-modal {
+  position: fixed; inset: 0; background: rgba(0,0,0,.6);
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: 40px 16px; z-index: 30; overflow-y: auto;
+}
+#preset-modal.hidden { display: none; }
+.preset-modal-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 26px 30px; width: 660px; max-width: 100%;
+}
+.preset-modal-card h3 { color: var(--accent); letter-spacing: .1em;
+  text-transform: uppercase; font-size: .95rem; margin-bottom: 18px; }
+#preset-modal-error { color: var(--danger); font-size: .8rem; min-height: 1.1em; margin-top: 6px; }
+.preset-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+
+/* Dimension sections */
+.dims-section { margin-bottom: 20px; }
+.section-header {
+  font-size: .7rem; text-transform: uppercase; letter-spacing: .12em;
+  color: var(--muted); margin-bottom: 12px;
+  display: flex; align-items: center; gap: 8px;
+}
+.section-header::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+.dim-row { margin-bottom: 12px; }
+.dim-label {
+  font-size: .75rem; color: var(--muted); text-transform: uppercase;
+  letter-spacing: .08em; margin-bottom: 5px;
+  display: flex; align-items: center; gap: 5px;
+}
+.required-star { color: var(--accent); font-size: .9rem; line-height: 1; }
+.dim-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+
+.chip {
+  padding: 5px 14px; font-size: .83rem; border-radius: 14px;
+  border: 1.5px solid var(--muted); color: var(--text);
+  background: transparent; cursor: pointer; transition: all .15s; user-select: none;
+}
+.chip:hover { border-color: var(--accent); color: var(--accent); background: var(--chip-sel); }
+.chip.selected {
+  background: var(--chip-sel); border-color: var(--accent); border-width: 2px;
+  color: var(--accent); font-weight: 600;
+}
+
+/* NSFW segmented control */
+.nsfw-row { margin-bottom: 16px; }
+.nsfw-row .conn-label { font-size: .75rem; color: var(--muted); text-transform: uppercase;
+  letter-spacing: .07em; margin-bottom: 6px; }
+.nsfw-seg { display: flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.nsfw-seg button {
+  flex: 1; border: none; border-radius: 0; padding: 7px 4px; font-size: .8rem;
+  font-family: inherit; cursor: pointer; background: transparent; color: var(--muted);
+  transition: all .15s; border-right: 1px solid var(--border);
+}
+.nsfw-seg button:last-child { border-right: none; }
+.nsfw-seg button:hover { color: var(--text); }
+.nsfw-seg button.active { background: var(--chip-sel); color: var(--accent); font-weight: 600; }
+/* show level in sidebar */
+.nsfw-badge { display: inline-block; padding: 2px 8px; border-radius: 10px;
+  font-size: .7rem; font-weight: 600; letter-spacing: .06em; }
+.nsfw-strict  { background: #2a1a1a; color: #e07070; border: 1px solid #6a2a2a; }
+.nsfw-medium  { background: #1a2a1a; color: #80c080; border: 1px solid #2a6a2a; }
+.nsfw-noctl   { background: #1a1a2a; color: #8080e0; border: 1px solid #2a2a6a; }
+
+/* User-added chips — dashed purple, clearly distinct */
+.chip-user { padding-right: 6px; border-style: dashed; border-color: #9b6fe0; color: #c49ef5; }
+.chip-user:hover { border-color: #c49ef5; color: #c49ef5; background: #2d1a55; }
+.chip-user.selected { background: #2d1a55; border-color: #c49ef5; border-width: 2px; color: #c49ef5; font-weight: 600; }
+.chip-del {
+  display: inline-block; margin-left: 4px; font-size: .7rem;
+  color: var(--muted); cursor: pointer; line-height: 1;
+  vertical-align: middle;
+}
+.chip-del:hover { color: var(--danger); }
+
+/* Inline add-option input */
+.chip-add-btn {
+  padding: 3px 9px; font-size: .78rem; border-radius: 14px;
+  border: 1px dashed var(--muted); color: var(--muted);
+  background: transparent; cursor: pointer; transition: all .15s;
+}
+.chip-add-btn:hover { border-color: var(--accent); color: var(--accent); }
+.chip-add-wrap { display: inline-flex; align-items: center; gap: 4px; }
+.chip-add-input {
+  width: 110px; background: var(--bg); border: 1px solid var(--accent);
+  color: var(--text); font-family: inherit; font-size: .82rem;
+  padding: 3px 8px; border-radius: 14px; outline: none;
+}
+
+/* Connection settings */
+.conn-row { margin-bottom: 12px; }
+.conn-row label { display: block; font-size: .75rem; color: var(--muted);
+  margin-bottom: 4px; text-transform: uppercase; letter-spacing: .07em; }
+.conn-row input {
+  width: 100%; background: var(--bg); border: 1px solid var(--border);
+  color: var(--text); font-family: inherit; font-size: .88rem;
+  padding: 7px 10px; border-radius: 5px; outline: none; transition: border-color .15s;
+}
+.conn-row input:focus { border-color: var(--accent); }
+.checkbox-row { display: flex; align-items: center; gap: 8px; }
+.checkbox-row input { width: auto; }
+.checkbox-row label { font-size: .82rem; text-transform: none; letter-spacing: 0; margin: 0; }
+
+.setup-actions { display: flex; justify-content: flex-end; margin-top: 20px; }
+#setup-error { color: var(--danger); font-size: .8rem; margin-top: 8px; min-height: 1.1em; }
+
+/* ── Modal ─────────────────────────────────────────────────────── */
+#modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.55);
+  display: flex; align-items: center; justify-content: center; z-index: 20; }
+#modal-overlay.hidden { display: none; }
+.modal-card { background: var(--surface); border: 1px solid var(--border);
+  border-radius: 6px; padding: 22px 26px; min-width: 260px; max-width: 90vw; }
+.modal-card h3 { color: var(--accent); margin-bottom: 12px; font-size: .9rem;
+  text-transform: uppercase; letter-spacing: .08em; }
+#modal-body { margin-bottom: 14px; font-size: .86rem; line-height: 1.5; }
+#modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+/* Always-visible theme button (setup + chat screens) */
+#global-theme-btn {
+  position: fixed; top: 10px; right: 14px; z-index: 40;
+  background: var(--surface); border: 1px solid var(--border);
+  color: var(--muted); border-radius: 6px; padding: 5px 9px;
+  font-size: 1rem; cursor: pointer; transition: color .15s;
+}
+#global-theme-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+.hidden { display: none !important; }
+</style>
+</head>
+<body>
+<button id="global-theme-btn" title="Toggle theme">◑</button>
+
+<div id="app">
+
+  <!-- Setup screen (shown until session starts) -->
+  <div id="setup">
+    <div class="setup-card">
+      <h2>faaltoo chat</h2>
+
+      <!-- Presets -->
+      <div class="section-header">Quick Presets</div>
+      <div class="preset-strip" id="preset-strip"></div>
+
+      <!-- Required dims -->
+      <div class="dims-section">
+        <div class="section-header">Required</div>
+        <div id="required-dims"></div>
+      </div>
+
+      <!-- Optional dims -->
+      <div class="dims-section">
+        <div class="section-header">Optional</div>
+        <div id="optional-dims"></div>
+      </div>
+
+      <!-- NSFW level -->
+      <div class="section-header">Content Level</div>
+      <div class="nsfw-row">
+        <div class="conn-label">How should the bot handle mature content?</div>
+        <div class="nsfw-seg">
+          <button id="nsfw-strict" class="nsfw-btn" data-level="strict">🔒 Strict</button>
+          <button id="nsfw-medium" class="nsfw-btn active" data-level="medium">⚖️ Medium</button>
+          <button id="nsfw-noctl"  class="nsfw-btn" data-level="no-control">🔓 No Control</button>
+        </div>
+      </div>
+
+      <!-- Connection -->
+      <div class="section-header">Connection</div>
+      <div class="conn-row">
+        <label>LLM Server URL</label>
+        <input id="server-url" type="text" placeholder="http://192.168.x.x:1234/v1 — leave blank for .env default">
+      </div>
+      <div class="conn-row">
+        <label>Model (optional override)</label>
+        <input id="model-input" type="text" placeholder="leave blank for .env default">
+      </div>
+      <div class="conn-row checkbox-row">
+        <input id="vision-check" type="checkbox">
+        <label for="vision-check">Enable vision probe</label>
+      </div>
+
+      <div id="setup-error"></div>
+      <div class="setup-actions" style="justify-content:space-between;">
+        <button id="save-preset-btn" class="hidden">＋ Save as Preset</button>
+        <button id="start-btn" class="btn-send" disabled>Start Chat →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Header (shown after session starts) -->
+  <header>
+    <h1 id="chat-title">faaltoo chat</h1>
+    <div class="hdr-right">
+      <button class="btn-icon" id="theme-btn" title="Toggle theme">◑</button>
+      <button class="btn-icon" id="font-dec-btn" title="Smaller text">A-</button>
+      <button class="btn-icon" id="font-reset-btn" title="Reset text size">A</button>
+      <button class="btn-icon" id="font-inc-btn" title="Larger text">A+</button>
+      <button id="undo-btn" disabled>↩ Undo</button>
+      <button id="regen-btn" disabled>↺ Regen</button>
+      <button id="export-btn">Export</button>
+      <button id="new-chat-btn">New Chat</button>
+    </div>
+  </header>
+
+  <!-- Main chat area -->
+  <div class="main">
+    <div id="chat-pane">
+      <div id="chat"></div>
+
+      <input type="file" id="img-file" accept="image/*" style="display:none">
+
+      <div id="img-attach" class="hidden">
+        <span>📎</span>
+        <span id="img-name"></span>
+        <input id="img-label-input" type="text" placeholder="Describe this image…">
+        <button id="img-clear-btn" class="btn-icon">✕</button>
+      </div>
+
+      <div id="input-bar">
+        <button class="btn-icon hidden" id="img-pick-btn" title="Attach image">📎</button>
+        <textarea id="chat-input" placeholder="Say something…" rows="1"></textarea>
+        <button id="send-btn" class="btn-send">Send</button>
+      </div>
+    </div>
+
+    <div id="sidebar">
+      <div class="sb-section">
+        <div class="sb-label">Persona</div>
+        <div id="sb-persona"></div>
+      </div>
+      <div class="sb-section">
+        <div class="sb-label">Content</div>
+        <div id="sb-nsfw"></div>
+      </div>
+      <div class="sb-section">
+        <div class="sb-label">Turn</div>
+        <div id="sb-turn">0</div>
+      </div>
+      <div id="sb-imgdesc-section" class="sb-section hidden">
+        <div class="sb-label">Last Image</div>
+        <div id="sb-imgdesc" style="font-size:.75rem;color:var(--muted);font-style:italic;line-height:1.4;"></div>
+        <button id="sb-imgdesc-clear-btn" style="margin-top:5px;width:100%;font-size:.75rem;">Clear</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Preset edit modal -->
+<div id="preset-modal" class="hidden">
+  <div class="preset-modal-card">
+    <h3 id="preset-modal-title">Save Preset</h3>
+    <div class="conn-row">
+      <label>Preset Name</label>
+      <input id="preset-name-input" type="text" placeholder="e.g. Sunday Mode" autocomplete="off">
+    </div>
+    <div id="preset-modal-dims"></div>
+    <div id="preset-modal-error"></div>
+    <div class="preset-modal-actions">
+      <button id="preset-modal-cancel">Cancel</button>
+      <button id="preset-modal-save" class="btn-send">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Generic modal -->
+<div id="modal-overlay" class="hidden">
+  <div class="modal-card">
+    <h3 id="modal-title">Dialog</h3>
+    <div id="modal-body"></div>
+    <div id="modal-actions"></div>
+  </div>
+</div>
+
+<script>
+/* ── Font size ──────────────────────────────────────────────────── */
+const FONT_DEFAULT = 15, FONT_MIN = 11, FONT_MAX = 24, FONT_STEP = 1;
+let fontSize = parseInt(localStorage.getItem('fc-font') || FONT_DEFAULT, 10);
+function applyFont() {
+  document.documentElement.style.fontSize = fontSize + 'px';
+  localStorage.setItem('fc-font', fontSize);
+}
+applyFont();
+document.getElementById('font-inc-btn').addEventListener('click', () => { if (fontSize < FONT_MAX) { fontSize += FONT_STEP; applyFont(); } });
+document.getElementById('font-dec-btn').addEventListener('click', () => { if (fontSize > FONT_MIN) { fontSize -= FONT_STEP; applyFont(); } });
+document.getElementById('font-reset-btn').addEventListener('click', () => { fontSize = FONT_DEFAULT; applyFont(); });
+
+/* ── Theme ──────────────────────────────────────────────────────── */
+const THEMES = ['system','dark','light'], ICONS = {system:'◑',dark:'🌙',light:'☀'};
+let themeIdx = THEMES.indexOf(localStorage.getItem('fc-theme') || 'system');
+if (themeIdx < 0) themeIdx = 0;
+function applyTheme() {
+  const t = THEMES[themeIdx];
+  document.documentElement.setAttribute('data-theme', t);
+  const icon = ICONS[t];
+  document.getElementById('theme-btn').textContent = icon;
+  document.getElementById('global-theme-btn').textContent = icon;
+  localStorage.setItem('fc-theme', t);
+}
+applyTheme();
+function cycleTheme() { themeIdx = (themeIdx+1)%THEMES.length; applyTheme(); }
+document.getElementById('theme-btn').addEventListener('click', cycleTheme);
+document.getElementById('global-theme-btn').addEventListener('click', cycleTheme);
+
+/* ── NSFW segmented control ─────────────────────────────────────── */
+let nsfwLevel = 'medium';
+document.querySelectorAll('.nsfw-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.nsfw-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    nsfwLevel = btn.dataset.level;
+  });
+});
+
+/* ── Setup state ────────────────────────────────────────────────── */
+let dimData = null;          // {dimensions, presets} from /api/dimensions
+let selectedDims = {};       // {key: value}
+let requiredKeys = [];
+
+async function loadDimensions() {
+  try {
+    const r = await fetch('/api/dimensions');
+    dimData = await r.json();
+  } catch(e) {
+    document.getElementById('setup-error').textContent = 'Could not load dimension data.';
+    return;
+  }
+
+  const { dimensions } = dimData;
+  requiredKeys = Object.entries(dimensions).filter(([,v]) => v.required).map(([k]) => k);
+
+  // Build the setup-screen dim rows (once)
+  const reqContainer = document.getElementById('required-dims');
+  const optContainer = document.getElementById('optional-dims');
+  Object.entries(dimensions).forEach(([key, dim]) => {
+    const row = document.createElement('div');
+    row.className = 'dim-row';
+    row.dataset.key = key;
+    const labelEl = document.createElement('div');
+    labelEl.className = 'dim-label';
+    labelEl.textContent = dim.label;
+    if (dim.required) {
+      const star = document.createElement('span');
+      star.className = 'required-star'; star.textContent = '*';
+      labelEl.appendChild(star);
+    }
+    row.appendChild(labelEl);
+    const chipsEl = document.createElement('div');
+    chipsEl.className = 'dim-chips';
+    chipsEl.id = `chips-${key}`;
+    row.appendChild(chipsEl);
+    (dim.required ? reqContainer : optContainer).appendChild(row);
+  });
+
+  refreshDimChips();
+
+  renderPresetStrip();
+  validateRequired();
+}
+
+function refreshDimChips() {
+  const { dimensions, user_dim_options = {} } = dimData;
+  Object.entries(dimensions).forEach(([key, dim]) => {
+    const container = document.getElementById(`chips-${key}`);
+    if (!container) return;
+    container.innerHTML = '';
+
+    // Built-in chips
+    dim.options.forEach(opt => {
+      const chip = makeSetupChip(key, opt, false);
+      container.appendChild(chip);
+    });
+
+    // User-added chips
+    (user_dim_options[key] || []).forEach(opt => {
+      const chip = makeSetupChip(key, opt, true);
+      container.appendChild(chip);
+    });
+
+    // ＋ add button
+    const addWrap = document.createElement('span');
+    addWrap.className = 'chip-add-wrap';
+    const addBtn = document.createElement('button');
+    addBtn.className = 'chip-add-btn';
+    addBtn.textContent = '＋';
+    addBtn.title = 'Add custom option';
+    addBtn.addEventListener('click', () => showAddInput(key, addWrap, addBtn));
+    addWrap.appendChild(addBtn);
+    container.appendChild(addWrap);
+  });
+}
+
+function makeSetupChip(key, opt, isUser) {
+  const chip = document.createElement('button');
+  chip.className = 'chip' + (isUser ? ' chip-user' : '') +
+                   (selectedDims[key] === opt ? ' selected' : '');
+  chip.dataset.key = key; chip.dataset.value = opt;
+  chip.addEventListener('click', () => toggleChip(key, opt, chip));
+
+  const label = document.createTextNode(opt);
+  chip.appendChild(label);
+
+  if (isUser) {
+    const x = document.createElement('span');
+    x.className = 'chip-del';
+    x.textContent = '✕';
+    x.title = 'Remove this option';
+    x.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      await deleteUserDimOption(key, opt);
+    });
+    chip.appendChild(x);
+  }
+  return chip;
+}
+
+function showAddInput(key, wrap, addBtn) {
+  addBtn.classList.add('hidden');
+  const inp = document.createElement('input');
+  inp.className = 'chip-add-input';
+  inp.placeholder = 'New option…';
+  inp.maxLength = 40;
+  wrap.appendChild(inp);
+  inp.focus();
+
+  async function commit() {
+    const val = inp.value.trim();
+    inp.remove();
+    addBtn.classList.remove('hidden');
+    if (!val) return;
+    const r = await fetch(`/api/dimensions/${key}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ value: val }),
+    });
+    const d = await r.json();
+    if (!r.ok) { alert(d.error || 'Could not add option.'); return; }
+    const dr = await fetch('/api/dimensions');
+    dimData = await dr.json();
+    refreshDimChips();
+  }
+
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'Enter') commit();
+    if (e.key === 'Escape') { inp.remove(); addBtn.classList.remove('hidden'); }
+  });
+  inp.addEventListener('blur', () => { inp.remove(); addBtn.classList.remove('hidden'); });
+}
+
+async function deleteUserDimOption(key, value) {
+  if (selectedDims[key] === value) delete selectedDims[key];
+  const r = await fetch(`/api/dimensions/${key}/${encodeURIComponent(value)}`, { method: 'DELETE' });
+  if (r.ok) {
+    const dr = await fetch('/api/dimensions');
+    dimData = await dr.json();
+    refreshDimChips();
+    validateRequired();
+  }
+}
+
+function renderPresetStrip() {
+  const strip = document.getElementById('preset-strip');
+  strip.innerHTML = '';
+
+  // Built-ins — click only
+  Object.keys(dimData.presets || {}).forEach(name => {
+    const btn = document.createElement('button');
+    btn.className = 'preset-btn';
+    btn.textContent = name;
+    btn.title = 'Built-in preset';
+    btn.addEventListener('click', () => applyPreset(dimData.presets[name]));
+    strip.appendChild(btn);
+  });
+
+  // User presets — click + edit + delete
+  Object.keys(dimData.user_presets || {}).forEach(name => {
+    const wrap = document.createElement('div');
+    wrap.className = 'user-preset-wrap';
+
+    const btn = document.createElement('button');
+    btn.className = 'preset-btn';
+    btn.textContent = name;
+    btn.addEventListener('click', () => applyPreset(dimData.user_presets[name]));
+
+    const editBtn = document.createElement('button');
+    editBtn.className = 'preset-icon-btn';
+    editBtn.title = 'Edit preset';
+    editBtn.textContent = '✎';
+    editBtn.addEventListener('click', (e) => { e.stopPropagation(); openPresetModal(name, dimData.user_presets[name]); });
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'preset-icon-btn del';
+    delBtn.title = 'Delete preset';
+    delBtn.textContent = '✕';
+    delBtn.addEventListener('click', (e) => { e.stopPropagation(); deleteUserPreset(name); });
+
+    wrap.appendChild(btn); wrap.appendChild(editBtn); wrap.appendChild(delBtn);
+    strip.appendChild(wrap);
+  });
+}
+
+function toggleChip(key, value, chipEl) {
+  // Deselect previously selected chip in this row
+  document.querySelectorAll(`.chip[data-key="${key}"]`).forEach(c => c.classList.remove('selected'));
+  if (selectedDims[key] === value) {
+    delete selectedDims[key];
+  } else {
+    selectedDims[key] = value;
+    chipEl.classList.add('selected');
+  }
+  validateRequired();
+}
+
+function applyPreset(preset) {
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('selected'));
+  selectedDims = {};
+  Object.entries(preset).forEach(([key, value]) => {
+    selectedDims[key] = value;
+    const chip = document.querySelector(`.chip[data-key="${key}"][data-value="${value}"]`);
+    if (chip) chip.classList.add('selected');
+  });
+  validateRequired();
+}
+
+/* ── Preset modal ───────────────────────────────────────────────── */
+let _editingPresetName = null;   // null = new preset, string = editing existing
+let _modalDims = {};             // selections being edited in the modal
+
+function openPresetModal(existingName, existingSelections) {
+  _editingPresetName = existingName || null;
+  _modalDims = existingSelections ? { ...existingSelections } : { ...selectedDims };
+
+  document.getElementById('preset-modal-title').textContent =
+    existingName ? 'Edit Preset' : 'Save as Preset';
+  document.getElementById('preset-name-input').value = existingName || '';
+  document.getElementById('preset-modal-error').textContent = '';
+
+  // Build chip grid inside the modal
+  const container = document.getElementById('preset-modal-dims');
+  container.innerHTML = '';
+  const { dimensions, user_dim_options = {} } = dimData;
+  Object.entries(dimensions).forEach(([key, dim]) => {
+    const row = document.createElement('div');
+    row.className = 'dim-row';
+    const labelEl = document.createElement('div');
+    labelEl.className = 'dim-label';
+    labelEl.textContent = dim.label;
+    if (dim.required) {
+      const star = document.createElement('span');
+      star.className = 'required-star'; star.textContent = '*';
+      labelEl.appendChild(star);
+    }
+    row.appendChild(labelEl);
+    const chipsEl = document.createElement('div');
+    chipsEl.className = 'dim-chips';
+    const allOpts = [...dim.options, ...(user_dim_options[key] || [])];
+    allOpts.forEach(opt => {
+      const chip = document.createElement('button');
+      chip.className = 'chip' + (_modalDims[key] === opt ? ' selected' : '');
+      chip.textContent = opt;
+      chip.addEventListener('click', () => {
+        chipsEl.querySelectorAll('.chip').forEach(c => c.classList.remove('selected'));
+        if (_modalDims[key] === opt) {
+          delete _modalDims[key];
+        } else {
+          _modalDims[key] = opt;
+          chip.classList.add('selected');
+        }
+      });
+      chipsEl.appendChild(chip);
+    });
+    row.appendChild(chipsEl);
+    container.appendChild(row);
+  });
+
+  document.getElementById('preset-modal').classList.remove('hidden');
+  document.getElementById('preset-name-input').focus();
+}
+
+function closePresetModal() {
+  document.getElementById('preset-modal').classList.add('hidden');
+  _editingPresetName = null;
+  _modalDims = {};
+}
+
+document.getElementById('preset-modal-cancel').addEventListener('click', closePresetModal);
+
+document.getElementById('preset-modal-save').addEventListener('click', async () => {
+  const name = document.getElementById('preset-name-input').value.trim();
+  const errEl = document.getElementById('preset-modal-error');
+  errEl.textContent = '';
+
+  if (!name) { errEl.textContent = 'Please enter a name.'; return; }
+  if (!requiredKeys.every(k => _modalDims[k])) {
+    errEl.textContent = 'Archetype, Energy and Talk-Type are required.'; return;
+  }
+
+  const isEdit = _editingPresetName !== null;
+  const url = isEdit ? `/api/presets/${encodeURIComponent(_editingPresetName)}` : '/api/presets';
+  const method = isEdit ? 'PUT' : 'POST';
+
+  try {
+    const r = await fetch(url, {
+      method, headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, selections: _modalDims }),
+    });
+    const d = await r.json();
+    if (!r.ok) { errEl.textContent = d.error || 'Save failed.'; return; }
+    // Refresh dimData and re-render strip
+    const dr = await fetch('/api/dimensions');
+    dimData = await dr.json();
+    renderPresetStrip();
+    closePresetModal();
+  } catch(e) {
+    errEl.textContent = 'Error: ' + e.message;
+  }
+});
+
+async function deleteUserPreset(name) {
+  if (!confirm(`Delete preset "${name}"?`)) return;
+  try {
+    const r = await fetch(`/api/presets/${encodeURIComponent(name)}`, { method: 'DELETE' });
+    if (r.ok) {
+      const dr = await fetch('/api/dimensions');
+      dimData = await dr.json();
+      renderPresetStrip();
+    }
+  } catch(e) {
+    console.error('Delete failed:', e);
+  }
+}
+
+function validateRequired() {
+  const ok = requiredKeys.every(k => selectedDims[k]);
+  document.getElementById('start-btn').disabled = !ok;
+  document.getElementById('save-preset-btn').classList.toggle('hidden', !ok);
+}
+
+document.getElementById('save-preset-btn').addEventListener('click', () => {
+  openPresetModal(null, null);  // new preset, pre-filled with current setup selection
+});
+
+/* ── Start chat ─────────────────────────────────────────────────── */
+document.getElementById('start-btn').addEventListener('click', startChat);
+
+async function startChat() {
+  const serverUrl = document.getElementById('server-url').value.trim();
+  const model = document.getElementById('model-input').value.trim();
+  const vision = document.getElementById('vision-check').checked;
+  const errEl = document.getElementById('setup-error');
+  errEl.textContent = '';
+
+  if (!requiredKeys.every(k => selectedDims[k])) {
+    errEl.textContent = 'Please select all required dimensions.';
+    return;
+  }
+
+  const btn = document.getElementById('start-btn');
+  btn.disabled = true;
+  btn.textContent = 'Starting…';
+
+  try {
+    const resp = await fetch('/api/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ selections: selectedDims, server_url: serverUrl, model, vision, nsfw_level: nsfwLevel }),
+    });
+    if (!resp.ok) {
+      const d = await resp.json().catch(() => ({}));
+      errEl.textContent = d.error || `Error ${resp.status}`;
+      btn.disabled = false; btn.textContent = 'Start Chat →';
+      return;
+    }
+
+    const d = await resp.json();
+    document.getElementById('setup').classList.add('hidden');
+    renderPersonaSidebar(selectedDims);
+    if (d.vision_capable) document.getElementById('img-pick-btn').classList.remove('hidden');
+    syncState(d);
+    document.getElementById('chat-input').focus();
+  } catch(e) {
+    errEl.textContent = 'Connection failed: ' + e.message;
+    btn.disabled = false; btn.textContent = 'Start Chat →';
+  }
+}
+
+const NSFW_BADGE = {
+  'strict':     { cls: 'nsfw-strict', label: '🔒 Strict' },
+  'medium':     { cls: 'nsfw-medium', label: '⚖️ Medium' },
+  'no-control': { cls: 'nsfw-noctl',  label: '🔓 No Control' },
+};
+
+function renderPersonaSidebar(sels) {
+  const container = document.getElementById('sb-persona');
+  container.innerHTML = '';
+  if (!dimData) return;
+  Object.entries(sels).forEach(([key, val]) => {
+    const badge = document.createElement('span');
+    badge.className = 'persona-badge';
+    badge.title = dimData.dimensions[key]?.label || key;
+    badge.textContent = val;
+    container.appendChild(badge);
+  });
+
+  const nb = NSFW_BADGE[nsfwLevel] || NSFW_BADGE['medium'];
+  const nsfwEl = document.getElementById('sb-nsfw');
+  nsfwEl.innerHTML = `<span class="nsfw-badge ${nb.cls}">${nb.label}</span>`;
+}
+
+/* ── SSE consumer ───────────────────────────────────────────────── */
+async function consumeSSE(response, handlers) {
+  const reader = response.body.getReader(), decoder = new TextDecoder();
+  let buf = '';
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    const parts = buf.split('\n\n');
+    buf = parts.pop();
+    for (const part of parts) {
+      const line = part.trim();
+      if (!line.startsWith('data: ')) continue;
+      try {
+        const ev = JSON.parse(line.slice(6));
+        const h = handlers[ev.type];
+        if (h) h(ev);
+      } catch {}
+    }
+  }
+}
+
+/* ── Chat rendering ─────────────────────────────────────────────── */
+const chat = document.getElementById('chat');
+let streamEl = null, streamText = '';
+
+function appendChunk(text) {
+  if (!streamEl) {
+    const cur = document.getElementById('streaming-cursor');
+    if (cur) cur.remove();
+    streamEl = document.createElement('div');
+    streamEl.className = 'entry entry-bot';
+    streamText = '';
+    chat.appendChild(streamEl);
+  }
+  streamText += text;
+  streamEl.textContent = streamText;
+  let cur = document.getElementById('streaming-cursor');
+  if (!cur) { cur = document.createElement('span'); cur.id = 'streaming-cursor'; }
+  streamEl.appendChild(cur);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function finalizeStream() {
+  const cur = document.getElementById('streaming-cursor');
+  if (cur) cur.remove();
+  if (streamEl) {
+    chat.querySelectorAll('.entry-bot[data-last-bot]').forEach(el => delete el.dataset.lastBot);
+    streamEl.dataset.lastBot = '1';
+    wireEdit(streamEl);
+    streamEl = null;
+    streamText = '';
+  }
+}
+
+function appendUser(text) {
+  const el = document.createElement('div');
+  el.className = 'entry entry-user';
+  el.textContent = text;
+  chat.appendChild(el);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function appendSys(text) {
+  const el = document.createElement('div');
+  el.className = 'entry entry-sys';
+  el.textContent = text;
+  chat.appendChild(el);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function appendImageDesc(text) {
+  const el = document.createElement('div');
+  el.className = 'entry entry-img-desc';
+  el.textContent = '🖼 ' + text;
+  chat.appendChild(el);
+  chat.scrollTop = chat.scrollHeight;
+  document.getElementById('sb-imgdesc').textContent = text;
+  document.getElementById('sb-imgdesc-section').classList.remove('hidden');
+}
+
+/* ── Inline edit ────────────────────────────────────────────────── */
+let editingEntry = null;
+
+function wireEdit(el) {
+  el.title = 'Double-click to edit';
+  el.style.cursor = 'default';
+  el.addEventListener('dblclick', () => { if (!busy) startEdit(el); });
+}
+
+function startEdit(el) {
+  if (editingEntry) return;
+  editingEntry = el;
+  const original = el.textContent;
+  el.contentEditable = 'true';
+  el.focus();
+  const range = document.createRange();
+  range.selectNodeContents(el); range.collapse(false);
+  window.getSelection().removeAllRanges(); window.getSelection().addRange(range);
+
+  const bar = document.createElement('div');
+  bar.className = 'edit-bar';
+  bar.innerHTML = '<button class="edit-save">✓ Save</button><button class="edit-cancel">✗ Cancel</button><span class="edit-hint">Ctrl+Enter · Esc</span>';
+  el.insertAdjacentElement('afterend', bar);
+  document.getElementById('chat-input').disabled = true;
+  document.getElementById('send-btn').disabled = true;
+
+  function doSave() {
+    const newText = el.innerText.trim();
+    if (!newText) { doCancel(); return; }
+    el.contentEditable = 'false'; bar.remove(); editingEntry = null;
+    document.getElementById('chat-input').disabled = false;
+    if (!busy) document.getElementById('send-btn').disabled = false;
+    el.textContent = newText;
+    fetch('/api/edit', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({text:newText}) })
+      .then(r => { if (r.ok) appendSys('[edit saved]'); else appendSys('[edit failed]'); el.textContent = newText; })
+      .catch(() => { appendSys('[edit failed]'); el.textContent = original; });
+  }
+  function doCancel() {
+    el.contentEditable = 'false'; el.textContent = original; bar.remove(); editingEntry = null;
+    document.getElementById('chat-input').disabled = false;
+    if (!busy) document.getElementById('send-btn').disabled = false;
+  }
+
+  bar.querySelector('.edit-save').addEventListener('click', doSave);
+  bar.querySelector('.edit-cancel').addEventListener('click', doCancel);
+  function kbHandler(e) {
+    if (e.key === 'Escape') { doCancel(); el.removeEventListener('keydown', kbHandler); }
+    if (e.key === 'Enter' && e.ctrlKey) { doSave(); el.removeEventListener('keydown', kbHandler); }
+  }
+  el.addEventListener('keydown', kbHandler);
+}
+
+/* ── State sync ─────────────────────────────────────────────────── */
+function syncState(d) {
+  if (d.turn_count !== undefined) document.getElementById('sb-turn').textContent = d.turn_count;
+}
+
+let busy = false;
+let pendingImage = null;
+
+function setBusy(b) {
+  busy = b;
+  document.getElementById('chat-input').disabled = b || !!editingEntry;
+  document.getElementById('send-btn').disabled = b;
+  document.getElementById('regen-btn').disabled = b;
+  document.getElementById('undo-btn').disabled = b;
+}
+
+/* ── Send message ───────────────────────────────────────────────── */
+document.getElementById('send-btn').addEventListener('click', sendMessage);
+document.getElementById('chat-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+});
+
+async function sendMessage() {
+  if (busy || editingEntry) return;
+  const inp = document.getElementById('chat-input');
+  const text = inp.value.trim();
+  if (!text) return;
+  inp.value = ''; inp.style.height = '42px';
+  setBusy(true);
+
+  const fd = new FormData();
+  fd.append('text', text);
+  if (pendingImage) {
+    fd.append('image', pendingImage.file);
+    fd.append('image_label', pendingImage.label);
+    pendingImage = null;
+    clearImageAttach();
+  }
+
+  try {
+    const resp = await fetch('/api/chat', { method:'POST', body:fd });
+    if (!resp.ok) {
+      const d = await resp.json().catch(()=>({}));
+      appendSys('Error: ' + (d.error || resp.status)); setBusy(false); return;
+    }
+    await consumeSSE(resp, {
+      user(ev)      { appendUser(ev.text); },
+      image_desc(ev){ appendImageDesc(ev.text); },
+      chunk(ev)     { appendChunk(ev.text); },
+      state(ev)     { syncState(ev); },
+      done()        { finalizeStream(); setBusy(false);
+                      document.getElementById('regen-btn').disabled = false;
+                      document.getElementById('undo-btn').disabled = false; },
+      error(ev)     { appendSys('Error: '+ev.message); finalizeStream(); setBusy(false); },
+    });
+  } catch(e) {
+    appendSys('Connection error: ' + e.message); setBusy(false);
+  }
+}
+
+/* ── Undo ───────────────────────────────────────────────────────── */
+document.getElementById('undo-btn').addEventListener('click', async () => {
+  if (busy) return;
+  setBusy(true);
+  try {
+    const r = await fetch('/api/undo', { method:'POST' });
+    if (!r.ok) {
+      const d = await r.json().catch(()=>({}));
+      appendSys('Undo error: ' + (d.error || r.status)); setBusy(false); return;
+    }
+    const d = await r.json();
+    // Remove last bot entry from DOM
+    const botEntries = Array.from(chat.querySelectorAll('.entry-bot'));
+    if (botEntries.length) botEntries[botEntries.length-1].remove();
+    // Remove last user entry from DOM
+    const userEntries = Array.from(chat.querySelectorAll('.entry-user'));
+    if (userEntries.length) userEntries[userEntries.length-1].remove();
+    // Re-wire edit on new last bot entry
+    const remaining = chat.querySelectorAll('.entry-bot');
+    if (remaining.length) {
+      chat.querySelectorAll('.entry-bot[data-last-bot]').forEach(el => delete el.dataset.lastBot);
+      const last = remaining[remaining.length-1];
+      last.dataset.lastBot = '1'; wireEdit(last);
+    }
+    syncState(d);
+    document.getElementById('regen-btn').disabled = true;
+  } catch(e) { appendSys('Connection error: '+e.message); }
+  setBusy(false);
+});
+
+/* ── Regen ──────────────────────────────────────────────────────── */
+document.getElementById('regen-btn').addEventListener('click', async () => {
+  if (busy) return;
+  setBusy(true);
+  const lastBot = chat.querySelector('.entry-bot[data-last-bot]');
+  if (lastBot) lastBot.remove();
+  try {
+    const resp = await fetch('/api/regen', { method:'POST' });
+    if (!resp.ok) {
+      const d = await resp.json().catch(()=>({}));
+      appendSys('Regen error: '+(d.error||resp.status)); setBusy(false); return;
+    }
+    await consumeSSE(resp, {
+      regen() {},
+      chunk(ev) { appendChunk(ev.text); },
+      state(ev) { syncState(ev); },
+      done()    { finalizeStream(); setBusy(false); },
+      error(ev) { appendSys('Error: '+ev.message); finalizeStream(); setBusy(false); },
+    });
+  } catch(e) { appendSys('Connection error: '+e.message); setBusy(false); }
+});
+
+/* ── Export ─────────────────────────────────────────────────────── */
+document.getElementById('export-btn').addEventListener('click', () => {
+  window.location.href = '/api/export';
+});
+
+/* ── New Chat ───────────────────────────────────────────────────── */
+document.getElementById('new-chat-btn').addEventListener('click', async () => {
+  if (busy) return;
+  await fetch('/api/reset', { method:'POST' });
+  chat.innerHTML = '';
+  selectedDims = {};
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('selected'));
+  document.getElementById('sb-persona').innerHTML = '';
+  document.getElementById('sb-nsfw').innerHTML = '';
+  document.getElementById('sb-turn').textContent = '0';
+  document.getElementById('img-pick-btn').classList.add('hidden');
+  document.getElementById('sb-imgdesc-section').classList.add('hidden');
+  document.getElementById('regen-btn').disabled = true;
+  document.getElementById('undo-btn').disabled = true;
+  document.getElementById('setup-error').textContent = '';
+  const btn = document.getElementById('start-btn');
+  btn.textContent = 'Start Chat →';
+  validateRequired();
+  document.getElementById('setup').classList.remove('hidden');
+});
+
+/* ── Image attach ───────────────────────────────────────────────── */
+document.getElementById('img-pick-btn').addEventListener('click', () => document.getElementById('img-file').click());
+document.getElementById('img-file').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  document.getElementById('img-name').textContent = file.name;
+  document.getElementById('img-label-input').value = '';
+  document.getElementById('img-attach').classList.remove('hidden');
+  pendingImage = { file, label: '' };
+});
+document.getElementById('img-label-input').addEventListener('input', e => {
+  if (pendingImage) pendingImage.label = e.target.value;
+});
+document.getElementById('img-clear-btn').addEventListener('click', clearImageAttach);
+function clearImageAttach() {
+  document.getElementById('img-file').value = '';
+  document.getElementById('img-name').textContent = '';
+  document.getElementById('img-label-input').value = '';
+  document.getElementById('img-attach').classList.add('hidden');
+  pendingImage = null;
+}
+document.getElementById('sb-imgdesc-clear-btn').addEventListener('click', () => {
+  document.getElementById('sb-imgdesc').textContent = '';
+  document.getElementById('sb-imgdesc-section').classList.add('hidden');
+});
+
+/* ── Auto-resize textarea ───────────────────────────────────────── */
+document.getElementById('chat-input').addEventListener('input', function() {
+  this.style.height = '42px';
+  this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+});
+
+/* ── Modal ──────────────────────────────────────────────────────── */
+function showModal(title, bodyHtml, buttons) {
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-body').innerHTML = bodyHtml;
+  const acts = document.getElementById('modal-actions');
+  acts.innerHTML = '';
+  buttons.forEach(b => {
+    const btn = document.createElement('button');
+    btn.textContent = b.label;
+    if (b.cls) btn.className = b.cls;
+    btn.addEventListener('click', b.action);
+    acts.appendChild(btn);
+  });
+  document.getElementById('modal-overlay').classList.remove('hidden');
+}
+function closeModal() { document.getElementById('modal-overlay').classList.add('hidden'); }
+document.getElementById('modal-overlay').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal(); });
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && !editingEntry) {
+    closeModal();
+    closePresetModal();
+  }
+});
+document.getElementById('preset-modal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closePresetModal();
+});
+
+/* ── Boot ───────────────────────────────────────────────────────── */
+loadDimensions();
+</script>
+</body>
+</html>

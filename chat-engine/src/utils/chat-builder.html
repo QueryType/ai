@@ -1,0 +1,1818 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chat Engine - Chat Builder</title>
+<style>
+:root {
+  --bg: #f3ede2;
+  --panel: rgba(255, 251, 245, 0.92);
+  --panel-strong: rgba(255, 248, 239, 0.98);
+  --ink: #2f241f;
+  --muted: #72645d;
+  --line: rgba(87, 61, 43, 0.16);
+  --accent: #8f4b2e;
+  --accent-strong: #6f361d;
+  --accent-soft: rgba(143, 75, 46, 0.12);
+  --success: #27624c;
+  --warn: #9d6b12;
+  --danger: #9d3f31;
+  --shadow: 0 18px 50px rgba(61, 38, 24, 0.12);
+  --radius: 16px;
+}
+
+:root[data-theme="midnight"] {
+  --bg: #17151a;
+  --panel: rgba(28, 26, 33, 0.94);
+  --panel-strong: rgba(37, 33, 43, 0.98);
+  --ink: #f1e5d8;
+  --muted: #b7a99b;
+  --line: rgba(235, 213, 193, 0.12);
+  --accent: #d98657;
+  --accent-strong: #f0b185;
+  --accent-soft: rgba(217, 134, 87, 0.14);
+  --success: #7bc4a2;
+  --warn: #d7af57;
+  --danger: #ee8d7c;
+  --shadow: 0 22px 60px rgba(0, 0, 0, 0.35);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  font-family: Georgia, "Times New Roman", serif;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at top left, rgba(201, 149, 100, 0.22), transparent 34%),
+    radial-gradient(circle at top right, rgba(94, 74, 138, 0.08), transparent 28%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.42), transparent 28%),
+    var(--bg);
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.42;
+  background-image:
+    linear-gradient(rgba(111, 54, 29, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(111, 54, 29, 0.03) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+.shell {
+  position: relative;
+  z-index: 1;
+  max-width: 1480px;
+  margin: 0 auto;
+  padding: 28px 20px 36px;
+}
+
+.topbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  border-radius: 22px;
+  padding: 18px 20px;
+  margin-bottom: 22px;
+  backdrop-filter: blur(14px);
+}
+
+.title-block h1 {
+  margin: 0;
+  font-size: clamp(1.6rem, 2.2vw, 2.4rem);
+  letter-spacing: 0.02em;
+}
+
+.title-block p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.98rem;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.theme-toggle {
+  display: inline-flex;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  border: 1px solid var(--line);
+}
+
+.theme-toggle button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.theme-toggle button.active {
+  background: var(--panel-strong);
+  color: var(--accent-strong);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+}
+
+.btn {
+  border: 1px solid var(--line);
+  background: var(--panel-strong);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 10px 14px;
+  cursor: pointer;
+  font: inherit;
+  transition: 0.16s ease;
+}
+
+.btn:hover {
+  border-color: rgba(143, 75, 46, 0.35);
+  transform: translateY(-1px);
+}
+
+.btn.primary {
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+  color: #fff8f1;
+  border-color: transparent;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(14px);
+}
+
+.panel-inner {
+  padding: 20px;
+}
+
+.stack {
+  display: grid;
+  gap: 18px;
+}
+
+.section-card {
+  background: var(--panel-strong);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.section-head {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(143, 75, 46, 0.08), transparent);
+}
+
+.section-head h2,
+.section-head h3 {
+  margin: 0;
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.section-head p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  line-height: 1.45;
+  font-size: 0.92rem;
+}
+
+.section-body {
+  padding: 16px;
+}
+
+.grid {
+  display: grid;
+  gap: 14px;
+}
+
+.grid.two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.grid.three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+}
+
+.field label {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.field small {
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+input[type="text"],
+input[type="number"],
+select,
+textarea {
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  padding: 11px 12px;
+  font: inherit;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.58);
+}
+
+:root[data-theme="midnight"] input[type="text"],
+:root[data-theme="midnight"] input[type="number"],
+:root[data-theme="midnight"] select,
+:root[data-theme="midnight"] textarea {
+  background: rgba(10, 9, 13, 0.34);
+}
+
+textarea {
+  min-height: 116px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 2px solid rgba(143, 75, 46, 0.18);
+  border-color: rgba(143, 75, 46, 0.4);
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.4);
+}
+
+:root[data-theme="midnight"] .checkbox-row {
+  background: rgba(10, 9, 13, 0.28);
+}
+
+.checkbox-row input {
+  width: 18px;
+  height: 18px;
+}
+
+.character-toolbar,
+.phase-toolbar,
+.preview-toolbar,
+.status-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.character-card,
+.phase-card {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 16px;
+  background: linear-gradient(180deg, rgba(143, 75, 46, 0.07), transparent 30%), var(--panel-strong);
+}
+
+.character-header,
+.phase-header {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.character-index,
+.phase-index {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent-strong);
+}
+
+.character-actions,
+.phase-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.character-actions .btn,
+.phase-actions .btn {
+  padding: 8px 10px;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  border: 1px solid rgba(143, 75, 46, 0.14);
+  font-size: 0.9rem;
+}
+
+.pill.good {
+  color: var(--success);
+  background: rgba(39, 98, 76, 0.12);
+  border-color: rgba(39, 98, 76, 0.2);
+}
+
+.pill.warn {
+  color: var(--warn);
+  background: rgba(157, 107, 18, 0.12);
+  border-color: rgba(157, 107, 18, 0.2);
+}
+
+.issues {
+  display: grid;
+  gap: 10px;
+}
+
+.issue {
+  border-radius: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.44);
+}
+
+.issue.error {
+  border-color: rgba(157, 63, 49, 0.28);
+  color: var(--danger);
+}
+
+.issue.warn {
+  border-color: rgba(157, 107, 18, 0.28);
+  color: var(--warn);
+}
+
+.preview-box {
+  min-height: 70vh;
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+}
+
+#preview {
+  min-height: 52vh;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.9rem;
+  white-space: pre;
+}
+
+.stats {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.hidden {
+  display: none !important;
+}
+
+@media (max-width: 1100px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .preview-box {
+    min-height: auto;
+  }
+}
+
+@media (max-width: 720px) {
+  .shell {
+    padding: 18px 12px 28px;
+  }
+
+  .grid.two,
+  .grid.three {
+    grid-template-columns: 1fr;
+  }
+
+  .topbar,
+  .section-body,
+  .panel-inner {
+    padding: 14px;
+  }
+
+  .toolbar,
+  .character-toolbar,
+  .preview-toolbar,
+  .status-row,
+  .character-header {
+    align-items: stretch;
+  }
+
+  .btn,
+  .theme-toggle {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .theme-toggle button {
+    flex: 1;
+  }
+}
+</style>
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <div class="title-block">
+        <h1>Chat Engine Builder</h1>
+        <p>Single-file editor for chat-engine scenario markdown, aligned to the parser in this repo.</p>
+      </div>
+      <div class="toolbar">
+        <div class="theme-toggle" aria-label="Theme selector">
+          <button type="button" data-theme-choice="parchment">Parchment</button>
+          <button type="button" data-theme-choice="midnight">Midnight</button>
+        </div>
+        <button class="btn" type="button" id="import-button">Import markdown</button>
+        <button class="btn" type="button" id="copy-button">Copy markdown</button>
+        <button class="btn primary" type="button" id="download-button">Download .md</button>
+        <button class="btn" type="button" id="reset-button">Reset sample</button>
+        <input class="hidden" id="file-input" type="file" accept=".md,text/markdown,text/plain">
+      </div>
+    </header>
+
+    <div class="layout">
+      <main class="panel">
+        <div class="panel-inner stack">
+          <section class="section-card">
+            <div class="section-head">
+              <h2>Meta</h2>
+              <p>Top-level file identity and output targets.</p>
+            </div>
+            <div class="section-body grid two">
+              <div class="field">
+                <label for="meta-title">Title</label>
+                <input id="meta-title" type="text" data-path="meta.title">
+              </div>
+              <div class="field">
+                <label for="meta-version">Version</label>
+                <input id="meta-version" type="text" data-path="meta.version">
+              </div>
+              <div class="field">
+                <label for="meta-language">Language</label>
+                <input id="meta-language" type="text" data-path="meta.language">
+              </div>
+              <div class="field">
+                <label for="meta-mode">Mode</label>
+                <input id="meta-mode" type="text" data-path="meta.mode" readonly>
+                <small>Parser requires this to stay set to chat.</small>
+              </div>
+              <div class="field">
+                <label for="meta-output-transcript">Output transcript</label>
+                <input id="meta-output-transcript" type="text" data-path="meta.output_transcript">
+              </div>
+              <div class="field">
+                <label for="meta-output-runlog">Output runlog</label>
+                <input id="meta-output-runlog" type="text" data-path="meta.output_runlog">
+              </div>
+              <div class="field">
+                <label for="file-slug">Download file name</label>
+                <input id="file-slug" type="text" data-path="ui.file_slug">
+                <small>Used only when downloading the markdown file.</small>
+              </div>
+              <div class="field">
+                <label>Flags</label>
+                <label class="checkbox-row"><input type="checkbox" data-path="meta.nsfw"> Mark file as NSFW</label>
+              </div>
+            </div>
+          </section>
+
+          <section class="section-card">
+            <div class="section-head">
+              <h2>Chat Config</h2>
+              <p>These fields map directly to the parser's ChatConfig, including bounded-history controls and optional legacy selector context.</p>
+            </div>
+            <div class="section-body grid three">
+              <div class="field">
+                <label for="cfg-max-turns">Max turns</label>
+                <input id="cfg-max-turns" type="number" min="0" step="1" data-path="config.max_turns">
+              </div>
+              <div class="field">
+                <label for="cfg-pause-every">Pause every</label>
+                <input id="cfg-pause-every" type="number" min="0" step="1" data-path="config.pause_every">
+              </div>
+              <div class="field">
+                <label for="cfg-history-window">History window</label>
+                <input id="cfg-history-window" type="number" min="0" step="1" data-path="config.history_window">
+              </div>
+              <div class="field">
+                <label for="cfg-history-summary-chars">History summary chars</label>
+                <input id="cfg-history-summary-chars" type="number" min="0" step="1" data-path="config.history_summary_chars">
+              </div>
+              <div class="field">
+                <label for="cfg-ending-countdown-turns">Ending countdown turns</label>
+                <input id="cfg-ending-countdown-turns" type="number" min="0" step="1" data-path="config.ending_countdown_turns">
+              </div>
+              <div class="field">
+                <label for="cfg-ending-grace-turns">Ending grace turns</label>
+                <input id="cfg-ending-grace-turns" type="number" min="0" step="1" data-path="config.ending_grace_turns">
+              </div>
+              <div class="field">
+                <label for="cfg-opening-speaker">Opening speaker</label>
+                <input id="cfg-opening-speaker" type="text" data-path="config.opening_speaker">
+              </div>
+              <div class="field">
+                <label for="cfg-turn-selection">Turn selection</label>
+                <select id="cfg-turn-selection" data-path="config.turn_selection">
+                  <option value="rules">rules</option>
+                  <option value="llm">llm</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="cfg-max-retries">Max retries</label>
+                <input id="cfg-max-retries" type="number" min="0" step="1" data-path="config.max_retries">
+              </div>
+              <div class="field">
+                <label for="cfg-orchestrator-history-window">Selector history window</label>
+                <input id="cfg-orchestrator-history-window" type="number" min="0" step="1" data-path="config.orchestrator_history_window">
+                <small>Legacy parser field. Only needed if you still rely on a separate selector context budget.</small>
+              </div>
+              <div class="field" style="grid-column: 1 / -1;">
+                <label for="cfg-response-length">Response length</label>
+                <input id="cfg-response-length" type="text" data-path="config.response_length">
+                <small>Example values: free, 1-2 sentences, 2-4 sentences.</small>
+              </div>
+            </div>
+          </section>
+
+          <section class="section-card">
+            <div class="section-head">
+              <div class="phase-toolbar">
+                <div>
+                  <h2>Phases</h2>
+                  <p>Optional pacing plan for the planner. These emit as [phase-1], [phase-2], and so on.</p>
+                </div>
+                <button class="btn primary" type="button" id="add-phase-button">Add phase</button>
+              </div>
+            </div>
+            <div class="section-body">
+              <div id="phase-list" class="stack"></div>
+            </div>
+          </section>
+
+          <section class="section-card">
+            <div class="section-head">
+              <h2>Shared Prompting</h2>
+              <p>Free-text sections passed into the GM, planner guidance, and runtime prompt assembly.</p>
+            </div>
+            <div class="section-body grid">
+              <div class="field">
+                <label for="world-info">World info</label>
+                <textarea id="world-info" data-path="world_info"></textarea>
+              </div>
+              <div class="field">
+                <label for="gm-prompt">GM prompt</label>
+                <textarea id="gm-prompt" data-path="gm_prompt"></textarea>
+              </div>
+              <div class="field">
+                <label for="writing-style">Writing style</label>
+                <textarea id="writing-style" data-path="writing_style"></textarea>
+              </div>
+              <div class="field">
+                <label for="scenario">Scenario</label>
+                <textarea id="scenario" data-path="scenario"></textarea>
+              </div>
+            </div>
+          </section>
+
+          <section class="section-card">
+            <div class="section-head">
+              <div class="character-toolbar">
+                <div>
+                  <h2>Characters</h2>
+                  <p>At least two character blocks are required. Cards are emitted as [character-1], [character-2], and so on.</p>
+                </div>
+                <button class="btn primary" type="button" id="add-character-button">Add character</button>
+              </div>
+            </div>
+            <div class="section-body">
+              <div id="character-list" class="stack"></div>
+            </div>
+          </section>
+        </div>
+      </main>
+
+      <aside class="panel preview-box">
+        <div class="panel-inner stack">
+          <section class="section-card">
+            <div class="section-head">
+              <div class="preview-toolbar">
+                <div>
+                  <h2>Preview</h2>
+                  <p>Live markdown generated from the form state.</p>
+                </div>
+                <div class="stats" id="preview-stats"></div>
+              </div>
+            </div>
+            <div class="section-body">
+              <textarea id="preview" readonly spellcheck="false"></textarea>
+            </div>
+          </section>
+
+          <section class="section-card">
+            <div class="section-head">
+              <h2>Validation</h2>
+              <p>Schema checks tuned to this repo's parser and runtime expectations.</p>
+            </div>
+            <div class="section-body stack">
+              <div class="status-row">
+                <div class="pill" id="save-pill">Draft not saved yet</div>
+                <div class="pill good" id="valid-pill">Waiting for input</div>
+              </div>
+              <div id="issues" class="issues"></div>
+            </div>
+          </section>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <template id="character-template">
+    <article class="character-card">
+      <div class="character-header">
+        <div>
+          <div class="character-index"></div>
+        </div>
+        <div class="character-actions">
+          <button class="btn move-up" type="button">Move up</button>
+          <button class="btn move-down" type="button">Move down</button>
+          <button class="btn" type="button" data-action="duplicate">Duplicate</button>
+          <button class="btn" type="button" data-action="remove">Remove</button>
+        </div>
+      </div>
+      <div class="grid two">
+        <div class="field">
+          <label>Name</label>
+          <input type="text" data-field="name">
+        </div>
+        <div class="field">
+          <label>Role</label>
+          <select data-field="role">
+            <option value="player-character">player-character</option>
+            <option value="npc">npc</option>
+            <option value="antagonist">antagonist</option>
+            <option value="neutral">neutral</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Triggers</label>
+          <input type="text" data-field="triggers_text">
+          <small>Comma-separated aliases and references.</small>
+        </div>
+        <div class="field">
+          <label>Speaking weight</label>
+          <input type="number" min="0" step="0.1" data-field="speaking_weight">
+        </div>
+        <div class="field" style="grid-column: 1 / -1;">
+          <label>Takeover</label>
+          <label class="checkbox-row"><input type="checkbox" data-field="can_be_taken_over"> Human can inject lines as this character</label>
+        </div>
+        <div class="field" style="grid-column: 1 / -1;">
+          <label>Description</label>
+          <textarea data-field="description"></textarea>
+        </div>
+        <div class="field" style="grid-column: 1 / -1;">
+          <label>Personality</label>
+          <textarea data-field="personality"></textarea>
+        </div>
+        <div class="field" style="grid-column: 1 / -1;">
+          <label>Backstory</label>
+          <textarea data-field="backstory"></textarea>
+        </div>
+        <div class="field" style="grid-column: 1 / -1;">
+          <label>Speech style</label>
+          <textarea data-field="speech_style"></textarea>
+        </div>
+      </div>
+    </article>
+  </template>
+
+  <template id="phase-template">
+    <article class="phase-card">
+      <div class="phase-header">
+        <div>
+          <div class="phase-index"></div>
+        </div>
+        <div class="phase-actions">
+          <button class="btn move-up" type="button">Move up</button>
+          <button class="btn move-down" type="button">Move down</button>
+          <button class="btn" type="button" data-action="duplicate">Duplicate</button>
+          <button class="btn" type="button" data-action="remove">Remove</button>
+        </div>
+      </div>
+      <div class="grid two">
+        <div class="field">
+          <label>Name</label>
+          <input type="text" data-field="name">
+        </div>
+        <div class="field">
+          <label>Turns</label>
+          <input type="text" data-field="turns_text">
+          <small>Use start-end, for example 1-8.</small>
+        </div>
+        <div class="field">
+          <label>Pace</label>
+          <input type="text" data-field="pace">
+        </div>
+        <div class="field">
+          <label>Max consecutive turns</label>
+          <input type="number" min="1" step="1" data-field="max_consecutive_turns">
+        </div>
+        <div class="field" style="grid-column: 1 / -1;">
+          <label>Goal</label>
+          <textarea data-field="goal"></textarea>
+        </div>
+        <div class="field" style="grid-column: 1 / -1;">
+          <label>Focus characters</label>
+          <input type="text" data-field="focus_characters_text">
+          <small>Comma-separated character names to emphasize.</small>
+        </div>
+        <div class="field">
+          <label>Required characters</label>
+          <input type="text" data-field="required_characters_text">
+        </div>
+        <div class="field">
+          <label>Avoid characters</label>
+          <input type="text" data-field="avoid_characters_text">
+        </div>
+        <div class="field" style="grid-column: 1 / -1;">
+          <label>Guidance</label>
+          <textarea data-field="guidance"></textarea>
+        </div>
+      </div>
+    </article>
+  </template>
+
+  <script>
+  (function () {
+    const LS_KEY = "chat-engine-builder-v1";
+    const THEME_KEY = "chat-engine-builder-theme";
+
+    const DEFAULT_STATE = {
+      meta: {
+        title: "Ashenveil - The Ruins Encounter",
+        version: "1.0",
+        mode: "chat",
+        output_transcript: "output/ashenveil_chat1_transcript.md",
+        output_runlog: "output/ashenveil_chat1_runlog.md",
+        language: "en",
+        nsfw: false
+      },
+      config: {
+        max_turns: 40,
+        pause_every: 0,
+        history_window: 20,
+        history_summary_chars: 700,
+        ending_countdown_turns: 2,
+        ending_grace_turns: 2,
+        opening_speaker: "Lyra",
+        turn_selection: "llm",
+        max_retries: 2,
+        orchestrator_history_window: 8,
+        response_length: "free"
+      },
+      phases: [
+        {
+          name: "First Contact",
+          start_turn: 1,
+          end_turn: 8,
+          goal: "Establish distrust, mutual probing, and the initial argument over why Aldric is here.",
+          pace: "measured",
+          focus_characters: ["Lyra Voss", "Brother Aldric"],
+          required_characters: ["Lyra Voss", "Brother Aldric"],
+          avoid_characters: ["Mira"],
+          guidance: "Keep Mira peripheral in this phase. Do not resolve the ruins mystery yet.",
+          max_consecutive_turns: 2
+        },
+        {
+          name: "Unwelcome Witness",
+          start_turn: 9,
+          end_turn: 18,
+          goal: "Bring Mira into the exchange and let her complicate the dynamic without taking over the scene.",
+          pace: "steady escalation",
+          focus_characters: ["Mira", "Lyra Voss"],
+          required_characters: ["Mira", "Brother Aldric"],
+          avoid_characters: [],
+          guidance: "Mira should feel disruptive and specific. Aldric should start revealing that he knows more than he says.",
+          max_consecutive_turns: 2
+        },
+        {
+          name: "Decision At The Threshold",
+          start_turn: 19,
+          end_turn: 30,
+          goal: "Force the group to decide whether to enter the ruins and let each character stake out their role.",
+          pace: "tightening",
+          focus_characters: ["Lyra Voss", "Brother Aldric", "Mira"],
+          required_characters: ["Lyra Voss", "Brother Aldric", "Mira"],
+          avoid_characters: [],
+          guidance: "Use this phase to spread participation across all three characters. Move from suspicion toward commitment.",
+          max_consecutive_turns: 2
+        },
+        {
+          name: "Crossing Over",
+          start_turn: 31,
+          end_turn: 40,
+          goal: "Commit to the descent and end on active forward motion rather than more setup.",
+          pace: "brisk",
+          focus_characters: ["Lyra Voss", "Brother Aldric"],
+          required_characters: ["Lyra Voss", "Brother Aldric"],
+          avoid_characters: [],
+          guidance: "Keep the exchange compressed. Mira can still appear, but the final push should belong mainly to Lyra and Aldric.",
+          max_consecutive_turns: 2
+        }
+      ],
+      world_info: "Ashenveil is a crumbling empire on the edge of collapse.\nMagic is rare and feared. The ruling Conclave of Scribes hoards\nall written knowledge. Outside the capital, the land is wild and\ndangerous - old ruins hold power that predates the empire itself.\nThe common people are superstitious and largely illiterate by\ndesign. Conclave enforcers wear grey coats with a red wax seal\nat the collar. Deserters are executed on sight.",
+      gm_prompt: "You are the Game Master of Ashenveil.\nYou write dialogue for multiple characters in a shared story.\nEach turn you will either be told which character speaks next,\nor you will choose the next speaker from the available cast.\nWrite ONLY that character's dialogue - nothing else.\nFormat your output exactly as:\n  [Character Name]: \"dialogue here\"\nNo stage directions. No narration. No asterisks.\nStay true to each character's voice as defined in their card.\nNever speak as a narrator. Never add parenthetical actions.\nNever write more than one character per turn.",
+      writing_style: "Chat style. Dialogue only - no prose narration between lines.\nEach turn is one character speaking.\nDialogue should feel natural and character-specific.\nCharacters may use incomplete sentences if that fits their voice.\nSubtext is welcome. Characters don't always say what they mean.",
+      scenario: "Lyra Voss has tracked Brother Aldric to the entrance of the\nAshenveil ruins. She doesn't know if he's a threat, a fool,\nor bait. She confronts him just as he's about to step inside.\nBoth are wary of each other and of the ruins. Neither wants\nto be here with a stranger - but neither wants to be here alone.\nA girl named Mira watches from the shadows nearby - she has\nbeen here longer than either of them and finds them both\nmildly interesting.\nThe conversation begins the moment Lyra steps out of the treeline.",
+      characters: [
+        {
+          name: "Lyra Voss",
+          role: "player-character",
+          triggers: ["Lyra", "she", "Voss", "the scout", "the woman"],
+          speaking_weight: 1.0,
+          can_be_taken_over: true,
+          description: "Lyra Voss is a 28-year-old deserter from the Conclave's enforcement arm. Lean, dark-haired, perpetually wary. Carries a shortbow and a knife she has never cleaned.",
+          personality: "Stubborn, darkly funny, deeply distrustful of authority. Loyal to a fault once trust is earned. Compartmentalises guilt rather than processing it.",
+          backstory: "Deserted three years ago after being ordered to burn a village. She did it. Has been running ever since. Knows enough about Conclave operations to be dangerous - and hunted.",
+          speech_style: "Clipped sentences. Sarcasm as deflection. Rarely says what she means. Asks questions she already knows the answer to. Swears quietly."
+        },
+        {
+          name: "Brother Aldric",
+          role: "npc",
+          triggers: ["Aldric", "he", "the monk", "the brother", "old man"],
+          speaking_weight: 1.0,
+          can_be_taken_over: true,
+          description: "A 60-year-old disgraced monk of the Hollow Order. Gaunt, white-bearded, surprisingly strong for his age. Wears a patched grey robe with the Order's symbol scratched out at the breast.",
+          personality: "Gentle but evasive. Knows far more than he admits. Unafraid of things that should frighten him. Genuinely kind - which makes him suspicious.",
+          backstory: "Cast out of the Hollow Order for heresy - claiming the old ruins still held living power the Conclave was suppressing. He was right. He has been back to the ruins three times since his exile. He is here now for a fourth.",
+          speech_style: "Formal, old-fashioned diction. Speaks in questions more than statements. Long pauses implied between sentences. Never lies directly - deflects instead."
+        },
+        {
+          name: "Mira",
+          role: "npc",
+          triggers: ["Mira", "girl", "the child", "she"],
+          speaking_weight: 0.6,
+          can_be_taken_over: true,
+          description: "A 14-year-old girl who lives near the ruins. Wild dark hair, bare feet despite the cold. Appears from nowhere and disappears the same way. Locals say she is touched.",
+          personality: "Odd, direct, unfiltered. Says disturbing things casually. Not malicious - she simply sees things others do not and has never learned to hide it.",
+          backstory: "Has lived near the ruins her whole life. The Conclave tried to remove her twice. Both times she came back within the week. She knows the ruins the way other children know their homes. She has never explained how.",
+          speech_style: "Simple words. Short sentences. Always literal. States things as facts that have not happened yet. Never explains herself. Never asks questions."
+        }
+      ],
+      ui: {
+        file_slug: "ashenveil_chat1"
+      }
+    };
+
+    let state = loadState();
+    let saveTimer = null;
+
+    function deepClone(value) {
+      return JSON.parse(JSON.stringify(value));
+    }
+
+    function deepMerge(base, incoming) {
+      if (Array.isArray(base)) {
+        return Array.isArray(incoming) ? incoming : base;
+      }
+      if (base && typeof base === "object") {
+        const merged = { ...base };
+        Object.keys(incoming || {}).forEach((key) => {
+          if (key in base) {
+            merged[key] = deepMerge(base[key], incoming[key]);
+          } else {
+            merged[key] = incoming[key];
+          }
+        });
+        return merged;
+      }
+      return incoming === undefined ? base : incoming;
+    }
+
+    function loadState() {
+      if (typeof localStorage === "undefined") {
+        return deepClone(DEFAULT_STATE);
+      }
+      try {
+        const raw = localStorage.getItem(LS_KEY);
+        if (!raw) {
+          return deepClone(DEFAULT_STATE);
+        }
+        return deepMerge(deepClone(DEFAULT_STATE), JSON.parse(raw));
+      } catch (error) {
+        console.warn("Could not restore draft", error);
+        return deepClone(DEFAULT_STATE);
+      }
+    }
+
+    function saveState(message) {
+      if (typeof localStorage !== "undefined") {
+        localStorage.setItem(LS_KEY, JSON.stringify(state));
+      }
+      updateSavePill(message || "Draft saved locally");
+    }
+
+    function scheduleSave(message) {
+      updateSavePill("Saving draft...");
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(() => saveState(message), 220);
+    }
+
+    function updateSavePill(message) {
+      const node = document.getElementById("save-pill");
+      if (node) {
+        node.textContent = message;
+      }
+    }
+
+    function applyTheme(theme) {
+      document.documentElement.setAttribute("data-theme", theme);
+      if (typeof localStorage !== "undefined") {
+        localStorage.setItem(THEME_KEY, theme);
+      }
+      document.querySelectorAll("[data-theme-choice]").forEach((button) => {
+        button.classList.toggle("active", button.getAttribute("data-theme-choice") === theme);
+      });
+    }
+
+    function restoreTheme() {
+      let theme = "parchment";
+      if (typeof localStorage !== "undefined") {
+        theme = localStorage.getItem(THEME_KEY) || theme;
+      }
+      applyTheme(theme);
+    }
+
+    function getByPath(root, path) {
+      return path.split(".").reduce((acc, key) => acc[key], root);
+    }
+
+    function setByPath(root, path, value) {
+      const keys = path.split(".");
+      let cursor = root;
+      for (let index = 0; index < keys.length - 1; index += 1) {
+        cursor = cursor[keys[index]];
+      }
+      cursor[keys[keys.length - 1]] = value;
+    }
+
+    function slugify(text) {
+      return String(text || "chat_scenario")
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, "_")
+        .replace(/^_+|_+$/g, "") || "chat_scenario";
+    }
+
+    function basenameWithoutExtension(filePath) {
+      const raw = String(filePath || "").trim();
+      if (!raw) {
+        return "";
+      }
+      const base = raw.split(/[\\/]/).pop() || "";
+      return base.replace(/\.[^.]+$/, "");
+    }
+
+    function deriveSlugFromOutputs(meta, fallbackTitle) {
+      const candidates = [meta && meta.output_transcript, meta && meta.output_runlog]
+        .map((value) => basenameWithoutExtension(value))
+        .filter(Boolean);
+
+      for (const candidate of candidates) {
+        if (candidate.endsWith("_transcript")) {
+          return candidate.slice(0, -"_transcript".length);
+        }
+        if (candidate.endsWith("_runlog")) {
+          return candidate.slice(0, -"_runlog".length);
+        }
+      }
+
+      return slugify(fallbackTitle);
+    }
+
+    function normaliseMultiline(text) {
+      return String(text || "")
+        .replace(/\r\n/g, "\n")
+        .replace(/\u00a0/g, " ")
+        .trim();
+    }
+
+    function formatFoldedBlock(value) {
+      const lines = normaliseMultiline(value).split("\n").map((line) => line.trim()).filter(Boolean);
+      if (!lines.length) {
+        return "";
+      }
+      return [">", ...lines.map((line) => `  ${line}`)].join("\n");
+    }
+
+    function formatField(label, value) {
+      const text = normaliseMultiline(value);
+      if (!text) {
+        return "";
+      }
+      if (text.includes("\n")) {
+        return `${label}: ${formatFoldedBlock(text)}`;
+      }
+      return `${label}: ${text}`;
+    }
+
+    function formatBoolean(value) {
+      return value ? "true" : "false";
+    }
+
+    function parseList(text) {
+      return String(text || "").split(",").map((item) => item.trim()).filter(Boolean);
+    }
+
+    function formatList(items) {
+      return (items || []).filter(Boolean).join(", ");
+    }
+
+    function parseTurnsRange(value) {
+      const match = String(value || "").trim().match(/^(\d+)\s*-\s*(\d+)$/);
+      if (!match) {
+        return null;
+      }
+      return {
+        start_turn: Number(match[1]),
+        end_turn: Number(match[2])
+      };
+    }
+
+    function serializeCharacter(character, index) {
+      const lines = [
+        `[character-${index + 1}]`,
+        `name: ${character.name || ""}`,
+        `role: ${character.role || "npc"}`,
+        `triggers: ${(character.triggers || []).join(", ")}`,
+        `speaking_weight: ${Number(character.speaking_weight || 0)}`,
+        `can_be_taken_over: ${formatBoolean(Boolean(character.can_be_taken_over))}`,
+        "",
+        formatField("description", character.description),
+        "",
+        formatField("personality", character.personality),
+        "",
+        formatField("backstory", character.backstory),
+        "",
+        formatField("speech_style", character.speech_style)
+      ];
+      return lines.filter((line, lineIndex, array) => {
+        if (line !== "") {
+          return true;
+        }
+        return array[lineIndex - 1] !== "" && array[lineIndex + 1] !== "";
+      }).join("\n");
+    }
+
+    function serializePhase(phase, index) {
+      const lines = [
+        `[phase-${index + 1}]`,
+        `name: ${phase.name || ""}`,
+        `turns: ${Number(phase.start_turn || 0)}-${Number(phase.end_turn || 0)}`,
+        formatField("goal", phase.goal),
+        formatField("pace", phase.pace),
+        formatField("focus_characters", formatList(phase.focus_characters)),
+        formatField("required_characters", formatList(phase.required_characters)),
+        formatField("avoid_characters", formatList(phase.avoid_characters)),
+        formatField("guidance", phase.guidance),
+        `max_consecutive_turns: ${Number(phase.max_consecutive_turns || 1)}`
+      ];
+
+      return lines.filter((line) => line !== "").join("\n");
+    }
+
+    function serialize(stateValue) {
+      const meta = stateValue.meta;
+      const config = stateValue.config;
+      const blocks = [
+        "# ============================================================",
+        "# CHAT ENGINE - CHAT INPUT FILE",
+        "# ============================================================",
+        "",
+        "[meta]",
+        `title: ${meta.title}`,
+        `version: ${meta.version}`,
+        `mode: chat`,
+        `output_transcript: ${meta.output_transcript}`,
+        `output_runlog: ${meta.output_runlog}`,
+        `language: ${meta.language}`,
+        `nsfw: ${formatBoolean(Boolean(meta.nsfw))}`,
+        "",
+        "[chat-config]",
+        `max_turns: ${Number(config.max_turns || 0)}`,
+        `pause_every: ${Number(config.pause_every || 0)}`,
+        `history_window: ${Number(config.history_window || 0)}`,
+        `history_summary_chars: ${Number(config.history_summary_chars || 0)}`,
+        `ending_countdown_turns: ${Number(config.ending_countdown_turns || 0)}`,
+        `ending_grace_turns: ${Number(config.ending_grace_turns || 0)}`,
+        `opening_speaker: ${config.opening_speaker || "auto"}`,
+        `turn_selection: ${config.turn_selection || "rules"}`,
+        `max_retries: ${Number(config.max_retries || 0)}`,
+        `response_length: ${config.response_length || "2-4 sentences"}`,
+        config.orchestrator_history_window === "" || config.orchestrator_history_window === null || config.orchestrator_history_window === undefined
+          ? ""
+          : `orchestrator_history_window: ${Number(config.orchestrator_history_window || 0)}`,
+        "[world-info]",
+        normaliseMultiline(stateValue.world_info),
+        "",
+        "[gm-prompt]",
+        normaliseMultiline(stateValue.gm_prompt),
+        "",
+        "[writing-style]",
+        normaliseMultiline(stateValue.writing_style),
+        "",
+        "[scenario]",
+        normaliseMultiline(stateValue.scenario)
+      ];
+
+      stateValue.phases.forEach((phase, index) => {
+        blocks.push("");
+        blocks.push(serializePhase(phase, index));
+      });
+
+      stateValue.characters.forEach((character, index) => {
+        blocks.push("");
+        blocks.push(serializeCharacter(character, index));
+      });
+
+      blocks.push("");
+      return blocks.join("\n");
+    }
+
+    function splitSections(text) {
+      const regex = /^\[([a-z][a-z0-9_-]*)\]\s*$/gm;
+      const sections = {};
+      const matches = Array.from(text.matchAll(regex));
+      matches.forEach((match, index) => {
+        const name = match[1];
+        const start = match.index + match[0].length;
+        const end = index + 1 < matches.length ? matches[index + 1].index : text.length;
+        sections[name] = text.slice(start, end).trim();
+      });
+      return sections;
+    }
+
+    function parseKv(text) {
+      const lines = String(text || "").replace(/\r\n/g, "\n").split("\n");
+      const result = {};
+      let currentKey = null;
+      let currentLines = [];
+      lines.forEach((line) => {
+        if (line.trim().startsWith("#")) {
+          return;
+        }
+        const match = line.match(/^([a-z_]+)\s*:\s*(.*)$/);
+        if (match) {
+          if (currentKey !== null) {
+            result[currentKey] = joinLines(currentLines);
+          }
+          currentKey = match[1];
+          const value = match[2].trim();
+          currentLines = value === ">" ? [] : [value];
+          return;
+        }
+        if (currentKey !== null) {
+          if (line.trim()) {
+            currentLines.push(line.trim());
+          } else if (currentLines.length && currentLines[currentLines.length - 1] !== "") {
+            currentLines.push("");
+          }
+        }
+      });
+      if (currentKey !== null) {
+        result[currentKey] = joinLines(currentLines);
+      }
+      return result;
+    }
+
+    function joinLines(lines) {
+      const buffer = [...lines];
+      while (buffer.length && buffer[buffer.length - 1] === "") {
+        buffer.pop();
+      }
+      return buffer.filter(Boolean).join(" ").trim();
+    }
+
+    function parseChatMarkdown(text) {
+      const sections = splitSections(text);
+      const nextState = deepClone(DEFAULT_STATE);
+      const meta = parseKv(sections.meta || "");
+      const config = parseKv(sections["chat-config"] || "");
+
+      nextState.meta.title = meta.title || nextState.meta.title;
+      nextState.meta.version = meta.version || nextState.meta.version;
+      nextState.meta.mode = "chat";
+      nextState.meta.output_transcript = meta.output_transcript || nextState.meta.output_transcript;
+      nextState.meta.output_runlog = meta.output_runlog || nextState.meta.output_runlog;
+      nextState.meta.language = meta.language || nextState.meta.language;
+      nextState.meta.nsfw = String(meta.nsfw || "false").toLowerCase() === "true";
+
+      nextState.config.max_turns = Number(config.max_turns || nextState.config.max_turns);
+      nextState.config.pause_every = Number(config.pause_every || nextState.config.pause_every);
+      nextState.config.history_window = Number(config.history_window || nextState.config.history_window);
+      nextState.config.history_summary_chars = Number(config.history_summary_chars || nextState.config.history_summary_chars);
+      nextState.config.ending_countdown_turns = Number(config.ending_countdown_turns || nextState.config.ending_countdown_turns);
+      nextState.config.ending_grace_turns = Number(config.ending_grace_turns || nextState.config.ending_grace_turns);
+      nextState.config.opening_speaker = config.opening_speaker || nextState.config.opening_speaker;
+      nextState.config.turn_selection = config.turn_selection || nextState.config.turn_selection;
+      nextState.config.max_retries = Number(config.max_retries || nextState.config.max_retries);
+      nextState.config.response_length = config.response_length || nextState.config.response_length;
+      nextState.config.orchestrator_history_window = config.orchestrator_history_window === undefined || config.orchestrator_history_window === ""
+        ? nextState.config.orchestrator_history_window
+        : Number(config.orchestrator_history_window);
+
+      nextState.world_info = sections["world-info"] || "";
+      nextState.gm_prompt = sections["gm-prompt"] || "";
+      nextState.writing_style = sections["writing-style"] || "";
+      nextState.scenario = sections.scenario || "";
+
+      const phaseSections = Object.keys(sections)
+        .filter((name) => /^phase-\d+$/.test(name))
+        .sort((left, right) => Number(left.split("-")[1]) - Number(right.split("-")[1]));
+
+      nextState.phases = phaseSections.map((sectionName) => {
+        const kv = parseKv(sections[sectionName]);
+        const turns = parseTurnsRange(kv.turns);
+        return {
+          name: kv.name || "",
+          start_turn: turns ? turns.start_turn : 1,
+          end_turn: turns ? turns.end_turn : 1,
+          goal: kv.goal || "",
+          pace: kv.pace || "",
+          focus_characters: parseList(kv.focus_characters),
+          required_characters: parseList(kv.required_characters),
+          avoid_characters: parseList(kv.avoid_characters),
+          guidance: kv.guidance || "",
+          max_consecutive_turns: Number(kv.max_consecutive_turns || 2)
+        };
+      });
+
+      const characterSections = Object.keys(sections)
+        .filter((name) => /^character-\d+$/.test(name))
+        .sort((left, right) => Number(left.split("-")[1]) - Number(right.split("-")[1]));
+
+      nextState.characters = characterSections.map((sectionName) => {
+        const kv = parseKv(sections[sectionName]);
+        return {
+          name: kv.name || "",
+          role: kv.role || "npc",
+          triggers: String(kv.triggers || "").split(",").map((item) => item.trim()).filter(Boolean),
+          speaking_weight: Number(kv.speaking_weight || 1),
+          can_be_taken_over: String(kv.can_be_taken_over || "true").toLowerCase() === "true",
+          description: kv.description || "",
+          personality: kv.personality || "",
+          backstory: kv.backstory || "",
+          speech_style: kv.speech_style || ""
+        };
+      });
+
+      nextState.ui.file_slug = deriveSlugFromOutputs(nextState.meta, nextState.meta.title);
+      if (!nextState.characters.length) {
+        nextState.characters = deepClone(DEFAULT_STATE.characters);
+      }
+      return nextState;
+    }
+
+    function validate(stateValue) {
+      const errors = [];
+      const warnings = [];
+
+      if (!normaliseMultiline(stateValue.meta.title)) {
+        errors.push("[meta] title is required.");
+      }
+      if (!normaliseMultiline(stateValue.meta.output_transcript)) {
+        errors.push("[meta] output_transcript is required.");
+      }
+      if (!normaliseMultiline(stateValue.meta.output_runlog)) {
+        errors.push("[meta] output_runlog is required.");
+      }
+      if (String(stateValue.meta.mode || "") !== "chat") {
+        errors.push("[meta] mode must remain chat.");
+      }
+      if (Number(stateValue.config.history_summary_chars) < 0) {
+        errors.push("[chat-config] history_summary_chars must be 0 or greater.");
+      }
+      if (Number(stateValue.config.ending_countdown_turns) < 0) {
+        errors.push("[chat-config] ending_countdown_turns must be 0 or greater.");
+      }
+      if (Number(stateValue.config.ending_grace_turns) < 0) {
+        errors.push("[chat-config] ending_grace_turns must be 0 or greater.");
+      }
+      if (Number(stateValue.config.orchestrator_history_window) < 0) {
+        errors.push("[chat-config] orchestrator_history_window must be 0 or greater.");
+      }
+      if (stateValue.characters.length < 2) {
+        errors.push("At least two character cards are required.");
+      }
+      if (!normaliseMultiline(stateValue.world_info)) {
+        errors.push("[world-info] is required.");
+      }
+      if (!normaliseMultiline(stateValue.gm_prompt)) {
+        errors.push("[gm-prompt] is required.");
+      }
+      if (!normaliseMultiline(stateValue.writing_style)) {
+        errors.push("[writing-style] is required.");
+      }
+      if (!normaliseMultiline(stateValue.scenario)) {
+        errors.push("[scenario] is required.");
+      }
+      stateValue.characters.forEach((character, index) => {
+        const tag = `[character-${index + 1}]`;
+        if (!normaliseMultiline(character.name)) {
+          errors.push(`${tag} name is required.`);
+        }
+        if (!normaliseMultiline(character.role)) {
+          errors.push(`${tag} role is required.`);
+        }
+        if (!(character.triggers || []).length) {
+          errors.push(`${tag} needs at least one trigger.`);
+        }
+        if (!normaliseMultiline(character.description)) {
+          errors.push(`${tag} description is required.`);
+        }
+        if (!normaliseMultiline(character.personality)) {
+          errors.push(`${tag} personality is required.`);
+        }
+      });
+
+      const characterNames = new Set(stateValue.characters.map((character) => normaliseMultiline(character.name)).filter(Boolean));
+      const orderedPhases = [...stateValue.phases].sort((left, right) => left.start_turn - right.start_turn);
+      orderedPhases.forEach((phase, index) => {
+        const tag = `[phase-${index + 1}]`;
+        if (!normaliseMultiline(phase.name)) {
+          errors.push(`${tag} name is required.`);
+        }
+        if (!Number.isInteger(Number(phase.start_turn)) || !Number.isInteger(Number(phase.end_turn)) || Number(phase.start_turn) < 1 || Number(phase.end_turn) < Number(phase.start_turn)) {
+          errors.push(`${tag} turns must be a valid start-end range.`);
+        }
+        if (Number(phase.max_consecutive_turns) < 1) {
+          errors.push(`${tag} max_consecutive_turns must be 1 or greater.`);
+        }
+        [
+          ["focus_characters", phase.focus_characters],
+          ["required_characters", phase.required_characters],
+          ["avoid_characters", phase.avoid_characters]
+        ].forEach(([label, names]) => {
+          (names || []).forEach((name) => {
+            if (!characterNames.has(name)) {
+              warnings.push(`${tag} ${label} references unknown character '${name}'.`);
+            }
+          });
+        });
+      });
+
+      orderedPhases.forEach((phase, index) => {
+        if (index === 0) {
+          return;
+        }
+        const prev = orderedPhases[index - 1];
+        if (Number(phase.start_turn) <= Number(prev.end_turn)) {
+          errors.push(`Phase '${phase.name || `#${index + 1}`}' overlaps '${prev.name || `#${index}`}'.`);
+        }
+      });
+
+      if (Number(stateValue.config.max_turns) > 0 && orderedPhases.length) {
+        const lastPhase = orderedPhases[orderedPhases.length - 1];
+        if (Number(lastPhase.end_turn) > Number(stateValue.config.max_turns)) {
+          errors.push(`Last phase ends at turn ${lastPhase.end_turn}, beyond max_turns=${stateValue.config.max_turns}.`);
+        }
+      }
+
+      if (!/^[a-z0-9_\-/\.]+$/i.test(stateValue.meta.output_transcript || "")) {
+        warnings.push("Output transcript path contains unusual characters.");
+      }
+      if (!/^[a-z0-9_\-/\.]+$/i.test(stateValue.meta.output_runlog || "")) {
+        warnings.push("Output runlog path contains unusual characters.");
+      }
+      if (String(stateValue.config.turn_selection) === "llm" && !String(stateValue.config.response_length || "").trim()) {
+        warnings.push("response_length is blank. The parser will fall back, but the prompt intent will be unclear.");
+      }
+      if (/exactly which character speaks next/i.test(stateValue.gm_prompt || "")) {
+        warnings.push("GM prompt still describes the old explicit-speaker-only flow.");
+      }
+      return { errors, warnings };
+    }
+
+    function countStats(markdown) {
+      const lines = markdown ? markdown.split("\n").length : 0;
+      const words = markdown.trim() ? markdown.trim().split(/\s+/).length : 0;
+      const chars = markdown.length;
+      return `${lines} lines | ${words} words | ${chars} chars`;
+    }
+
+    function refreshForm() {
+      document.querySelectorAll("[data-path]").forEach((input) => {
+        const path = input.getAttribute("data-path");
+        const value = getByPath(state, path);
+        if (input.type === "checkbox") {
+          input.checked = Boolean(value);
+        } else {
+          input.value = value;
+        }
+      });
+      renderPhases();
+      renderCharacters();
+      refreshPreview();
+    }
+
+    function renderPhases() {
+      const list = document.getElementById("phase-list");
+      const template = document.getElementById("phase-template");
+      list.innerHTML = "";
+      state.phases.forEach((phase, index) => {
+        const fragment = template.content.cloneNode(true);
+        fragment.querySelector(".phase-index").textContent = `Phase ${index + 1}`;
+
+        fragment.querySelectorAll("[data-field]").forEach((field) => {
+          const key = field.getAttribute("data-field");
+          let value = phase[key];
+          if (key === "turns_text") {
+            value = `${phase.start_turn}-${phase.end_turn}`;
+          } else if (key.endsWith("_text")) {
+            const baseKey = key.replace(/_text$/, "");
+            value = formatList(phase[baseKey]);
+          }
+
+          field.value = value ?? "";
+          field.addEventListener("input", () => {
+            if (key === "turns_text") {
+              const turns = parseTurnsRange(field.value);
+              if (turns) {
+                state.phases[index].start_turn = turns.start_turn;
+                state.phases[index].end_turn = turns.end_turn;
+              }
+            } else if (key.endsWith("_text")) {
+              const baseKey = key.replace(/_text$/, "");
+              state.phases[index][baseKey] = parseList(field.value);
+            } else if (field.type === "number") {
+              state.phases[index][key] = Number(field.value || 0);
+            } else {
+              state.phases[index][key] = field.value;
+            }
+            refreshPreview();
+            scheduleSave();
+          });
+        });
+
+        const up = fragment.querySelector(".move-up");
+        const down = fragment.querySelector(".move-down");
+        up.disabled = index === 0;
+        down.disabled = index === state.phases.length - 1;
+        up.addEventListener("click", () => movePhase(index, index - 1));
+        down.addEventListener("click", () => movePhase(index, index + 1));
+
+        fragment.querySelector('[data-action="duplicate"]').addEventListener("click", () => {
+          const copy = deepClone(state.phases[index]);
+          copy.name = copy.name ? `${copy.name} Copy` : "New Phase";
+          state.phases.splice(index + 1, 0, copy);
+          refreshForm();
+          scheduleSave();
+        });
+
+        fragment.querySelector('[data-action="remove"]').addEventListener("click", () => {
+          state.phases.splice(index, 1);
+          refreshForm();
+          scheduleSave();
+        });
+
+        list.appendChild(fragment);
+      });
+    }
+
+    function renderCharacters() {
+      const list = document.getElementById("character-list");
+      const template = document.getElementById("character-template");
+      list.innerHTML = "";
+      state.characters.forEach((character, index) => {
+        const fragment = template.content.cloneNode(true);
+        const card = fragment.querySelector(".character-card");
+        fragment.querySelector(".character-index").textContent = `Character ${index + 1}`;
+
+        fragment.querySelectorAll("[data-field]").forEach((field) => {
+          const key = field.getAttribute("data-field");
+          const value = key === "triggers_text" ? (character.triggers || []).join(", ") : character[key];
+          if (field.type === "checkbox") {
+            field.checked = Boolean(value);
+          } else {
+            field.value = value ?? "";
+          }
+          field.addEventListener("input", () => {
+            if (key === "triggers_text") {
+              state.characters[index].triggers = field.value.split(",").map((item) => item.trim()).filter(Boolean);
+            } else if (field.type === "number") {
+              state.characters[index][key] = Number(field.value || 0);
+            } else if (field.type === "checkbox") {
+              state.characters[index][key] = field.checked;
+            } else {
+              state.characters[index][key] = field.value;
+            }
+            refreshPreview();
+            scheduleSave();
+          });
+        });
+
+        const up = fragment.querySelector(".move-up");
+        const down = fragment.querySelector(".move-down");
+        up.disabled = index === 0;
+        down.disabled = index === state.characters.length - 1;
+        up.addEventListener("click", () => moveCharacter(index, index - 1));
+        down.addEventListener("click", () => moveCharacter(index, index + 1));
+
+        fragment.querySelector('[data-action="duplicate"]').addEventListener("click", () => {
+          const copy = deepClone(state.characters[index]);
+          copy.name = copy.name ? `${copy.name} Copy` : "New Character";
+          state.characters.splice(index + 1, 0, copy);
+          refreshForm();
+          scheduleSave();
+        });
+
+        fragment.querySelector('[data-action="remove"]').addEventListener("click", () => {
+          state.characters.splice(index, 1);
+          refreshForm();
+          scheduleSave();
+        });
+
+        list.appendChild(fragment);
+      });
+    }
+
+    function moveCharacter(fromIndex, toIndex) {
+      if (toIndex < 0 || toIndex >= state.characters.length) {
+        return;
+      }
+      const [item] = state.characters.splice(fromIndex, 1);
+      state.characters.splice(toIndex, 0, item);
+      refreshForm();
+      scheduleSave();
+    }
+
+    function movePhase(fromIndex, toIndex) {
+      if (toIndex < 0 || toIndex >= state.phases.length) {
+        return;
+      }
+      const [item] = state.phases.splice(fromIndex, 1);
+      state.phases.splice(toIndex, 0, item);
+      refreshForm();
+      scheduleSave();
+    }
+
+    function refreshPreview() {
+      const markdown = serialize(state);
+      document.getElementById("preview").value = markdown;
+      document.getElementById("preview-stats").textContent = countStats(markdown);
+
+      const results = validate(state);
+      const issueBox = document.getElementById("issues");
+      issueBox.innerHTML = "";
+
+      results.errors.forEach((message) => {
+        const item = document.createElement("div");
+        item.className = "issue error";
+        item.textContent = message;
+        issueBox.appendChild(item);
+      });
+      results.warnings.forEach((message) => {
+        const item = document.createElement("div");
+        item.className = "issue warn";
+        item.textContent = message;
+        issueBox.appendChild(item);
+      });
+      if (!results.errors.length && !results.warnings.length) {
+        const item = document.createElement("div");
+        item.className = "issue";
+        item.textContent = "No validation issues. This markdown should satisfy the parser contract.";
+        issueBox.appendChild(item);
+      }
+
+      const validPill = document.getElementById("valid-pill");
+      if (results.errors.length) {
+        validPill.textContent = `${results.errors.length} error(s)`;
+        validPill.className = "pill";
+      } else if (results.warnings.length) {
+        validPill.textContent = `${results.warnings.length} warning(s)`;
+        validPill.className = "pill warn";
+      } else {
+        validPill.textContent = "Parser-ready";
+        validPill.className = "pill good";
+      }
+    }
+
+    function wireFlatFields() {
+      document.querySelectorAll("[data-path]").forEach((input) => {
+        input.addEventListener("input", () => {
+          const path = input.getAttribute("data-path");
+          const oldSlug = state.ui.file_slug;
+          let value;
+          if (input.type === "checkbox") {
+            value = input.checked;
+          } else if (input.type === "number") {
+            value = Number(input.value || 0);
+          } else {
+            value = input.value;
+          }
+          setByPath(state, path, value);
+
+          if (path === "meta.title" && (!oldSlug || oldSlug === slugify(DEFAULT_STATE.meta.title) || oldSlug === slugify(input.defaultValue))) {
+            state.ui.file_slug = slugify(value);
+            const slugInput = document.getElementById("file-slug");
+            if (slugInput) {
+              slugInput.value = state.ui.file_slug;
+            }
+          }
+
+          if (path === "meta.title" || path === "ui.file_slug") {
+            maybeSyncOutputPaths();
+          }
+
+          refreshPreview();
+          scheduleSave();
+        });
+      });
+    }
+
+    function maybeSyncOutputPaths() {
+      const slug = state.ui.file_slug || slugify(state.meta.title);
+      const transcript = `output/${slug}_transcript.md`;
+      const runlog = `output/${slug}_runlog.md`;
+      if (!state.meta.output_transcript || state.meta.output_transcript.startsWith("output/")) {
+        state.meta.output_transcript = transcript;
+      }
+      if (!state.meta.output_runlog || state.meta.output_runlog.startsWith("output/")) {
+        state.meta.output_runlog = runlog;
+      }
+      document.getElementById("meta-output-transcript").value = state.meta.output_transcript;
+      document.getElementById("meta-output-runlog").value = state.meta.output_runlog;
+    }
+
+    function addCharacter() {
+      state.characters.push({
+        name: "",
+        role: "npc",
+        triggers: [],
+        speaking_weight: 1.0,
+        can_be_taken_over: true,
+        description: "",
+        personality: "",
+        backstory: "",
+        speech_style: ""
+      });
+      refreshForm();
+      scheduleSave();
+    }
+
+    function addPhase() {
+      const lastPhase = state.phases[state.phases.length - 1];
+      const startTurn = lastPhase ? Number(lastPhase.end_turn || 0) + 1 : 1;
+      state.phases.push({
+        name: "",
+        start_turn: startTurn,
+        end_turn: startTurn,
+        goal: "",
+        pace: "",
+        focus_characters: [],
+        required_characters: [],
+        avoid_characters: [],
+        guidance: "",
+        max_consecutive_turns: 2
+      });
+      refreshForm();
+      scheduleSave();
+    }
+
+    function resetSample() {
+      state = deepClone(DEFAULT_STATE);
+      refreshForm();
+      saveState("Sample restored");
+    }
+
+    async function copyMarkdown() {
+      const markdown = serialize(state);
+      await navigator.clipboard.writeText(markdown);
+      updateSavePill("Markdown copied to clipboard");
+    }
+
+    function downloadMarkdown() {
+      const markdown = serialize(state);
+      const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = `${state.ui.file_slug || slugify(state.meta.title)}.md`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(link.href);
+      updateSavePill("Markdown downloaded");
+    }
+
+    async function importMarkdown(file) {
+      const text = await file.text();
+      state = parseChatMarkdown(text);
+      refreshForm();
+      saveState("Imported markdown file");
+    }
+
+    function init() {
+      restoreTheme();
+      wireFlatFields();
+      refreshForm();
+      updateSavePill("Draft restored from local browser storage");
+
+      document.querySelectorAll("[data-theme-choice]").forEach((button) => {
+        button.addEventListener("click", () => applyTheme(button.getAttribute("data-theme-choice")));
+      });
+
+      document.getElementById("add-character-button").addEventListener("click", addCharacter);
+  document.getElementById("add-phase-button").addEventListener("click", addPhase);
+      document.getElementById("reset-button").addEventListener("click", resetSample);
+      document.getElementById("download-button").addEventListener("click", downloadMarkdown);
+      document.getElementById("copy-button").addEventListener("click", () => {
+        copyMarkdown().catch((error) => {
+          console.error(error);
+          updateSavePill("Clipboard copy failed in this browser");
+        });
+      });
+
+      const fileInput = document.getElementById("file-input");
+      document.getElementById("import-button").addEventListener("click", () => fileInput.click());
+      fileInput.addEventListener("change", async (event) => {
+        const [file] = event.target.files || [];
+        if (!file) {
+          return;
+        }
+        try {
+          await importMarkdown(file);
+        } catch (error) {
+          console.error(error);
+          updateSavePill("Import failed - check browser console");
+        }
+        fileInput.value = "";
+      });
+    }
+
+    const api = {
+      DEFAULT_STATE: deepClone(DEFAULT_STATE),
+      serialize,
+      parseChatMarkdown,
+      validate
+    };
+
+    if (typeof window !== "undefined") {
+      window.ChatBuilder = api;
+    }
+    if (typeof globalThis !== "undefined") {
+      globalThis.ChatBuilder = api;
+    }
+    if (typeof document !== "undefined") {
+      init();
+    }
+  }());
+  </script>
+</body>
+</html>
