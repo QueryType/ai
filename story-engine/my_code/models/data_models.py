@@ -66,6 +66,7 @@ class ParsedScene:
     beats: list[Beat]
     author_note: AuthorNote | None = None
     writing_instructions: str | None = None
+    prior_context: str | None = None
 
 
 # ---------------------------------------------------------------------------

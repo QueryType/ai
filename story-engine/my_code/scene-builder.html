@@ -358,6 +358,58 @@ textarea[rows="2"] { min-height: 58px; }
   resize: vertical;
 }
 
+/* ── Sequel panel ── */
+#sequel-panel {
+  background: var(--bg2);
+  border-bottom: 2px solid var(--accent);
+  padding: 0;
+  overflow: hidden;
+  max-height: 0;
+  transition: max-height 0.25s ease, padding 0.2s ease;
+}
+#sequel-panel.open {
+  max-height: 800px;
+  padding: 16px 20px 20px;
+}
+#sequel-panel .sq-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+#sequel-panel .sq-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--accent2);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+#sequel-panel .sq-subtitle {
+  font-size: 12px;
+  color: var(--muted);
+}
+.sq-row { display: flex; gap: 10px; align-items: flex-end; margin-bottom: 12px; }
+.sq-field { display: flex; flex-direction: column; gap: 4px; }
+.sq-field label { font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+#sq-file-btn { white-space: nowrap; }
+#sq-filename { font-size: 12px; color: var(--muted); margin-left: 2px; font-style: italic; }
+#sq-brief { width: 100%; }
+#sq-output {
+  width: 100%;
+  min-height: 300px;
+  font-family: monospace;
+  font-size: 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  padding: 12px;
+  resize: vertical;
+  margin-top: 10px;
+}
+#sq-output-area { display: none; }
+#sq-error { color: var(--red); font-size: 12px; margin-top: 6px; display: none; }
+
 /* ── Extend area ── */
 .extend-area {
   background: var(--bg2);
@@ -508,6 +560,53 @@ hr.divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; 
   <div style="display:flex; gap:6px;">
     <button class="btn btn-secondary btn-sm" onclick="clearStorage()" title="Clear saved state from localStorage">Clear Storage</button>
     <button class="btn btn-secondary btn-sm" id="btn-new" onclick="confirmNew()">New Scene</button>
+    <button class="btn btn-secondary btn-sm" id="btn-sequel" onclick="sqToggle()" title="Generate a sequel scene file from a previous one">Create Sequel</button>
+  </div>
+</div>
+
+<!-- ── Sequel panel ── -->
+<div id="sequel-panel">
+  <div class="sq-header">
+    <span class="sq-title">Create Sequel Scene</span>
+    <span class="sq-subtitle">Load a previous scene file, describe what happens next, and generate the sequel input file.</span>
+    <button class="btn btn-secondary btn-sm" style="margin-left:auto;" onclick="sqToggle()">Close ✕</button>
+  </div>
+
+  <div class="sq-row">
+    <div class="sq-field">
+      <label>Previous scene file</label>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <button class="btn btn-secondary btn-sm" id="sq-file-btn" onclick="document.getElementById('sq-file-input').click()">Choose file…</button>
+        <input type="file" id="sq-file-input" accept=".md" style="display:none" onchange="sqLoadFile(this)">
+        <span id="sq-filename">No file loaded</span>
+      </div>
+    </div>
+    <div class="sq-field" style="margin-left:auto;">
+      <label>Beats</label>
+      <input type="number" id="sq-beats" value="5" min="3" max="10" style="width:70px;">
+    </div>
+  </div>
+
+  <div class="sq-field" style="margin-bottom:12px;">
+    <label>Brief — what happens in the next part</label>
+    <textarea id="sq-brief" rows="3" placeholder="e.g. The two characters reach the inner sanctum. One of them recognises something but won't say how. A decision must be made before they can leave."></textarea>
+  </div>
+
+  <div style="display:flex; align-items:center; gap:10px;">
+    <button class="btn btn-primary btn-sm" id="sq-btn-generate" onclick="sqGenerate()">Generate Sequel</button>
+    <div id="sq-spinner" style="display:none; align-items:center; gap:6px; font-size:13px; color:var(--muted);">
+      <span class="inline-spinner"></span> Generating…
+    </div>
+  </div>
+  <div id="sq-error"></div>
+
+  <div id="sq-output-area">
+    <div style="display:flex; align-items:center; gap:10px; margin-top:14px; margin-bottom:4px;">
+      <span style="font-size:13px; font-weight:600; color:var(--green);">✓ Sequel file ready</span>
+      <span id="sq-out-filename" style="font-size:12px; color:var(--muted);"></span>
+      <button class="btn btn-primary btn-sm" style="margin-left:auto;" onclick="sqDownload()">Download .md</button>
+    </div>
+    <textarea id="sq-output" readonly spellcheck="false"></textarea>
   </div>
 </div>
 
@@ -2490,6 +2589,201 @@ function discardSectionRegen(section) {
   if (resEl) { resEl.classList.remove('open'); resEl._pending = null; }
 }
 
+
+// ── Sequel flow ───────────────────────────────────────────────────────────────
+// Completely independent from S state and the main phase flow.
+
+const SYSTEM_SEQUEL = `You are a story continuation planner for a multi-agent story engine.
+
+You receive a complete scene input file (the previous part of a story) and a brief
+description of what the next part should cover. Your job is to generate the planning
+sections for the next scene file.
+
+Return ONLY a valid JSON object with these exact keys:
+
+{
+  "title": "Short evocative title for this part (5-8 words)",
+  "prior_context": "3-5 bullet points (one per line, each starting with -) summarising what happened in the previous scene: concrete events, character states, unresolved threads. Use real character names and specific details.",
+  "scene_setup": {
+    "location": "Where this scene takes place — specific physical space",
+    "time": "Time of day and how much time has passed since the previous scene ended",
+    "atmosphere": "Dominant mood and sensory environment"
+  },
+  "scenario": "2-4 sentences describing the exact situation at the start of this scene, picking up directly from where the previous ended.",
+  "scene_beats": [
+    {"text": "Concrete beat description — what happens, what changes, what decision or revelation drives it", "pause": false}
+  ],
+  "writing_instructions": "Specific craft and tone notes for this installment only"
+}
+
+Rules:
+- scene_beats: exactly the requested number of beats. Each must be a concrete story event.
+- Mark pause: true on exactly 1-2 beats where a natural human review point falls.
+- prior_context: bullet points only, concrete and specific. No vague phrases.
+- scenario: must start exactly where the previous scene's last beat ended.
+- Return ONLY the JSON object. No preamble, no commentary, no markdown fences.`;
+
+const SQ = {
+  rawText:      '',
+  prevFilename: '',
+  outFilename:  '',
+  assembled:    '',
+};
+
+function sqToggle() {
+  const panel = document.getElementById('sequel-panel');
+  const isOpen = panel.classList.contains('open');
+  panel.classList.toggle('open', !isOpen);
+  document.getElementById('btn-sequel').classList.toggle('active', !isOpen);
+}
+
+function sqLoadFile(input) {
+  const file = input.files?.[0];
+  if (!file) return;
+  SQ.prevFilename = file.name;
+  SQ.outFilename  = sqDeriveName(file.name);
+  document.getElementById('sq-filename').textContent = file.name;
+  document.getElementById('sq-output-area').style.display = 'none';
+  document.getElementById('sq-error').style.display = 'none';
+  SQ.assembled = '';
+  const reader = new FileReader();
+  reader.onload = e => { SQ.rawText = e.target.result; };
+  reader.readAsText(file);
+}
+
+function sqDeriveName(prevName) {
+  const m = prevName.match(/^(.+?)_(\d+)(\.[^.]+)$/);
+  if (m) {
+    const next = String(parseInt(m[2]) + 1).padStart(m[2].length, '0');
+    return `${m[1]}_${next}${m[3]}`;
+  }
+  return prevName.replace(/(\.[^.]+)$/, '_01$1');
+}
+
+async function sqGenerate() {
+  const brief = document.getElementById('sq-brief').value.trim();
+  const beats  = parseInt(document.getElementById('sq-beats').value) || 5;
+  const errEl  = document.getElementById('sq-error');
+  const spinner = document.getElementById('sq-spinner');
+
+  errEl.style.display = 'none';
+
+  if (!SQ.rawText) { errEl.textContent = 'Load a previous scene file first.'; errEl.style.display = 'block'; return; }
+  if (!brief)       { errEl.textContent = 'Brief is required.';                errEl.style.display = 'block'; return; }
+
+  document.getElementById('sq-btn-generate').disabled = true;
+  spinner.style.display = 'flex';
+  document.getElementById('sq-output-area').style.display = 'none';
+
+  const prompt = `## Previous Scene File\n\n${SQ.rawText}\n\n## Brief for the Next Part\n\n${brief}\n\nGenerate the next scene with exactly ${beats} beats.`;
+
+  try {
+    const raw = await callLLM(SYSTEM_SEQUEL, prompt, 2048);
+    const gen = parseJSON(raw);
+
+    SQ.assembled   = sqAssemble(SQ.rawText, gen, SQ.outFilename);
+    SQ.outFilename = sqDeriveName(SQ.prevFilename); // re-derive in case file was reloaded
+
+    document.getElementById('sq-output').value = SQ.assembled;
+    document.getElementById('sq-out-filename').textContent = SQ.outFilename;
+    document.getElementById('sq-output-area').style.display = 'block';
+  } catch(e) {
+    errEl.textContent = 'Generation failed: ' + (e.message || String(e));
+    errEl.style.display = 'block';
+  } finally {
+    document.getElementById('sq-btn-generate').disabled = false;
+    spinner.style.display = 'none';
+  }
+}
+
+function sqAssemble(rawPrevText, gen, outFilename) {
+  // Parse sections from raw previous file
+  const sectionRe = /^\[([a-z][a-z0-9_-]*)\]\s*$/gm;
+  const matches = [...rawPrevText.matchAll(sectionRe)];
+  const sections = {};
+  matches.forEach((m, i) => {
+    const start = m.index + m[0].length;
+    const end   = i + 1 < matches.length ? matches[i+1].index : rawPrevText.length;
+    sections[m[1]] = rawPrevText.slice(start, end).trim();
+  });
+
+  // Parse meta key:value from previous file
+  const parseKV = txt => {
+    const res = {}; let key = null, lines = [];
+    for (const line of txt.split('\n')) {
+      const kv = line.match(/^([a-z_]+)\s*:\s*(.*)/);
+      if (kv) {
+        if (key) res[key] = lines.join(' ').trim();
+        key = kv[1]; lines = kv[2].trim() === '>' ? [] : [kv[2].trim()];
+      } else if (key && line.trim()) { lines.push(line.trim()); }
+    }
+    if (key) res[key] = lines.join(' ').trim();
+    return res;
+  };
+  const meta = parseKV(sections['meta'] || '');
+
+  const parts = [];
+  const sec = (name, content) => parts.push(`[${name}]\n${content.trim()}`);
+
+  // Meta — inherit settings, update title + output_file
+  const stemOut = outFilename.replace(/\.[^.]+$/, '');
+  sec('meta', [
+    `title: ${gen.title || meta.title || 'Untitled'}`,
+    `version: ${meta.version || '1.0'}`,
+    `mode: ${meta.mode || 'autonomous'}`,
+    `pause_at: ${meta.pause_at || 'beat'}`,
+    `output_file: output/${stemOut}.md`,
+    `output_format: ${meta.output_format || 'prose'}`,
+    `pov: ${meta.pov || 'third-person'}`,
+    `target_length: ${meta.target_length || '3500'}`,
+    `language: ${meta.language || 'en'}`,
+    `nsfw: ${meta.nsfw || 'false'}`,
+  ].join('\n'));
+
+  // Static sections — copied verbatim
+  ['narrator-prompt', 'writing-style'].forEach(k => { if (sections[k]) sec(k, sections[k]); });
+  if (sections['author-note']) sec('author-note', sections['author-note']);
+  if (sections['world-info'])  sec('world-info',  sections['world-info']);
+
+  // Character cards — all, in order
+  Object.keys(sections)
+    .filter(k => k.startsWith('character-'))
+    .sort((a, b) => parseInt(a.split('-')[1]) - parseInt(b.split('-')[1]))
+    .forEach(k => sec(k, sections[k]));
+
+  // Generated sections
+  sec('prior-context', gen.prior_context || '');
+
+  const setup = gen.scene_setup || {};
+  sec('scene-setup', [
+    setup.location   ? `location: ${setup.location}`     : '',
+    setup.time       ? `time: ${setup.time}`              : '',
+    setup.atmosphere ? `atmosphere: ${setup.atmosphere}`  : '',
+  ].filter(Boolean).join('\n'));
+
+  sec('scenario', gen.scenario || '');
+
+  const beatsText = (gen.scene_beats || []).map((b, i) => {
+    let line = `${i + 1}. ${(b.text || '').trim()}`;
+    if (b.pause) line += '\n   [pause]';
+    return line;
+  }).join('\n\n');
+  sec('scene-beats', beatsText);
+
+  if ((gen.writing_instructions || '').trim()) sec('writing-instructions', gen.writing_instructions);
+
+  return parts.join('\n\n\n');
+}
+
+function sqDownload() {
+  if (!SQ.assembled) return;
+  const blob = new Blob([SQ.assembled], { type: 'text/markdown' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = SQ.outFilename || 'sequel.md';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 
