@@ -169,6 +169,16 @@ def run_scene(file_path: str) -> str:
                 len(resume_story_summary),
             )
 
+        # Inter-scene continuity: inject [prior-context] from the scene file on beat 1
+        # only when this is a fresh run (not a checkpoint resume — checkpoint already
+        # has accumulated summaries which are more specific).
+        scene_prior_context_pending = bool(scene.prior_context) and not bool(checkpoint_beats)
+        if scene_prior_context_pending:
+            logger.info(
+                "Prior context from scene file will be injected on beat 1 (chars=%d)",
+                len(scene.prior_context),
+            )
+
         # --- Beat loop ---
         for beat in scene.beats:
             key = str(beat.index)
@@ -196,13 +206,20 @@ def run_scene(file_path: str) -> str:
             if scene.author_note and beat.index > 0 and beat.index % scene.author_note.depth == 0:
                 author_note_text = scene.author_note.content
 
+            if resume_context_pending:
+                _prior_summary_for_beat = resume_story_summary
+            elif scene_prior_context_pending:
+                _prior_summary_for_beat = scene.prior_context
+            else:
+                _prior_summary_for_beat = None
+
             ctx = NarratorContext(
                 beat_instruction=beat.text,
                 lore_context=lore_context,
                 beat_index=beat.index,
                 beat_total=len(scene.beats),
                 author_note=author_note_text,
-                prior_story_summary=resume_story_summary if resume_context_pending else None,
+                prior_story_summary=_prior_summary_for_beat,
             )
 
             # 3. Narrate + evaluate loop (with retries)
@@ -230,6 +247,8 @@ def run_scene(file_path: str) -> str:
 
             if resume_context_pending:
                 resume_context_pending = False
+            if scene_prior_context_pending:
+                scene_prior_context_pending = False
 
             # 5. Proactive narrator context management.
             # Uses token-based threshold + direct message deletion to avoid KV cache eviction.
