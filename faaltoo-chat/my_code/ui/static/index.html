@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>faaltoo chat</title>
+<script src="/static/emojis.js"></script>
+<script src="/static/emoticons.js"></script>
 <style>
 /* ── Theme tokens ──────────────────────────────────────────────── */
 :root {
@@ -24,39 +26,39 @@
   --edit-border:#2a5a6a;
 }
 [data-theme="light"] {
-  --bg:         #f4f4f4;
-  --surface:    #ebebeb;
-  --border:     #ccc;
-  --text:       #1a1a1a;
-  --muted:      #888;
-  --accent:     #1e7a96;
-  --bot:        #1e6a7a;
+  --bg:         #f7f3ee;
+  --surface:    #ffffff;
+  --border:     #ddd0c4;
+  --text:       #1c1612;
+  --muted:      #8a7a6e;
+  --accent:     #c2692a;
+  --bot:        #7a4a1e;
   --user:       #2d5a32;
-  --sys:        #3a5a7a;
-  --danger:     #8b2020;
-  --btn-bg:     #ddd;
-  --btn-hover:  #ccc;
-  --chip-sel:   #c2e4ef;
-  --edit-bg:    #e8f4f8;
-  --edit-border:#4a9eba;
+  --sys:        #6a5a4a;
+  --danger:     #9e2a2a;
+  --btn-bg:     #ffffff;
+  --btn-hover:  #fdf6ee;
+  --chip-sel:   #fde8d5;
+  --edit-bg:    #fdf6ee;
+  --edit-border:#c2692a;
 }
 @media (prefers-color-scheme: light) {
   [data-theme="system"] {
-    --bg:         #f4f4f4;
-    --surface:    #ebebeb;
-    --border:     #ccc;
-    --text:       #1a1a1a;
-    --muted:      #888;
-    --accent:     #1e7a96;
-    --bot:        #1e6a7a;
+    --bg:         #f7f3ee;
+    --surface:    #ffffff;
+    --border:     #ddd0c4;
+    --text:       #1c1612;
+    --muted:      #8a7a6e;
+    --accent:     #c2692a;
+    --bot:        #7a4a1e;
     --user:       #2d5a32;
-    --sys:        #3a5a7a;
-    --danger:     #8b2020;
-    --btn-bg:     #ddd;
-    --btn-hover:  #ccc;
-    --chip-sel:   #c2e4ef;
-    --edit-bg:    #e8f4f8;
-    --edit-border:#4a9eba;
+    --sys:        #6a5a4a;
+    --danger:     #9e2a2a;
+    --btn-bg:     #ffffff;
+    --btn-hover:  #fdf6ee;
+    --chip-sel:   #fde8d5;
+    --edit-bg:    #fdf6ee;
+    --edit-border:#c2692a;
   }
 }
 
@@ -93,17 +95,43 @@ header h1 { font-size: .95rem; letter-spacing: .08em; color: var(--accent);
 #chat-input {
   flex: 1; background: var(--bg); border: 1px solid var(--border);
   color: var(--text); font-family: inherit; font-size: .9rem;
-  padding: 8px 12px; border-radius: 6px; resize: none; height: 42px;
+  padding: 8px 12px; border-radius: 6px; resize: none;
+  min-height: 68px; max-height: 200px;
   line-height: 1.4; outline: none; transition: border-color .15s;
+  overflow-y: auto;
 }
 #chat-input:focus { border-color: var(--accent); }
 #chat-input:disabled { opacity: .4; cursor: not-allowed; }
 
+/* Send group + auto checkbox */
+#send-group {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 5px; flex-shrink: 0;
+}
+#auto-label {
+  display: flex; align-items: center; gap: 4px;
+  font-size: .72rem; color: var(--muted); cursor: pointer;
+  white-space: nowrap; user-select: none;
+}
+#auto-label input { cursor: pointer; accent-color: var(--accent); }
+#auto-label.active { color: var(--accent); }
+
+/* Sidebar resizer */
+#sidebar-resizer {
+  width: 5px; flex-shrink: 0; cursor: col-resize;
+  background: transparent; transition: background .15s;
+  border-left: 1px solid var(--border);
+}
+#sidebar-resizer:hover, #sidebar-resizer.dragging {
+  background: var(--accent);
+}
+
 /* Sidebar */
 #sidebar {
   width: 210px; flex-shrink: 0; overflow-y: auto;
-  border-left: 1px solid var(--border); background: var(--surface);
+  background: var(--surface);
   padding: 14px 12px; font-size: .82rem;
+  min-width: 140px; max-width: 420px;
 }
 .sb-section { margin-bottom: 18px; }
 .sb-label { color: var(--muted); text-transform: uppercase; letter-spacing: .1em;
@@ -182,15 +210,17 @@ button:disabled { opacity: .4; cursor: not-allowed; }
 #setup {
   position: fixed; inset: 0; background: var(--bg);
   overflow-y: auto; display: flex; justify-content: center;
-  padding: 32px 16px; z-index: 10;
+  padding: 28px 16px; z-index: 10;
 }
 .setup-card {
   background: var(--surface); border: 1px solid var(--border);
-  border-radius: 10px; padding: 28px 32px; width: 680px; max-width: 100%;
-  height: fit-content;
+  border-radius: 12px; padding: 24px 28px; width: 900px; max-width: 100%;
+  height: fit-content; border-top: 3px solid var(--accent);
 }
-.setup-card h2 { color: var(--accent); letter-spacing: .12em;
-  text-transform: uppercase; font-size: 1.1rem; margin-bottom: 20px; }
+.setup-card h2 { color: var(--accent); letter-spacing: .18em;
+  text-transform: uppercase; font-size: 1.25rem; margin-bottom: 3px; }
+.setup-tagline { color: var(--muted); font-size: .76rem; margin-bottom: 18px;
+  letter-spacing: .04em; }
 
 /* Presets */
 .preset-strip { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 20px; align-items: center; }
@@ -240,32 +270,46 @@ button:disabled { opacity: .4; cursor: not-allowed; }
 .preset-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
 
 /* Dimension sections */
-.dims-section { margin-bottom: 20px; }
+.dims-section { margin-bottom: 18px; }
 .section-header {
-  font-size: .7rem; text-transform: uppercase; letter-spacing: .12em;
-  color: var(--muted); margin-bottom: 12px;
+  font-size: .67rem; text-transform: uppercase; letter-spacing: .14em;
+  color: var(--muted); margin-bottom: 10px;
   display: flex; align-items: center; gap: 8px;
 }
+.section-header.section-required { color: var(--accent); }
 .section-header::after { content: ''; flex: 1; height: 1px; background: var(--border); }
 
-.dim-row { margin-bottom: 12px; }
+/* Grid layouts for dims */
+#required-dims {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+}
+#required-dims [data-key="talk_type"] { grid-column: span 2; }
+#required-dims [data-key="chat_medium"] { grid-column: span 2; }
+#optional-dims {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+}
+
+.dim-row {
+  margin-bottom: 0; background: var(--bg);
+  border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;
+}
 .dim-label {
-  font-size: .75rem; color: var(--muted); text-transform: uppercase;
-  letter-spacing: .08em; margin-bottom: 5px;
+  font-size: .7rem; color: var(--muted); text-transform: uppercase;
+  letter-spacing: .09em; margin-bottom: 7px;
   display: flex; align-items: center; gap: 5px;
 }
 .required-star { color: var(--accent); font-size: .9rem; line-height: 1; }
-.dim-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.dim-chips { display: flex; flex-wrap: wrap; gap: 4px; }
 
 .chip {
-  padding: 5px 14px; font-size: .83rem; border-radius: 14px;
-  border: 1.5px solid var(--muted); color: var(--text);
+  padding: 4px 11px; font-size: .8rem; border-radius: 12px;
+  border: 1.5px solid var(--border); color: var(--muted);
   background: transparent; cursor: pointer; transition: all .15s; user-select: none;
 }
 .chip:hover { border-color: var(--accent); color: var(--accent); background: var(--chip-sel); }
 .chip.selected {
-  background: var(--chip-sel); border-color: var(--accent); border-width: 2px;
-  color: var(--accent); font-weight: 600;
+  background: var(--accent); border-color: var(--accent); border-width: 2px;
+  color: var(--bg); font-weight: 600;
 }
 
 /* NSFW segmented control */
@@ -287,11 +331,32 @@ button:disabled { opacity: .4; cursor: not-allowed; }
 .nsfw-strict  { background: #2a1a1a; color: #e07070; border: 1px solid #6a2a2a; }
 .nsfw-medium  { background: #1a2a1a; color: #80c080; border: 1px solid #2a6a2a; }
 .nsfw-noctl   { background: #1a1a2a; color: #8080e0; border: 1px solid #2a2a6a; }
+[data-theme="light"] .nsfw-strict  { background: #fdecea; color: #a02020; border-color: #e0a0a0; }
+[data-theme="light"] .nsfw-medium  { background: #edfaed; color: #1a5c1a; border-color: #a0d0a0; }
+[data-theme="light"] .nsfw-noctl   { background: #eeedf8; color: #3a3a9a; border-color: #a0a0d8; }
+@media (prefers-color-scheme: light) {
+  [data-theme="system"] .nsfw-strict { background: #fdecea; color: #a02020; border-color: #e0a0a0; }
+  [data-theme="system"] .nsfw-medium { background: #edfaed; color: #1a5c1a; border-color: #a0d0a0; }
+  [data-theme="system"] .nsfw-noctl  { background: #eeedf8; color: #3a3a9a; border-color: #a0a0d8; }
+}
+
+/* ── Response length segmented control ────────────────────────── */
+.length-seg {
+  display: flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden;
+}
+.len-btn {
+  flex: 1; border: none; border-radius: 0; padding: 6px 2px; font-size: .68rem;
+  font-family: inherit; cursor: pointer; background: transparent; color: var(--muted);
+  transition: all .15s; border-right: 1px solid var(--border); line-height: 1.2;
+}
+.len-btn:last-child { border-right: none; }
+.len-btn:hover { color: var(--text); }
+.len-btn.active { background: var(--chip-sel); color: var(--accent); font-weight: 600; }
 
 /* User-added chips — dashed purple, clearly distinct */
 .chip-user { padding-right: 6px; border-style: dashed; border-color: #9b6fe0; color: #c49ef5; }
 .chip-user:hover { border-color: #c49ef5; color: #c49ef5; background: #2d1a55; }
-.chip-user.selected { background: #2d1a55; border-color: #c49ef5; border-width: 2px; color: #c49ef5; font-weight: 600; }
+.chip-user.selected { background: #7c52c8; border-color: #c49ef5; border-width: 2px; color: #fff; font-weight: 600; }
 .chip-del {
   display: inline-block; margin-left: 4px; font-size: .7rem;
   color: var(--muted); cursor: pointer; line-height: 1;
@@ -350,6 +415,40 @@ button:disabled { opacity: .4; cursor: not-allowed; }
 }
 #global-theme-btn:hover { color: var(--accent); border-color: var(--accent); }
 
+/* ── Emoji picker ──────────────────────────────────────────────── */
+#emoji-panel {
+  position: fixed; width: 308px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; box-shadow: 0 -4px 24px rgba(0,0,0,.28);
+  z-index: 50; display: flex; flex-direction: column; overflow: hidden;
+}
+#emoji-cat-bar {
+  display: flex; background: var(--bg);
+  border-bottom: 1px solid var(--border); flex-shrink: 0; overflow-x: auto;
+}
+#emoji-cat-bar::-webkit-scrollbar { display: none; }
+.emoji-cat-btn {
+  flex-shrink: 0; padding: 6px 9px; font-size: 1.05rem;
+  border: none; border-bottom: 2px solid transparent;
+  background: transparent; cursor: pointer; transition: all .12s;
+  line-height: 1;
+}
+.emoji-cat-btn:hover { background: var(--btn-hover); }
+.emoji-cat-btn.active { border-bottom-color: var(--accent); }
+#emoji-grid {
+  display: flex; flex-wrap: wrap; padding: 5px;
+  gap: 1px; overflow-y: auto; max-height: 230px;
+}
+#emoji-grid::-webkit-scrollbar { width: 4px; }
+#emoji-grid::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.emoji-btn {
+  font-size: 1.3rem; width: 36px; height: 36px;
+  border: none; background: transparent; cursor: pointer;
+  border-radius: 6px; display: flex; align-items: center; justify-content: center;
+  padding: 0; transition: background .1s; line-height: 1;
+}
+.emoji-btn:hover { background: var(--btn-hover); }
+
 .hidden { display: none !important; }
 </style>
 </head>
@@ -362,14 +461,21 @@ button:disabled { opacity: .4; cursor: not-allowed; }
   <div id="setup">
     <div class="setup-card">
       <h2>faaltoo chat</h2>
+      <p class="setup-tagline">pick your vibe — we generate the character</p>
 
       <!-- Presets -->
       <div class="section-header">Quick Presets</div>
       <div class="preset-strip" id="preset-strip"></div>
 
+      <!-- Chip utility bar -->
+      <div id="chip-utils-bar" style="display:flex;gap:8px;align-items:center;margin-bottom:14px;">
+        <button id="clear-sel-btn" class="chip-add-btn">✕ Clear selection</button>
+        <button id="del-user-chips-btn" class="chip-add-btn hidden" style="border-color:var(--danger);color:var(--danger);">🗑 Delete custom chips</button>
+      </div>
+
       <!-- Required dims -->
       <div class="dims-section">
-        <div class="section-header">Required</div>
+        <div class="section-header section-required">Required</div>
         <div id="required-dims"></div>
       </div>
 
@@ -444,11 +550,18 @@ button:disabled { opacity: .4; cursor: not-allowed; }
 
       <div id="input-bar">
         <button class="btn-icon hidden" id="img-pick-btn" title="Attach image">📎</button>
-        <textarea id="chat-input" placeholder="Say something…" rows="1"></textarea>
-        <button id="send-btn" class="btn-send">Send</button>
+        <button class="btn-icon" id="emoji-btn" title="Insert emoji">😊</button>
+        <textarea id="chat-input" placeholder="Say something…" rows="2"></textarea>
+        <div id="send-group">
+          <button id="send-btn" class="btn-send">Send</button>
+          <label id="auto-label" title="Auto chat — click textarea to stop">
+            <input type="checkbox" id="auto-cb" disabled> Auto
+          </label>
+        </div>
       </div>
     </div>
 
+    <div id="sidebar-resizer"></div>
     <div id="sidebar">
       <div class="sb-section">
         <div class="sb-label">Persona</div>
@@ -462,10 +575,30 @@ button:disabled { opacity: .4; cursor: not-allowed; }
         <div class="sb-label">Turn</div>
         <div id="sb-turn">0</div>
       </div>
+      <div class="sb-section">
+        <div class="sb-label">Memory</div>
+        <div id="sb-ctx-bar-wrap" style="background:var(--border);border-radius:4px;height:6px;overflow:hidden;margin-bottom:4px;">
+          <div id="sb-ctx-bar" style="height:100%;width:0%;background:var(--accent);border-radius:4px;transition:width .4s,background .4s;"></div>
+        </div>
+        <div id="sb-ctx-label" style="font-size:.72rem;color:var(--muted);">Fresh</div>
+      </div>
       <div id="sb-imgdesc-section" class="sb-section hidden">
         <div class="sb-label">Last Image</div>
         <div id="sb-imgdesc" style="font-size:.75rem;color:var(--muted);font-style:italic;line-height:1.4;"></div>
         <button id="sb-imgdesc-clear-btn" style="margin-top:5px;width:100%;font-size:.75rem;">Clear</button>
+      </div>
+      <div class="sb-section">
+        <div class="sb-label">Response Length</div>
+        <div class="length-seg">
+          <button class="len-btn" data-tokens="150">Brief</button>
+          <button class="len-btn" data-tokens="350">Short</button>
+          <button class="len-btn active" data-tokens="700">Medium</button>
+          <button class="len-btn" data-tokens="1400">Long</button>
+          <button class="len-btn" data-tokens="2800">Extended</button>
+        </div>
+      </div>
+      <div class="sb-section">
+        <button id="sb-save-preset-btn" style="width:100%;font-size:.78rem;">＋ Save as Preset</button>
       </div>
     </div>
   </div>
@@ -486,6 +619,12 @@ button:disabled { opacity: .4; cursor: not-allowed; }
       <button id="preset-modal-save" class="btn-send">Save</button>
     </div>
   </div>
+</div>
+
+<!-- Emoji picker panel -->
+<div id="emoji-panel" class="hidden">
+  <div id="emoji-cat-bar"></div>
+  <div id="emoji-grid"></div>
 </div>
 
 <!-- Generic modal -->
@@ -540,6 +679,7 @@ document.querySelectorAll('.nsfw-btn').forEach(btn => {
 /* ── Setup state ────────────────────────────────────────────────── */
 let dimData = null;          // {dimensions, presets} from /api/dimensions
 let selectedDims = {};       // {key: value}
+let activePresetName = null; // preset name applied on setup screen, if any
 let requiredKeys = [];
 
 async function loadDimensions() {
@@ -585,6 +725,9 @@ async function loadDimensions() {
 
 function refreshDimChips() {
   const { dimensions, user_dim_options = {} } = dimData;
+  const hasUserChips = Object.values(user_dim_options).some(arr => arr.length > 0);
+  document.getElementById('del-user-chips-btn').classList.toggle('hidden', !hasUserChips);
+
   Object.entries(dimensions).forEach(([key, dim]) => {
     const container = document.getElementById(`chips-${key}`);
     if (!container) return;
@@ -692,7 +835,7 @@ function renderPresetStrip() {
     btn.className = 'preset-btn';
     btn.textContent = name;
     btn.title = 'Built-in preset';
-    btn.addEventListener('click', () => applyPreset(dimData.presets[name]));
+    btn.addEventListener('click', () => applyPreset(dimData.presets[name], name));
     strip.appendChild(btn);
   });
 
@@ -704,7 +847,7 @@ function renderPresetStrip() {
     const btn = document.createElement('button');
     btn.className = 'preset-btn';
     btn.textContent = name;
-    btn.addEventListener('click', () => applyPreset(dimData.user_presets[name]));
+    btn.addEventListener('click', () => applyPreset(dimData.user_presets[name], name));
 
     const editBtn = document.createElement('button');
     editBtn.className = 'preset-icon-btn';
@@ -724,7 +867,7 @@ function renderPresetStrip() {
 }
 
 function toggleChip(key, value, chipEl) {
-  // Deselect previously selected chip in this row
+  activePresetName = null;  // manual chip change breaks preset identity
   document.querySelectorAll(`.chip[data-key="${key}"]`).forEach(c => c.classList.remove('selected'));
   if (selectedDims[key] === value) {
     delete selectedDims[key];
@@ -735,15 +878,46 @@ function toggleChip(key, value, chipEl) {
   validateRequired();
 }
 
-function applyPreset(preset) {
+function setNsfwLevel(level) {
+  nsfwLevel = level;
+  document.querySelectorAll('.nsfw-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.level === level);
+  });
+}
+
+function _doApplyPreset(preset, name, nsfwOverride) {
   document.querySelectorAll('.chip').forEach(c => c.classList.remove('selected'));
   selectedDims = {};
+  activePresetName = name || null;
   Object.entries(preset).forEach(([key, value]) => {
+    if (key === 'nsfw_level') return;  // meta field, not a dimension
     selectedDims[key] = value;
     const chip = document.querySelector(`.chip[data-key="${key}"][data-value="${value}"]`);
     if (chip) chip.classList.add('selected');
   });
+  if (nsfwOverride) setNsfwLevel(nsfwOverride);
   validateRequired();
+}
+
+function applyPreset(preset, name) {
+  const nsfwOverride = preset.nsfw_level || null;
+  if (nsfwOverride) {
+    showModal(
+      'Adult Content Preset',
+      '<p style="line-height:1.6">This preset is designed for mature conversations.<br>' +
+      'Content Level will be set to <strong>No Control</strong>.<br>' +
+      '<span style="color:var(--muted);font-size:.85em">You can change it before starting.</span></p>',
+      [
+        { label: 'Cancel', action: closeModal },
+        { label: 'Apply anyway', cls: 'btn-send', action: () => {
+          closeModal();
+          _doApplyPreset(preset, name, nsfwOverride);
+        }},
+      ]
+    );
+  } else {
+    _doApplyPreset(preset, name, null);
+  }
 }
 
 /* ── Preset modal ───────────────────────────────────────────────── */
@@ -834,6 +1008,11 @@ document.getElementById('preset-modal-save').addEventListener('click', async () 
     const dr = await fetch('/api/dimensions');
     dimData = await dr.json();
     renderPresetStrip();
+    // If chat is active and we just saved the current session's dims, show the name in sidebar
+    if (!document.getElementById('chat').classList.contains('hidden')) {
+      activePresetName = name;
+      renderPersonaSidebar(selectedDims);
+    }
     closePresetModal();
   } catch(e) {
     errEl.textContent = 'Error: ' + e.message;
@@ -862,6 +1041,10 @@ function validateRequired() {
 
 document.getElementById('save-preset-btn').addEventListener('click', () => {
   openPresetModal(null, null);  // new preset, pre-filled with current setup selection
+});
+
+document.getElementById('sb-save-preset-btn').addEventListener('click', () => {
+  openPresetModal(null, null);  // save current session's selections as a new preset
 });
 
 /* ── Start chat ─────────────────────────────────────────────────── */
@@ -898,8 +1081,10 @@ async function startChat() {
 
     const d = await resp.json();
     document.getElementById('setup').classList.add('hidden');
+    document.getElementById('global-theme-btn').classList.add('hidden');
     renderPersonaSidebar(selectedDims);
     if (d.vision_capable) document.getElementById('img-pick-btn').classList.remove('hidden');
+    document.getElementById('auto-cb').disabled = false;
     syncState(d);
     document.getElementById('chat-input').focus();
   } catch(e) {
@@ -918,6 +1103,12 @@ function renderPersonaSidebar(sels) {
   const container = document.getElementById('sb-persona');
   container.innerHTML = '';
   if (!dimData) return;
+  if (activePresetName) {
+    const nameEl = document.createElement('div');
+    nameEl.style.cssText = 'font-size:.7rem;color:var(--accent);letter-spacing:.05em;margin-bottom:6px;font-weight:600;';
+    nameEl.textContent = activePresetName;
+    container.appendChild(nameEl);
+  }
   Object.entries(sels).forEach(([key, val]) => {
     const badge = document.createElement('span');
     badge.className = 'persona-badge';
@@ -978,6 +1169,7 @@ function finalizeStream() {
   const cur = document.getElementById('streaming-cursor');
   if (cur) cur.remove();
   if (streamEl) {
+    streamEl.textContent = substituteEmoticons(streamText);
     chat.querySelectorAll('.entry-bot[data-last-bot]').forEach(el => delete el.dataset.lastBot);
     streamEl.dataset.lastBot = '1';
     wireEdit(streamEl);
@@ -989,7 +1181,7 @@ function finalizeStream() {
 function appendUser(text) {
   const el = document.createElement('div');
   el.className = 'entry entry-user';
-  el.textContent = text;
+  el.textContent = substituteEmoticons(text);
   chat.appendChild(el);
   chat.scrollTop = chat.scrollHeight;
 }
@@ -1065,8 +1257,26 @@ function startEdit(el) {
 }
 
 /* ── State sync ─────────────────────────────────────────────────── */
+let currentCtxPct = 0;
+
 function syncState(d) {
   if (d.turn_count !== undefined) document.getElementById('sb-turn').textContent = d.turn_count;
+  if (d.ctx_pct !== null && d.ctx_pct !== undefined) {
+    currentCtxPct = d.ctx_pct;
+    const pct = d.ctx_pct;
+    const bar = document.getElementById('sb-ctx-bar');
+    const lbl = document.getElementById('sb-ctx-label');
+    bar.style.width = pct + '%';
+    let color, text;
+    if (pct < 30)      { color = '#4caf50'; text = 'Fresh'; }
+    else if (pct < 55) { color = '#ff9800'; text = 'Warming up'; }
+    else if (pct < 75) { color = '#f57c00'; text = 'Getting full'; }
+    else if (pct < 90) { color = '#e53935'; text = 'Nearly full'; }
+    else               { color = '#b71c1c'; text = 'Pack it up'; }
+    bar.style.background = color;
+    lbl.textContent = text;
+    lbl.style.color = color;
+  }
 }
 
 let busy = false;
@@ -1091,11 +1301,12 @@ async function sendMessage() {
   const inp = document.getElementById('chat-input');
   const text = inp.value.trim();
   if (!text) return;
-  inp.value = ''; inp.style.height = '42px';
+  inp.value = ''; inp.style.height = '68px';
   setBusy(true);
 
   const fd = new FormData();
   fd.append('text', text);
+  fd.append('max_tokens', maxTokens);
   if (pendingImage) {
     fd.append('image', pendingImage.file);
     fd.append('image_label', pendingImage.label);
@@ -1123,6 +1334,115 @@ async function sendMessage() {
     appendSys('Connection error: ' + e.message); setBusy(false);
   }
 }
+
+/* ── Auto Chat ──────────────────────────────────────────────────── */
+const autoCb    = document.getElementById('auto-cb');
+const autoLabel = document.getElementById('auto-label');
+let autoRunning = false;
+let autoAbort   = false;
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function stopAutoChat(clearInput = true) {
+  autoAbort   = true;
+  autoRunning = false;
+  autoCb.checked = false;
+  autoLabel.classList.remove('active');
+  if (clearInput) {
+    const inp = document.getElementById('chat-input');
+    inp.value = '';
+    resetTextareaHeight();
+  }
+}
+
+async function typeIntoInput(text) {
+  const inp = document.getElementById('chat-input');
+  inp.value = '';
+  resetTextareaHeight();
+  for (const ch of text) {
+    if (autoAbort) return false;
+    inp.value += ch;
+    resetTextareaHeight();
+    await sleep(35 + Math.random() * 55);  // 35–90ms per char
+  }
+  return true;
+}
+
+async function runAutoLoop() {
+  autoRunning = true;
+  autoAbort   = false;
+  autoLabel.classList.add('active');
+
+  while (!autoAbort) {
+    // Stop if context is getting full
+    if (currentCtxPct >= 80) {
+      appendSys('Auto chat stopped — context nearly full.');
+      stopAutoChat();
+      break;
+    }
+
+    // Wait if a turn is in progress
+    while (busy && !autoAbort) await sleep(200);
+    if (autoAbort) break;
+
+    // 1. Generate the user side
+    let userText;
+    try {
+      const autoBody = pendingImage
+        ? JSON.stringify({ has_image: true, image_label: pendingImage.label })
+        : '{}';
+      const r = await fetch('/api/auto/user-turn', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: autoBody,
+      });
+      if (autoAbort) break;
+      if (!r.ok) { stopAutoChat(); break; }
+      const d = await r.json();
+      if (autoAbort) break;
+      if (d.goodbye) {
+        appendSys('Auto chat stopped — conversation wrapped up naturally.');
+        stopAutoChat(); break;
+      }
+      if (d.error) { stopAutoChat(); break; }
+      userText = d.text;
+    } catch { stopAutoChat(); break; }
+
+    if (autoAbort) break;
+
+    // 2. Type it into the textarea
+    const typed = await typeIntoInput(userText);
+    if (!typed || autoAbort) break;
+
+    // Brief pause before sending (feels human)
+    await sleep(300 + Math.random() * 300);
+    if (autoAbort) break;
+
+    // 3. Send (reuse normal send path)
+    await sendMessage();
+
+    // 4. Wait for the bot response to finish
+    await sleep(400);
+    while (busy && !autoAbort) await sleep(200);
+    if (autoAbort) break;
+
+    // 5. Pause between turns
+    await sleep(700 + Math.random() * 500);
+  }
+}
+
+autoCb.addEventListener('change', () => {
+  if (autoCb.checked) {
+    runAutoLoop();
+  } else {
+    stopAutoChat();
+  }
+});
+
+// Clicking the textarea during auto mode stops it
+document.getElementById('chat-input').addEventListener('focus', () => {
+  if (autoRunning) stopAutoChat(false);  // don't wipe what user clicked into
+});
 
 /* ── Undo ───────────────────────────────────────────────────────── */
 document.getElementById('undo-btn').addEventListener('click', async () => {
@@ -1161,7 +1481,11 @@ document.getElementById('regen-btn').addEventListener('click', async () => {
   const lastBot = chat.querySelector('.entry-bot[data-last-bot]');
   if (lastBot) lastBot.remove();
   try {
-    const resp = await fetch('/api/regen', { method:'POST' });
+    const resp = await fetch('/api/regen', {
+      method:'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ max_tokens: maxTokens }),
+    });
     if (!resp.ok) {
       const d = await resp.json().catch(()=>({}));
       appendSys('Regen error: '+(d.error||resp.status)); setBusy(false); return;
@@ -1195,11 +1519,14 @@ document.getElementById('new-chat-btn').addEventListener('click', async () => {
   document.getElementById('sb-imgdesc-section').classList.add('hidden');
   document.getElementById('regen-btn').disabled = true;
   document.getElementById('undo-btn').disabled = true;
+  stopAutoChat();
+  document.getElementById('auto-cb').disabled = true;
   document.getElementById('setup-error').textContent = '';
   const btn = document.getElementById('start-btn');
   btn.textContent = 'Start Chat →';
   validateRequired();
   document.getElementById('setup').classList.remove('hidden');
+  document.getElementById('global-theme-btn').classList.remove('hidden');
 });
 
 /* ── Image attach ───────────────────────────────────────────────── */
@@ -1228,11 +1555,62 @@ document.getElementById('sb-imgdesc-clear-btn').addEventListener('click', () => 
   document.getElementById('sb-imgdesc-section').classList.add('hidden');
 });
 
-/* ── Auto-resize textarea ───────────────────────────────────────── */
-document.getElementById('chat-input').addEventListener('input', function() {
-  this.style.height = '42px';
-  this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+/* ── Response length segmented control ──────────────────────────── */
+let maxTokens = 700; // medium default
+document.querySelectorAll('.len-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.len-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    maxTokens = parseInt(btn.dataset.tokens, 10);
+  });
 });
+
+/* ── Sidebar resizer ────────────────────────────────────────────── */
+(function () {
+  const resizer = document.getElementById('sidebar-resizer');
+  const sidebar = document.getElementById('sidebar');
+  const STORAGE_KEY = 'faaltoo_sidebar_width';
+
+  // Restore saved width
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (saved) sidebar.style.width = saved + 'px';
+
+  let startX, startWidth;
+
+  resizer.addEventListener('mousedown', e => {
+    startX = e.clientX;
+    startWidth = sidebar.offsetWidth;
+    resizer.classList.add('dragging');
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    function onMove(e) {
+      const delta = startX - e.clientX;  // dragging left = wider sidebar
+      const newWidth = Math.min(420, Math.max(140, startWidth + delta));
+      sidebar.style.width = newWidth + 'px';
+    }
+
+    function onUp() {
+      resizer.classList.remove('dragging');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      localStorage.setItem(STORAGE_KEY, sidebar.offsetWidth);
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    }
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+})();
+
+/* ── Auto-resize textarea ───────────────────────────────────────── */
+function resetTextareaHeight() {
+  const el = document.getElementById('chat-input');
+  el.style.height = '68px';
+  el.style.height = Math.min(el.scrollHeight, 200) + 'px';
+}
+document.getElementById('chat-input').addEventListener('input', resetTextareaHeight);
 
 /* ── Modal ──────────────────────────────────────────────────────── */
 function showModal(title, bodyHtml, buttons) {
@@ -1255,10 +1633,125 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && !editingEntry) {
     closeModal();
     closePresetModal();
+    closeEmojiPanel();
   }
 });
 document.getElementById('preset-modal').addEventListener('click', e => {
   if (e.target === e.currentTarget) closePresetModal();
+});
+
+/* ── Chip utility buttons ───────────────────────────────────────── */
+document.getElementById('clear-sel-btn').addEventListener('click', () => {
+  selectedDims = {};
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('selected'));
+  validateRequired();
+});
+
+document.getElementById('del-user-chips-btn').addEventListener('click', () => {
+  showModal(
+    'Delete all custom chips',
+    'Remove all user-defined chip options from every dimension? This cannot be undone.',
+    [
+      { label: 'Cancel', action: closeModal },
+      { label: 'Delete all', cls: 'btn-send', action: async () => {
+        closeModal();
+        const r = await fetch('/api/dimensions', { method: 'DELETE' });
+        if (!r.ok) return;
+        const dr = await fetch('/api/dimensions');
+        dimData = await dr.json();
+        // drop any selectedDims that no longer exist as valid options
+        const { dimensions, user_dim_options: newUD = {} } = dimData;
+        Object.keys(selectedDims).forEach(key => {
+          const dim = dimensions[key];
+          if (!dim) return;
+          const allOpts = [...dim.options, ...(newUD[key] || [])];
+          if (!allOpts.includes(selectedDims[key])) delete selectedDims[key];
+        });
+        refreshDimChips();
+        validateRequired();
+      }},
+    ]
+  );
+});
+
+// Only replaces emoticons surrounded by whitespace or at string edges
+// so URLs like http:// are left alone. Data loaded from /static/emoticons.js
+function substituteEmoticons(text) {
+  let out = text;
+  for (const [em, emoji] of EMOTICONS) {
+    const esc = em.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    out = out.replace(new RegExp(`(^|(?<=\\s))${esc}(?=\\s|$)`, 'g'), emoji);
+  }
+  return out;
+}
+
+/* ── Emoji picker ───────────────────────────────────────────────── */
+let _emojiCatIdx = 0;
+const _emojiPanel = document.getElementById('emoji-panel');
+const _emojiCatBar = document.getElementById('emoji-cat-bar');
+const _emojiGrid = document.getElementById('emoji-grid');
+
+// Build category tab bar once
+EMOJI_CATS.forEach((cat, i) => {
+  const btn = document.createElement('button');
+  btn.className = 'emoji-cat-btn' + (i === 0 ? ' active' : '');
+  btn.textContent = cat.icon;
+  btn.title = cat.label;
+  btn.addEventListener('click', () => {
+    _emojiCatIdx = i;
+    _emojiCatBar.querySelectorAll('.emoji-cat-btn').forEach((b, j) => b.classList.toggle('active', j === i));
+    _renderEmojiGrid();
+  });
+  _emojiCatBar.appendChild(btn);
+});
+
+function _renderEmojiGrid() {
+  _emojiGrid.innerHTML = '';
+  EMOJI_CATS[_emojiCatIdx].emojis.forEach(e => {
+    const btn = document.createElement('button');
+    btn.className = 'emoji-btn';
+    btn.textContent = e;
+    btn.addEventListener('click', () => _insertEmoji(e));
+    _emojiGrid.appendChild(btn);
+  });
+  _emojiGrid.scrollTop = 0;
+}
+
+function _insertEmoji(emoji) {
+  const inp = document.getElementById('chat-input');
+  const start = inp.selectionStart ?? inp.value.length;
+  const end = inp.selectionEnd ?? start;
+  inp.value = inp.value.slice(0, start) + emoji + inp.value.slice(end);
+  inp.selectionStart = inp.selectionEnd = start + emoji.length;
+  inp.focus();
+  inp.dispatchEvent(new Event('input'));
+  closeEmojiPanel();
+}
+
+function openEmojiPanel() {
+  const btn = document.getElementById('emoji-btn');
+  const rect = btn.getBoundingClientRect();
+  const panelW = 308;
+  const left = Math.min(Math.max(4, rect.left - panelW + rect.width), window.innerWidth - panelW - 4);
+  _emojiPanel.style.bottom = (window.innerHeight - rect.top + 6) + 'px';
+  _emojiPanel.style.left = left + 'px';
+  _emojiPanel.classList.remove('hidden');
+  _renderEmojiGrid();
+}
+
+function closeEmojiPanel() {
+  _emojiPanel.classList.add('hidden');
+}
+
+document.getElementById('emoji-btn').addEventListener('click', e => {
+  e.stopPropagation();
+  _emojiPanel.classList.contains('hidden') ? openEmojiPanel() : closeEmojiPanel();
+});
+
+document.addEventListener('click', e => {
+  if (!_emojiPanel.contains(e.target) && e.target.id !== 'emoji-btn') {
+    closeEmojiPanel();
+  }
 });
 
 /* ── Boot ───────────────────────────────────────────────────────── */
