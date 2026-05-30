@@ -19,6 +19,7 @@ def build_system_prompt(selections: dict[str, str], nsfw_level: str = "medium") 
     archetype = selections.get("archetype", "Best Friend")
     energy = selections.get("energy", "Chill")
     talk_type = selections.get("talk_type", "Timepass")
+    gender = selections.get("gender")
     region = selections.get("region")
     domain = selections.get("domain")
     language_style = selections.get("language_style")
@@ -28,10 +29,16 @@ def build_system_prompt(selections: dict[str, str], nsfw_level: str = "medium") 
 
     lines: list[str] = []
 
+    gender_qualifier = ""
+    if gender and gender not in ("Not Applicable", "Neutral"):
+        gender_qualifier = f" {gender.lower()}"
+    elif gender == "Neutral":
+        gender_qualifier = " gender-neutral"
+
     if region:
-        lines.append(f"You are a {archetype} with a {region} background.")
+        lines.append(f"You are a{gender_qualifier} {archetype} with a {region} background.")
     else:
-        lines.append(f"You are a {archetype}.")
+        lines.append(f"You are a{gender_qualifier} {archetype}.")
 
     extras: list[str] = []
     if domain:

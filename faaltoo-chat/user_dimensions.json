@@ -1,11 +1,24 @@
 {
-  "archetype": [
-    "dirty talk friend"
+  "language_style": [
+    "Hinglish Street Slang"
   ],
   "emotional_need": [
-    "libido"
+    "Sexual"
   ],
   "energy": [
-    "horny"
+    "Sensous"
+  ],
+  "talk_type": [
+    "Enquiring",
+    "marital bedtime"
+  ],
+  "archetype": [
+    "Wife"
+  ],
+  "familiarity": [
+    "Spouse"
+  ],
+  "situation": [
+    "Bed time"
   ]
 }
