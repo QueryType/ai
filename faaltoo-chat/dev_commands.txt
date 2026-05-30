@@ -1,0 +1,18 @@
+curl http://localhost:7860/api/debug/memory | python -m json.tool
+
+# ── Temperature ──────────────────────────────────────────────────────────────
+# FAALTOO_TEMPERATURE=0.85  (default — set in .env to change)
+# Range: 0.0–2.0. Only affects _stream_bot, not memory extraction calls.
+
+# Memory extraction notes:
+# - scene_state and core_facts extractions are bounded — they won't lag as conversation grows.
+# - scene_state always reads the last 8 messages only (fixed window).
+# - core_facts only reads new messages since last extraction (at most 8 per cycle).
+# - On turn multiples of 8, both fire — terminal awaits them sequentially.
+#   asyncio.gather() would help only if the inference server has --parallel >= 2.
+#   LM Studio / llama.cpp default is --parallel 1, so leave terminal as sequential.
+#
+# Real latency culprit as chat grows:
+# - _stream_bot sends the full message history every turn (KV cache grows, prefill slows).
+# - Watch ctx_pct in the UI — above ~70-80% you'll feel it on local hardware.
+# - Fix for that is a separate feature: context trimming or old-turn summarization.
