@@ -8,6 +8,7 @@ class ChatSession:
     selections: dict[str, str]
     system_prompt: str
     nsfw_level: str = "medium"
+    max_tokens: int = 700
     turn_count: int = 0
     story_log: list[str] = field(default_factory=list)
 
