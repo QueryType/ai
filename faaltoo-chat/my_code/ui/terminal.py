@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import random
 
 from rich.console import Console
 from rich.panel import Panel
@@ -45,6 +46,14 @@ class Terminal:
 
     def bot_end(self) -> None:
         self._console.print()
+        self._console.print()
+
+    async def auto_type(self, label: str, text: str) -> None:
+        """Print an auto-generated user message character by character."""
+        self._console.print(f"[user]{label}[/user] ", end="")
+        for ch in text:
+            self._console.print(ch, style="bold white", end="", highlight=False)
+            await asyncio.sleep(0.035 + random.random() * 0.055)
         self._console.print()
 
     async def prompt(self, label: str) -> str | None:
