@@ -12,10 +12,16 @@ import tempfile
 from pathlib import Path
 from typing import Any, Optional
 
-from fastapi import FastAPI, File, Form, UploadFile
+import httpx
+
+from fastapi import Body, FastAPI, File, Form, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, StreamingResponse
 
-from my_code.chat_loop import _EXPORTS_DIR, _stream_bot
+from my_code.chat_loop import (
+    _EXPORTS_DIR, _CORE_EVERY, _STATE_EVERY,
+    _effective_system, _extract_core_facts, _extract_scene_state, _stream_bot,
+    _is_conversation_done,
+)
 from my_code.dimensions import DIMENSIONS, PRESETS
 from my_code.models.data_models import ChatSession
 from my_code.models.provider import get_client, get_vision_client_args
@@ -73,7 +79,10 @@ def _save_user_dims(data: dict) -> None:
 _sess: dict[str, Any] = {
     "session": None,
     "messages": [],
-    "system": "",
+    "base_system": "",
+    "core_facts": "",
+    "core_since_idx": 0,
+    "scene_state": "",
     "last_response": "",
     "turn_snapshot": None,
     "initial_msg_count": 0,
@@ -82,7 +91,35 @@ _sess: dict[str, Any] = {
     "vision_capable": False,
     "vision_client_args": None,
     "lock": None,
+    "ctx_window_chars": None,  # fetched from model info at session start
 }
+
+
+async def _fetch_ctx_window_chars(base_url: str, model_id: str, api_key: str) -> int | None:
+    """Try to get the active context window from the model server. Returns None if unavailable."""
+    headers = {"Authorization": f"Bearer {api_key}"}
+    root = base_url.rstrip("/").removesuffix("/v1")
+    candidates = [
+        # LM Studio native API — returns loaded_context_length (actual active window)
+        (f"{root}/api/v0/models/{model_id}", ["loaded_context_length", "max_context_length"]),
+        # OpenAI-compat fallback (some servers expose context_length here)
+        (f"{base_url.rstrip('/')}/models/{model_id}", ["context_length", "context_window"]),
+    ]
+    try:
+        async with httpx.AsyncClient() as c:
+            for url, keys in candidates:
+                try:
+                    r = await c.get(url, headers=headers, timeout=5.0)
+                    if r.status_code == 200:
+                        data = r.json()
+                        for key in keys:
+                            if data.get(key):
+                                return int(data[key]) * 4
+                except Exception:
+                    continue
+    except Exception:
+        pass
+    return None
 
 
 def _lock() -> asyncio.Lock:
@@ -95,9 +132,17 @@ def _state_payload() -> dict:
     session: ChatSession | None = _sess["session"]
     if session is None:
         return {}
+    ctx_chars = sum(
+        len(m["content"]) if isinstance(m["content"], str)
+        else sum(len(p.get("text", "")) for p in m["content"] if isinstance(p, dict))
+        for m in _sess["messages"]
+    )
+    ctx_window = _sess["ctx_window_chars"]
+    ctx_pct = round(min(100.0, ctx_chars / ctx_window * 100), 1) if ctx_window else None
     return {
         "turn_count": session.turn_count,
         "vision_capable": _sess["vision_capable"],
+        "ctx_pct": ctx_pct,
     }
 
 
@@ -126,15 +171,47 @@ def _sse(data: dict) -> str:
     return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
-async def _run_and_drain(ui: _WebUI, client, model, system, messages, session) -> str:
+async def _run_and_drain(ui: _WebUI, client, model, system, messages, session, max_tokens: int = 512) -> str:
     try:
-        result = await _stream_bot(client, model, system, messages, ui)
+        result = await _stream_bot(client, model, system, messages, ui, max_tokens)
     except Exception as exc:
         ui.queue.put_nowait(f"\n\n[Error: {exc}]")
         result = ""
     finally:
         ui.queue.put_nowait(None)
     return result
+
+
+async def _run_core_extraction() -> None:
+    """Background task: additive permanent-facts extraction."""
+    try:
+        core_facts, since_idx = await _extract_core_facts(
+            _sess["client"],
+            _sess["model"],
+            _sess["base_system"],
+            list(_sess["messages"]),
+            _sess["core_facts"],
+            _sess["core_since_idx"],
+        )
+        _sess["core_facts"] = core_facts
+        _sess["core_since_idx"] = since_idx
+    except Exception:
+        pass
+
+
+async def _run_scene_extraction() -> None:
+    """Background task: replace scene state with a fresh snapshot."""
+    try:
+        scene_state = await _extract_scene_state(
+            _sess["client"],
+            _sess["model"],
+            _sess["base_system"],
+            list(_sess["messages"]),
+        )
+        if scene_state:
+            _sess["scene_state"] = scene_state
+    except Exception:
+        pass
 
 
 # ---------------------------------------------------------------------------
@@ -147,6 +224,15 @@ def create_app() -> FastAPI:
     @app.get("/")
     async def index():
         return HTMLResponse((_STATIC / "index.html").read_text(encoding="utf-8"))
+
+    @app.get("/static/{filename}")
+    async def static_file(filename: str):
+        path = _STATIC / filename
+        if not path.exists() or not path.is_file():
+            return JSONResponse({"error": "Not found"}, status_code=404)
+        suffix = path.suffix.lower()
+        mime = {".js": "application/javascript", ".css": "text/css"}.get(suffix, "text/plain")
+        return PlainTextResponse(path.read_text(encoding="utf-8"), media_type=mime)
 
     # ------------------------------------------------------------------
     # Dimension data for setup screen
@@ -189,6 +275,11 @@ def create_app() -> FastAPI:
         else:
             data[dim_key] = options
         _save_user_dims(data)
+        return JSONResponse({"ok": True})
+
+    @app.delete("/api/dimensions")
+    async def clear_all_user_dims():
+        _save_user_dims({})
         return JSONResponse({"ok": True})
 
     @app.post("/api/presets")
@@ -262,14 +353,23 @@ def create_app() -> FastAPI:
             except Exception:
                 pass
 
-        system = build_system_prompt(selections, nsfw_level=nsfw_level)
-        session = ChatSession(selections=selections, system_prompt=system, nsfw_level=nsfw_level)
+        base_system = build_system_prompt(selections, nsfw_level=nsfw_level)
+        session = ChatSession(selections=selections, system_prompt=base_system, nsfw_level=nsfw_level)
         messages: list[dict] = []
+
+        # Fetch real context window from the model server (best-effort, non-blocking)
+        import os as _os
+        base_url = _os.environ.get("FAALTOO_LOCAL_BASE_URL", "http://localhost:1234/v1")
+        api_key = _os.environ.get("OPENROUTER_API_KEY", "not-needed")
+        ctx_window_chars = await _fetch_ctx_window_chars(base_url, model, api_key)
 
         _sess.update({
             "session": session,
             "messages": messages,
-            "system": system,
+            "base_system": base_system,
+            "core_facts": "",
+            "core_since_idx": 0,
+            "scene_state": "",
             "last_response": "",
             "turn_snapshot": None,
             "initial_msg_count": 0,
@@ -278,6 +378,7 @@ def create_app() -> FastAPI:
             "vision_capable": vision_capable,
             "vision_client_args": vision_client_args,
             "lock": asyncio.Lock(),
+            "ctx_window_chars": ctx_window_chars,
         })
 
         _sess["initial_msg_count"] = 0
@@ -296,6 +397,7 @@ def create_app() -> FastAPI:
         text: str = Form(""),
         image: Optional[UploadFile] = File(None),
         image_label: str = Form(""),
+        max_tokens: int = Form(700),
     ):
         if _sess["session"] is None:
             return JSONResponse({"error": "No chat in progress."}, status_code=400)
@@ -311,7 +413,7 @@ def create_app() -> FastAPI:
             messages: list = _sess["messages"]
             client = _sess["client"]
             model: str = _sess["model"]
-            system: str = _sess["system"]
+            system: str = _effective_system(_sess["base_system"], _sess["core_facts"], _sess["scene_state"])
 
             image_desc = ""
             if image and _sess["vision_client_args"]:
@@ -323,7 +425,8 @@ def create_app() -> FastAPI:
                         tmp_path = tmp.name
                     from my_code.vision import describe_image
                     image_desc = await asyncio.to_thread(
-                        describe_image, tmp_path, label, *_sess["vision_client_args"]
+                        describe_image, tmp_path, label, *_sess["vision_client_args"],
+                        session.nsfw_level,
                     )
                     Path(tmp_path).unlink(missing_ok=True)
                 except Exception as exc:
@@ -333,6 +436,8 @@ def create_app() -> FastAPI:
             if not user_text:
                 lk.release()
                 return JSONResponse({"error": "Empty input."}, status_code=400)
+
+            clamped_tokens = max(150, min(2800, max_tokens))
 
             full_text = user_text
             if image_desc:
@@ -344,6 +449,7 @@ def create_app() -> FastAPI:
                 "turn_count": session.turn_count,
                 "story_log": list(session.story_log),
                 "turn_message": full_text,
+                "max_tokens": clamped_tokens,
             }
 
             session.turn_count += 1
@@ -351,7 +457,7 @@ def create_app() -> FastAPI:
 
             ui = _WebUI()
             task = asyncio.create_task(
-                _run_and_drain(ui, client, model, system, messages, session)
+                _run_and_drain(ui, client, model, system, messages, session, clamped_tokens)
             )
 
             async def generate():
@@ -370,6 +476,10 @@ def create_app() -> FastAPI:
                         _sess["last_response"] = response
                     yield _sse({"type": "state", **_state_payload()})
                     yield _sse({"type": "done"})
+                    if session.turn_count % _STATE_EVERY == 0:
+                        asyncio.create_task(_run_scene_extraction())
+                    if session.turn_count % _CORE_EVERY == 0:
+                        asyncio.create_task(_run_core_extraction())
                 except Exception as exc:
                     yield _sse({"type": "error", "message": str(exc)})
                 finally:
@@ -389,7 +499,7 @@ def create_app() -> FastAPI:
     # ------------------------------------------------------------------
 
     @app.post("/api/regen")
-    async def regen():
+    async def regen(body: dict = Body(default=None)):
         if _sess["turn_snapshot"] is None:
             return JSONResponse({"error": "Nothing to regenerate."}, status_code=400)
 
@@ -411,9 +521,15 @@ def create_app() -> FastAPI:
             session.turn_count += 1
             messages.append({"role": "user", "content": snap["turn_message"]})
 
+            raw_tokens = (body or {}).get("max_tokens", snap.get("max_tokens", 512))
+            regen_tokens = max(10, min(4096, int(raw_tokens)))
             ui = _WebUI()
             task = asyncio.create_task(
-                _run_and_drain(ui, _sess["client"], _sess["model"], _sess["system"], messages, session)
+                _run_and_drain(
+                    ui, _sess["client"], _sess["model"],
+                    _effective_system(_sess["base_system"], _sess["core_facts"], _sess["scene_state"]),
+                    messages, session, regen_tokens,
+                )
             )
 
             async def generate():
@@ -499,25 +615,117 @@ def create_app() -> FastAPI:
 
     @app.get("/api/export")
     async def export_chat():
+        from datetime import datetime
         session: ChatSession | None = _sess["session"]
         if not session or not session.story_log:
             return JSONResponse({"error": "Nothing to export."}, status_code=400)
         body = "\n\n".join(session.story_log)
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"chat_{ts}.txt"
         return PlainTextResponse(
             body,
-            headers={"Content-Disposition": 'attachment; filename="chat.txt"'},
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
         )
+
+    # ------------------------------------------------------------------
+    # Debug: memory state (dev only, not linked in UI)
+    # ------------------------------------------------------------------
+
+    @app.get("/api/debug/memory")
+    async def debug_memory():
+        session: ChatSession | None = _sess["session"]
+        turn_count = session.turn_count if session else 0
+        next_core_at = (turn_count // _CORE_EVERY + 1) * _CORE_EVERY if session else None
+        next_scene_at = (turn_count // _STATE_EVERY + 1) * _STATE_EVERY if session else None
+        return JSONResponse({
+            "core_facts": _sess["core_facts"] or None,
+            "scene_state": _sess["scene_state"] or None,
+            "core_since_idx": _sess["core_since_idx"],
+            "turn_count": turn_count,
+            "next_core_at": next_core_at,
+            "next_scene_at": next_scene_at,
+        })
 
     # ------------------------------------------------------------------
     # Reset (new chat)
     # ------------------------------------------------------------------
+
+    # ------------------------------------------------------------------
+    # Auto chat — generate the next user-side message
+    # ------------------------------------------------------------------
+
+    _AUTO_USER_PROMPT = (
+        "You are the human side of this conversation. "
+        "Write the single next message you would naturally send. "
+        "Rules: "
+        "(1) Never repeat a question or topic already covered earlier in the conversation. "
+        "(2) Do not rush to wrap up — if there is more to explore, explore it. "
+        "    Avoid agreeing to meet, saying bye, or concluding plans unless the conversation has genuinely run its course. "
+        "(3) Keep it short and casual — the way a real person texts. "
+        "(4) Vary your style: react, tease, ask something new, share something, go deeper on what was just said. "
+        "Output only the message itself, no quotes, no labels."
+    )
+
+    _AUTO_USER_PROMPT_IMAGE = (
+        "You are the human side of this conversation. "
+        "You are about to share an image described as: '{label}'. "
+        "Write the single natural message you'd send along with it — "
+        "something that fits the conversation and references what you're sharing. "
+        "Keep it short and casual. "
+        "Output only the message itself, no quotes, no labels."
+    )
+
+    @app.post("/api/auto/user-turn")
+    async def auto_user_turn(body: dict = Body(default={})):
+        if _sess["session"] is None:
+            return JSONResponse({"error": "No chat in progress."}, status_code=400)
+
+        lk = _lock()
+        if lk.locked():
+            return JSONResponse({"error": "Turn in progress."}, status_code=429)
+
+        client: AsyncOpenAI = _sess["client"]
+        model: str = _sess["model"]
+        base_system: str = _sess["base_system"]
+        messages: list = list(_sess["messages"])
+
+        has_image = body.get("has_image", False)
+        image_label = (body.get("image_label") or "").strip()
+        if has_image and image_label:
+            prompt = _AUTO_USER_PROMPT_IMAGE.format(label=image_label)
+        else:
+            prompt = _AUTO_USER_PROMPT
+
+        gen_messages = (
+            [{"role": "system", "content": base_system}]
+            + messages
+            + [{"role": "user", "content": prompt}]
+        )
+        # Check if the conversation has already wrapped up naturally
+        if await _is_conversation_done(client, model, messages):
+            return JSONResponse({"goodbye": True})
+
+        try:
+            resp = await client.chat.completions.create(
+                model=model,
+                messages=gen_messages,
+                max_tokens=120,
+                stream=False,
+            )
+            text = resp.choices[0].message.content.strip()
+            return JSONResponse({"text": text})
+        except Exception as exc:
+            return JSONResponse({"error": str(exc)}, status_code=500)
 
     @app.post("/api/reset")
     async def reset():
         _sess.update({
             "session": None,
             "messages": [],
-            "system": "",
+            "base_system": "",
+            "core_facts": "",
+            "core_since_idx": 0,
+            "scene_state": "",
             "last_response": "",
             "turn_snapshot": None,
             "initial_msg_count": 0,
