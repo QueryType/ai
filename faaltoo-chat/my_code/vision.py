@@ -15,11 +15,41 @@ _MIME_MAP = {
     "webp": "image/webp",
 }
 
-_DESCRIBE_PROMPT = (
-    "The image represents: {label}.\n\n"
-    "Describe what you see in 1-2 natural sentences, as if you're telling a friend about it. "
-    "Be casual and direct. Don't say 'the image shows'."
+_DESCRIBE_PROMPT_STRICT = (
+    "The user labelled this image as: {label}.\n\n"
+    "Give a vivid, detailed description of what you see — visuals, composition, mood, setting, "
+    "notable elements, colours, lighting, atmosphere, and any interesting details worth noting. "
+    "Write naturally, as if describing it to a friend who cannot see it. "
+    "Aim for around 5 sentences. Don't open with 'The image shows' or 'This image'."
 )
+
+_DESCRIBE_PROMPT_MEDIUM = (
+    "The user labelled this image as: {label}.\n\n"
+    "Describe what you see in rich detail across multiple aspects: the overall scene and setting, "
+    "colours, lighting and atmosphere, the people or subjects present (appearance, clothing, style, "
+    "expression, body language), background elements, mood and tone, and anything that stands out. "
+    "Write naturally and observantly, as if narrating it to someone who cannot see it. "
+    "Aim for around 10 sentences — don't rush, be thorough. "
+    "Don't open with 'The image shows' or 'This image'."
+)
+
+_DESCRIBE_PROMPT_NOCTL = (
+    "The user labelled this image as: {label}.\n\n"
+    "Describe what you see in full, unhurried detail across every dimension: the setting and environment, "
+    "lighting and colour palette, the people or subjects present (physical appearance, build, face, "
+    "expression, hair, clothing or lack thereof, skin, posture, body language), the mood and tension, "
+    "any sensual or intimate elements if present, and background details that add context. "
+    "Be frank, specific and immersive — write as if composing a detailed scene note for an adult "
+    "creative work where every visual element matters. "
+    "Aim for around 15 sentences. Be thorough and don't summarise — let the description breathe. "
+    "Don't open with 'The image shows' or 'This image'."
+)
+
+_PROMPTS = {
+    "strict":     _DESCRIBE_PROMPT_STRICT,
+    "medium":     _DESCRIBE_PROMPT_MEDIUM,
+    "no-control": _DESCRIBE_PROMPT_NOCTL,
+}
 
 
 def _red_png(size: int = 64) -> str:
@@ -72,6 +102,7 @@ def describe_image(
     base_url: str,
     model_id: str,
     api_key: str,
+    nsfw_level: str = "medium",
 ) -> str:
     path = Path(image_path)
     if not path.exists():
@@ -81,22 +112,25 @@ def describe_image(
     mime = _MIME_MAP.get(ext, "image/jpeg")
     b64 = base64.b64encode(path.read_bytes()).decode()
 
+    prompt_template = _PROMPTS.get(nsfw_level, _DESCRIBE_PROMPT_MEDIUM)
+    prompt = prompt_template.format(label=label or "the image")
+
     try:
         from openai import OpenAI
 
-        client = OpenAI(base_url=base_url, api_key=api_key, timeout=30.0)
+        client = OpenAI(base_url=base_url, api_key=api_key, timeout=120.0)
         resp = client.chat.completions.create(
             model=model_id,
             messages=[
                 {
                     "role": "user",
                     "content": [
-                        {"type": "text", "text": _DESCRIBE_PROMPT.format(label=label)},
+                        {"type": "text", "text": prompt},
                         {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}},
                     ],
                 }
             ],
-            max_tokens=150,
+            max_tokens=1200,
         )
         return resp.choices[0].message.content.strip()
     except Exception as exc:
