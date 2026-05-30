@@ -55,6 +55,10 @@ ENV/
 .dmypy.json
 dmypy.json
 
+# User-specific config
+user_dimensions.json
+user_presets.json
+
 # Claude Code
 CLAUDE.md
 .claude/
