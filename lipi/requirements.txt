@@ -1,0 +1,7 @@
+# harness/requirements.txt
+# Minimal dependencies — intentional.
+
+openai>=1.30.0        # OpenAI-compat client (points at llama-server)
+pyyaml>=6.0           # config.yaml loader
+tavily-python>=0.3.0  # web search + URL extraction
+duckdb>=0.10.0        # stock breadth DB queries (optional)
