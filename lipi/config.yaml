@@ -1,93 +1,68 @@
-# ── LLM Profiles ─────────────────────────────────────────────────────────────
-# Each profile points at a llama-server (or LM Studio) OpenAI-compat endpoint.
-
 profiles:
   coder:
-    base_url: "http://192.168.1.4:7890/v1"
-    model: "google/gemma-4-12b-qat"
+    base_url: http://192.168.1.4:7890/v1
+    model: google/gemma-4-12b-qat
     context_window: 65536
     temperature: 0.2
     max_tokens: 4096
-
   fast:
-    base_url: "http://192.168.1.4:7890/v1"
-    model: "qgoogle/gemma-4-12b-qat"
+    base_url: http://192.168.1.4:7890/v1
+    model: google/gemma-4-12b-qat
     context_window: 65536
     temperature: 0.3
     max_tokens: 2048
-
   vision:
-    base_url: "http://192.168.1.4:7890/v1"
-    model: "google/gemma-4-12b-qat"
+    base_url: http://192.168.1.4:7890/v1
+    model: google/gemma-4-12b-qat
     context_window: 65536
     temperature: 0.2
     max_tokens: 2048
-
   analyst:
-    base_url: "http://192.168.1.4:7890/v1"
-    model: "google/gemma-4-12b-qat"
+    base_url: http://192.168.1.4:7890/v1
+    model: google/gemma-4-12b-qat
     context_window: 65536
     temperature: 0.1
     max_tokens: 8192
-
-# ── Harness Settings ─────────────────────────────────────────────────────────
-
 harness:
-  profile: "coder"
-
-  # Agentic loop limits
+  profile: coder
   max_iterations: 30
   max_tool_output: 6000
-  compaction_threshold: 0.8      # compact at 80% of context_window
-  mid_turn_warn: 0.90            # warn and shorten response at this usage
-  mid_turn_abort: 0.95           # abort tool loop at this usage
-
-  # Shell safety
+  compaction_threshold: 0.8
+  mid_turn_warn: 0.9
+  mid_turn_abort: 0.95
   shell_timeout: 60
   allowed_write_paths:
-    - "~/projects"
-    - "~/harness"
-    - "/tmp"
+  - ~/projects
+  - ~/harness
+  - /tmp
   confirm_commands:
-    - "rm -rf"
-    - "sudo"
-    - "pip install"
-    - "brew install"
-    - "git push"
-    - "curl | bash"
-    - "wget | bash"
-
-  # File-write permission: prompt y/n/t before any write_file or patch_file
+  - rm -rf
+  - sudo
+  - pip install
+  - brew install
+  - git push
+  - curl | bash
+  - wget | bash
   confirm_writes: true
-
-  # Paths that can NEVER be written to — hard block, no prompt offered
   locked_paths:
-    - "/etc/*"
-    - "/System/*"
-    - "/Library/*"
-    - "/usr/*"
-    - "/bin/*"
-    - "/sbin/*"
-    - "/var/*"
-    - "/private/*"
-    - "/boot/*"
-    - "~/.ssh/*"
-    - "~/.gnupg/*"
-    - "~/.bash_profile"
-    - "~/.zshrc"
-    - "~/.zprofile"
-
-  # Vision
-  vision_profile: "vision"
-
-  # DuckDB (stock breadth system)
-  duckdb_path: "~/projects/breadth/breadth.duckdb"
-
-  # Session
-  sessions_dir: "~/.harness/sessions"
+  - /etc/*
+  - /System/*
+  - /Library/*
+  - /usr/*
+  - /bin/*
+  - /sbin/*
+  - /var/*
+  - /private/*
+  - /boot/*
+  - ~/.ssh/*
+  - ~/.gnupg/*
+  - ~/.bash_profile
+  - ~/.zshrc
+  - ~/.zprofile
+  vision_profile: vision
+  duckdb_path: ~/projects/breadth/breadth.duckdb
+  sessions_dir: ~/.harness/sessions
   save_sessions: true
-
-  # UI
   stream_output: true
   show_tool_calls: true
   show_timings: false

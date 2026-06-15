@@ -38,6 +38,7 @@ lipi/
 ├── harness.py              ← REPL entry point (run this)
 ├── agent.py                ← agentic loop: prompt → tool calls → loop
 ├── config.yaml             ← model profiles, limits, toggles
+├── cfg.py                  ← CLI to view/set/unset config values
 ├── config.py               ← loads config.yaml, exports cfg + PROFILES
 ├── tools/
 │   └── __init__.py         ← 12 tools + OpenAI-format schemas
@@ -90,6 +91,7 @@ profiles:
 Switch profile:
 - CLI: `python harness.py --profile analyst`
 - In REPL: `/profile analyst`
+- Persistent: `python cfg.py set harness.profile analyst`
 
 The `context_window` field is optional. Lipi auto-detects it by querying the server (LM Studio `/api/v0/models`, llama.cpp `/slots`). Falls back to the YAML value, then to a conservative 32K default.
 
@@ -159,6 +161,23 @@ Run `/init` in the REPL to generate a `.Lipi.md` — a living context document f
 - **Notes** — anything else worth remembering across sessions
 
 The LLM updates these sections organically as it works. Editable sections are preserved across `/init` runs — only mechanical sections are regenerated. The file is automatically loaded into context at session start.
+
+## Config CLI
+
+`cfg.py` lets you view and edit `config.yaml` from the command line.
+
+```bash
+python cfg.py                              # show all config values
+python cfg.py get harness.profile          # get a single value
+python cfg.py set harness.show_timings true  # set a value
+python cfg.py unset harness.show_timings   # revert to default
+
+# Update base_url and model across all profiles at once
+python cfg.py profile --url http://localhost:8080/v1 --model my/model
+
+# Update just one profile
+python cfg.py profile --url http://localhost:8080/v1 --only coder
+```
 
 ## Adding a new tool
 
