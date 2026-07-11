@@ -131,6 +131,8 @@ class Agent:
             timeout=120,
         )
 
+        _check_endpoint(self.profile["base_url"])
+
         self.context_window = _detect_context_window(
             self.profile["base_url"],
             self.profile.get("model", ""),
@@ -179,6 +181,7 @@ class Agent:
             api_key="local",
             timeout=120,
         )
+        _check_endpoint(self.profile["base_url"])
         self.context_window = _detect_context_window(
             self.profile["base_url"],
             self.profile.get("model", ""),
@@ -464,6 +467,29 @@ class Agent:
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 _DEFAULT_CONTEXT_WINDOW = 32768
+
+
+def _check_endpoint(base_url: str) -> None:
+    """
+    Warn early if base_url doesn't serve the OpenAI API.
+    Common mistake: LM Studio only serves it under /v1/ — without it every
+    call fails ("Unexpected endpoint or method") and turns come back empty.
+    Note: LM Studio returns HTTP 200 with an error body for bad paths, so
+    the JSON must be inspected — a "data" key marks a real models listing.
+    """
+    import urllib.request
+
+    url = base_url.rstrip("/") + "/models"
+    try:
+        with urllib.request.urlopen(urllib.request.Request(url), timeout=3) as resp:
+            if "data" in json.loads(resp.read()):
+                return
+        problem = f"{url} does not serve an OpenAI-compatible API"
+    except Exception as e:
+        problem = f"cannot reach {url} ({e})"
+
+    hint = "" if base_url.rstrip("/").endswith("/v1") else " — did you forget /v1 in base_url?"
+    print(f"  \033[33m⚠ {problem}{hint}\033[0m")
 
 
 def _detect_context_window(base_url: str, model: str, yaml_value: int | None) -> int:

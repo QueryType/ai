@@ -23,6 +23,11 @@ Fixes and small features from a code review. Each item is independent.
 - [x] **Bonus A — `/clear` re-injects project context** and resets `turn_count`.
 - [x] **Bonus B — empty-turn retry nudge**: on an empty model turn, append a short user
   message ("your last response was empty…") instead of resending an identical prompt.
+- [x] **P6 — base_url sanity check** (`agent.py`). LM Studio serves the OpenAI API only
+  under `/v1/`; a `base_url` without it makes every call fail with "Unexpected endpoint
+  or method" and lipi reports "empty content with no tool calls" (hit 2026-07-11).
+  At Agent init, probe the endpoint (e.g. GET `{base_url}/models`); on failure, warn
+  with a hint: "did you forget /v1 in base_url?". Keep it a warning, not a hard exit.
 
 ---
 
