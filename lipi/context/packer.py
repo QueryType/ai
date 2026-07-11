@@ -84,28 +84,38 @@ def _tree(path: Path, lines: list, prefix: str, depth: int, max_depth: int, max_
             _tree(entry, lines, prefix + ext, depth + 1, max_depth, max_files)
 
 
+CONTEXT_BUDGET = 3000
+
 def build_context_message(
     cwd: str = ".",
     extra_files: Optional[list[str]] = None,
+    skill_index: str = "",
+    budget: int = CONTEXT_BUDGET,
 ) -> str:
     """
     Build the initial context USER message injected at session start.
     This is NOT part of the system prompt — so the system prompt stays cache-stable.
+    Total output is capped at `budget` chars (tree trimmed first, then key files).
     """
-    lines = [
-        f"Today's date: {date.today().isoformat()}",
-        f"Working directory: {Path(cwd).expanduser().resolve()}",
-        "",
-        project_overview(cwd),
-    ]
+    header = (
+        f"Today's date: {date.today().isoformat()}\n"
+        f"Working directory: {Path(cwd).expanduser().resolve()}\n"
+    )
+    reserved = len(header)
 
+    lipi_block = ""
     lipi_md = Path(cwd) / ".Lipi.md"
     if lipi_md.exists():
         content = lipi_md.read_text(encoding="utf-8", errors="replace")
-        if len(content) > 6000:
-            content = content[:6000] + "\n[... truncated ...]"
-        lines.append(f"\n── .Lipi.md ──\n{content}")
+        if len(content) > 4000:
+            content = content[:4000] + "\n[... truncated ...]"
+        lipi_block = f"\n── .Lipi.md ──\n{content}"
+        reserved += len(lipi_block)
 
+    skill_block = f"\n{skill_index}" if skill_index else ""
+    reserved += len(skill_block)
+
+    extra_block = ""
     if extra_files:
         for fpath in extra_files:
             p = Path(fpath).expanduser().resolve()
@@ -113,6 +123,12 @@ def build_context_message(
                 content = p.read_text(encoding="utf-8", errors="replace")
                 if len(content) > 4000:
                     content = content[:4000] + "\n[... truncated ...]"
-                lines.append(f"\n── {p.name} (pre-loaded) ──\n{content}")
+                extra_block += f"\n── {p.name} (pre-loaded) ──\n{content}"
+        reserved += len(extra_block)
 
-    return "\n".join(lines)
+    overview = project_overview(cwd)
+    tree_budget = budget - reserved
+    if len(overview) > tree_budget:
+        overview = overview[:max(tree_budget, 200)] + "\n[... truncated ...]"
+
+    return header + "\n" + overview + lipi_block + skill_block + extra_block
