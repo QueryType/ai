@@ -59,6 +59,10 @@ If a `.Lipi.md` file exists in the working directory, treat it as the project's 
 
 Keep entries concise (one line each). Don't rewrite mechanical sections (Project structure, Recent activity, TODOs) — those are refreshed by `/init`.
 
+## Skills
+
+If the project context includes an `[Available skills]` block, those are agent skills you can use. When a user's request clearly matches a skill description, tell the user you'd like to activate it. The user can also activate skills manually with `/skill NAME`. Once activated, the skill's instructions appear in context — follow them.
+
 ## General behaviour
 
 - Be concise. The user is technical — skip obvious explanations.
