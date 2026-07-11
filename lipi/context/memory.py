@@ -23,8 +23,16 @@ def _last_user_index(messages: list[dict]) -> int:
     return 0
 
 
-def age_tool_outputs(messages: list[dict]) -> int:
-    """Age old tool outputs. Returns number of tool messages aged this pass."""
+def age_tool_outputs(messages: list[dict], usage: float = 1.0) -> int:
+    """
+    Age old tool outputs. Returns number of tool messages aged this pass.
+    Gated on context pressure (`usage` = fraction of context window in use):
+    below cfg.aging_start nothing is touched; stage-1 trim above aging_start;
+    stage-2 stub only above aging_stub. Aging mutates history destructively,
+    so it should only run when context is actually tight.
+    """
+    if usage < cfg.aging_start:
+        return 0
     aged = 0
     boundary = _last_user_index(messages)
     for m in messages[:boundary]:
@@ -33,7 +41,7 @@ def age_tool_outputs(messages: list[dict]) -> int:
         seen = m.get("_seen", 0)
         content = m.get("content", "")
 
-        if seen >= 3 and not content.startswith("[tool:"):
+        if usage >= cfg.aging_stub and seen >= 3 and not content.startswith("[tool:"):
             first_line = content.split("\n", 1)[0][:80]
             m["content"] = f"[tool: {first_line}]"
             aged += 1

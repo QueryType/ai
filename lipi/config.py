@@ -36,6 +36,8 @@ class HarnessConfig:
     compaction_threshold: float = _harness.get("compaction_threshold", 0.8)
     mid_turn_warn: float = _harness.get("mid_turn_warn", 0.90)
     mid_turn_abort: float = _harness.get("mid_turn_abort", 0.95)
+    aging_start: float = _harness.get("aging_start", 0.5)
+    aging_stub: float = _harness.get("aging_stub", 0.7)
 
     shell_timeout: int = _harness.get("shell_timeout", 60)
     allowed_write_paths: list = field(
@@ -74,6 +76,13 @@ class HarnessConfig:
     show_tool_calls: bool = _harness.get("show_tool_calls", True)
     show_timings: bool = _harness.get("show_timings", False)
     render_markdown: bool = _harness.get("render_markdown", True)
+    auto_approve: bool = False
+
+    skill_dirs: list = field(
+        default_factory=lambda: _harness.get(
+            "skill_dirs", [".skills", "~/.lipi/skills"]
+        )
+    )
 
 
 cfg = HarnessConfig()

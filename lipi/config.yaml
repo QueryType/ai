@@ -30,6 +30,8 @@ harness:
   compaction_threshold: 0.8
   mid_turn_warn: 0.9
   mid_turn_abort: 0.95
+  aging_start: 0.5
+  aging_stub: 0.7
   shell_timeout: 60
   allowed_write_paths:
   - ~/projects
@@ -67,3 +69,6 @@ harness:
   show_tool_calls: true
   show_timings: false
   render_markdown: true
+  skill_dirs:
+  - .skills
+  - ~/.lipi/skills

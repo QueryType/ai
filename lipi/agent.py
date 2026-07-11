@@ -170,6 +170,21 @@ class Agent:
 
         return self._run_loop()
 
+    def switch_profile(self, name: str):
+        """Switch to another profile: new client + re-detect the context window."""
+        self.profile_name = name
+        self.profile = PROFILES[name]
+        self.client = openai.OpenAI(
+            base_url=self.profile["base_url"],
+            api_key="local",
+            timeout=120,
+        )
+        self.context_window = _detect_context_window(
+            self.profile["base_url"],
+            self.profile.get("model", ""),
+            self.profile.get("context_window"),
+        )
+
     def inject_context(self, context_text: str):
         """Prepend project context as a user message (called at session start)."""
         self.messages.append({
@@ -195,12 +210,12 @@ class Agent:
         while self.iteration < cfg.max_iterations:
             self.iteration += 1
 
-            # Age old tool outputs and track seen counts
-            aged = age_tool_outputs(self.messages)
+            # Age old tool outputs (only under context pressure) and track seen counts
+            usage = context_usage(self.messages, context_window)
+            aged = age_tool_outputs(self.messages, usage)
             increment_seen(self.messages)
 
             if self.iteration > 1:
-                usage = context_usage(self.messages, context_window)
                 parts = [f"ctx {usage:.0%}"]
                 if aged:
                     parts.append(f"aged {aged}")
@@ -211,6 +226,7 @@ class Agent:
             if response.usage and hasattr(response.usage, "prompt_tokens"):
                 self.last_prompt_tokens = response.usage.prompt_tokens
                 calibrate(self.messages, self.last_prompt_tokens)
+
             choice = response.choices[0]
             msg = choice.message
 
@@ -234,6 +250,11 @@ class Agent:
                 if empty_streak >= 3:
                     final_text = "[Stopped: model produced no output or tool calls]"
                     break
+                # Nudge so the retry isn't a byte-identical request (matters at temp=0)
+                self.messages.append({
+                    "role": "user",
+                    "content": "[Your last response was empty. Reply with a tool call or your final answer as text.]",
+                })
                 continue
             empty_streak = 0
 
