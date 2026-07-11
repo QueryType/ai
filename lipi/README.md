@@ -57,7 +57,7 @@ lipi/
 
 | Tool | What it does |
 |---|---|
-| `shell` | Run bash, stream live output |
+| `shell` | Run bash, stream live output (wall-clock timeout, kills hung commands) |
 | `read_file` | Read any file (with optional line range) |
 | `write_file` | Write/create a file |
 | `patch_file` | Surgical text replacement (fuzzy whitespace matching) |
@@ -109,10 +109,11 @@ python harness.py --clean-sessions 5    # keep last 5
 /init           generate/update .Lipi.md for this project
 /profile NAME   switch model profile
 /ctx            show context window usage
+/compact        compact history now (summarize older turns)
 /sessions       list saved sessions
 /resume ID      load a past session
 /context        re-inject project context
-/clear          clear history (keep system prompt)
+/clear          clear history (re-injects project context)
 /cd PATH        change working directory
 /tools          list available tools
 /skills         list available agent skills
@@ -279,8 +280,8 @@ The `context_window` field is optional. Lipi auto-detects it by querying the ser
 Lipi actively manages the context window to prevent overflows:
 
 - **Token estimator** — estimates token usage from message sizes, auto-calibrates against actual API-reported token counts over time
-- **Tool output aging** — old tool results shrink in two stages: first trimmed to head+tail (after 1+ views), then collapsed to a one-line stub (after 3+ views)
-- **Budget-aware compaction** — when context hits 80%, older turns are summarized via the LLM. Keeps as many recent messages as fit in 40% of the context window (not a fixed count)
+- **Tool output aging** — under context pressure, old tool results shrink in two stages: trimmed to head+tail (above `aging_start`, default 50% usage), then collapsed to a one-line stub (above `aging_stub`, default 70%). Below `aging_start` nothing is touched, so the model keeps full tool outputs while there's room
+- **Budget-aware compaction** — when context hits 80%, older turns are summarized via the LLM. Keeps as many recent messages as fit in 40% of the context window (not a fixed count). Trigger manually anytime with `/compact`
 - **Project context pinning** — the project overview injected at startup is never compacted away
 - **Mid-turn protection** — if context exceeds 90% during a tool-call loop, the model is forced to wrap up with short responses. At 95%, the loop aborts
 - **Context meter** — visual usage bar shown after every response with percentage, estimated tokens, and color coding (green < 60%, yellow 60–80%, red > 80%). Run `/ctx` for detailed stats
