@@ -4,9 +4,11 @@ Each tool is a plain Python function + an OpenAI-format schema dict.
 Add a new tool: write the function, write the schema, add to TOOLS list.
 """
 
+import ast
 import os
 import re
 import json
+import signal
 import sys
 import base64
 import subprocess
@@ -41,6 +43,9 @@ def _confirm(command: str) -> bool:
     """Ask the user before running dangerous commands."""
     for pattern in cfg.confirm_commands:
         if pattern in command:
+            if cfg.auto_approve:
+                print(f"\n⚠  Command contains '{pattern}'. [auto-approved]")
+                return True
             input_active.set()
             sys.stdout.write("\r\033[K")
             sys.stdout.flush()
@@ -81,7 +86,9 @@ def _confirm_write(path: Path, action: str = "write") -> bool:
         print(f"\n🔒 BLOCKED — {path} matches a locked path. Cannot {action}.")
         return False
 
-    if not cfg.confirm_writes:
+    if not cfg.confirm_writes or cfg.auto_approve:
+        if cfg.auto_approve:
+            print(f"\n✏  {action.title()} → {path} [auto-approved]")
         return True
 
     s = str(path)
@@ -112,7 +119,12 @@ def _confirm_write(path: Path, action: str = "write") -> bool:
 # ── Tool implementations ───────────────────────────────────────────────────────
 
 def shell(command: str, working_dir: str = ".") -> str:
-    """Run a bash command, stream stdout+stderr, return combined output."""
+    """Run a bash command, stream stdout+stderr, return combined output.
+
+    Output is read on a background thread so the timeout is a real wall-clock
+    deadline — a command that hangs silently (no output) still gets killed.
+    The command runs in its own process group so children die with it.
+    """
     if not _confirm(command):
         return "Cancelled by user."
 
@@ -123,22 +135,39 @@ def shell(command: str, working_dir: str = ".") -> str:
         proc = subprocess.Popen(
             command, shell=True, cwd=wd, env=env,
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-            text=True, bufsize=1,
+            stdin=subprocess.DEVNULL,
+            text=True, bufsize=1, start_new_session=True,
         )
-        lines = []
+    except Exception as e:
+        return f"[Shell error: {e}]"
+
+    lines = []
+
+    def _read_output():
         for line in proc.stdout:
             print(line, end="", flush=True)   # live stream
             lines.append(line)
+
+    reader = threading.Thread(target=_read_output, daemon=True)
+    reader.start()
+
+    try:
         proc.wait(timeout=cfg.shell_timeout)
+        reader.join(timeout=5)
         output = "".join(lines)
         if proc.returncode != 0:
             output += f"\n[exit code: {proc.returncode}]"
         return _truncate(output)
     except subprocess.TimeoutExpired:
-        proc.kill()
-        return f"[Command timed out after {cfg.shell_timeout}s]"
-    except Exception as e:
-        return f"[Shell error: {e}]"
+        try:
+            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+        except (ProcessLookupError, PermissionError):
+            proc.kill()
+        proc.wait()
+        reader.join(timeout=5)
+        partial = "".join(lines)
+        msg = f"[Command timed out after {cfg.shell_timeout}s — killed]"
+        return _truncate(partial + "\n" + msg if partial else msg)
 
 
 def read_file(path: str, start_line: int = None, end_line: int = None) -> str:
@@ -436,20 +465,27 @@ def python_repl(code: str) -> str:
     buf = io.StringIO()
     local_ns = {}
     try:
+        tree = ast.parse(code, "<repl>", "exec")
+    except SyntaxError:
+        return f"[Error]\n{traceback.format_exc()}"
+
+    # Split off a trailing expression so it runs exactly once (via eval)
+    # and its value can be shown — never re-executed after exec.
+    last_expr = None
+    if tree.body and isinstance(tree.body[-1], ast.Expr):
+        last_expr = ast.Expression(tree.body.pop().value)
+
+    try:
         with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(buf):
-            exec(compile(code, "<repl>", "exec"), local_ns)  # noqa: S102
+            if tree.body:
+                exec(compile(tree, "<repl>", "exec"), local_ns)  # noqa: S102
+            val = eval(compile(last_expr, "<repl>", "eval"), local_ns) if last_expr else None  # noqa: S307
         output = buf.getvalue()
-        # If the last statement is an expression, show its value
-        lines = code.strip().split("\n")
-        try:
-            val = eval(compile(lines[-1], "<repl>", "eval"), local_ns)  # noqa: S307
-            if val is not None:
-                output += f"\n→ {repr(val)}"
-        except Exception:
-            pass
+        if val is not None:
+            output += f"\n→ {repr(val)}"
         return output or "[No output]"
     except Exception:
-        return f"[Error]\n{traceback.format_exc()}"
+        return f"[Error]\n{buf.getvalue()}{traceback.format_exc()}"
 
 
 def duckdb_query(sql: str) -> str:

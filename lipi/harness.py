@@ -26,6 +26,7 @@ from agent import Agent
 from context.packer import build_context_message
 from context.memory import list_sessions, clean_sessions
 from context.tokens import context_usage, estimate_tokens
+from skills.registry import SkillRegistry
 
 
 # ── ANSI colours (skip if not a TTY) ─────────────────────────────────────────
@@ -132,6 +133,9 @@ def _help_text():
         h("/cd PATH",      "change working directory"),
         h("/tools",        "list available tools"),
         h("/ctx",          "show context window usage"),
+        h("/compact",      "compact history now (summarize older turns)"),
+        h("/skills",       "list available agent skills"),
+        h("/skill NAME",   "activate a skill (inject into context)"),
         h("/init",         "generate/update .Lipi.md for this project"),
         h("/clean [N]",    "delete saved sessions (keep last N)"),
         h("/exit",         "quit  (also: Ctrl-D, /quit, exit)"),
@@ -147,12 +151,15 @@ _COMMANDS = {
     "/help":     "show help",
     "/profile":  "switch model profile",
     "/ctx":      "context window usage",
+    "/compact":  "compact history now",
     "/sessions": "list saved sessions",
     "/resume":   "load a past session",
     "/context":  "re-inject project context",
     "/clear":    "clear history",
     "/cd":       "change working directory",
     "/tools":    "list available tools",
+    "/skills":   "list available skills",
+    "/skill":    "activate a skill",
     "/init":     "generate/update .Lipi.md",
     "/clean":    "delete saved sessions",
     "/exit":     "quit",
@@ -197,8 +204,14 @@ def _path_matches(text: str) -> list[str]:
     return sorted(matches)
 
 
+_skill_registry_ref: SkillRegistry = None
+
 def _completer(text, state):
-    if text.startswith("/"):
+    buf = readline.get_line_buffer().lstrip()
+    if buf.startswith("/skill ") and _skill_registry_ref:
+        prefix = text
+        matches = [n for n in _skill_registry_ref.skill_names() if n.startswith(prefix)]
+    elif text.startswith("/"):
         matches = [c for c in _COMMANDS if c.startswith(text)]
     else:
         matches = _path_matches(text)
@@ -278,7 +291,7 @@ def _banner(agent: Agent, cwd: Path):
     print()
 
 
-def repl(agent: Agent, inject_context: bool, one_shot: str = None):
+def repl(agent: Agent, inject_context: bool, one_shot: str = None, skill_registry: SkillRegistry = None):
     cwd = Path.cwd()
 
     # Set up readline: history + tab completion
@@ -300,14 +313,19 @@ def repl(agent: Agent, inject_context: bool, one_shot: str = None):
     import atexit
     atexit.register(readline.write_history_file, str(history_path))
 
+    # Set up skill registry for tab completion
+    global _skill_registry_ref
+    _skill_registry_ref = skill_registry
+
     # Inject project context at session start
-    if inject_context and not one_shot:
-        context = build_context_message(str(cwd))
+    if inject_context:
+        skill_index = skill_registry.index_block() if skill_registry else ""
+        context = build_context_message(str(cwd), skill_index=skill_index)
         agent.inject_context(context)
 
     if one_shot:
         response = agent.chat(one_shot)
-        if response:
+        if response and not cfg.stream_output:
             print(response)
         return
 
@@ -366,6 +384,34 @@ def repl(agent: Agent, inject_context: bool, one_shot: str = None):
             print("  " + "  ".join(CYAN(t) for t in TOOL_FUNCTIONS.keys()))
             continue
 
+        if raw == "/skills":
+            if not skill_registry or not skill_registry.skills:
+                print("  No skills found.")
+            else:
+                for s in skill_registry.list_skills():
+                    active = CYAN(" [active]") if skill_registry.is_active(s.name) else ""
+                    desc = s.description.split("\n")[0][:80]
+                    print(f"  {GREEN(s.name.ljust(20))} {desc}{active}")
+            continue
+
+        if raw.startswith("/skill "):
+            name = raw[7:].strip()
+            if not skill_registry:
+                print("  No skill registry available.")
+                continue
+            body = skill_registry.activate(name)
+            if body is None:
+                if skill_registry.is_active(name):
+                    print(f"  Skill '{name}' is already active.")
+                else:
+                    available = ", ".join(skill_registry.skill_names()) or "none"
+                    print(f"  Skill '{name}' not found. Available: {available}")
+            else:
+                agent.messages.append({"role": "user", "content": body})
+                agent.messages.append({"role": "assistant", "content": f"Skill '{name}' loaded. Ready."})
+                print(f"  {GREEN('*')} Skill {CYAN(name)} activated.")
+            continue
+
         if raw == "/sessions":
             sessions = list_sessions(with_description=True)
             if sessions:
@@ -397,14 +443,10 @@ def repl(agent: Agent, inject_context: bool, one_shot: str = None):
         if raw.startswith("/profile "):
             name = raw[9:].strip()
             if name in PROFILES:
-                agent.profile_name = name
-                agent.profile = PROFILES[name]
-                import openai
-                agent.client = openai.OpenAI(
-                    base_url=agent.profile["base_url"], api_key="local", timeout=120
-                )
+                agent.switch_profile(name)
                 model = _short_model(agent.profile.get("model", "?"))
-                print(f"  Switched to {YELLOW(name)} ({GREEN(model)})")
+                ctx = f"{agent.context_window // 1024}K ctx"
+                print(f"  Switched to {YELLOW(name)} ({GREEN(model)} · {DIM(ctx)})")
             else:
                 print(f"  Unknown profile. Available: {', '.join(PROFILES)}")
             continue
@@ -429,6 +471,16 @@ def repl(agent: Agent, inject_context: bool, one_shot: str = None):
             print(f"  {DIM('Messages')}       {n_msgs}  ({n_tool} tool results)")
             continue
 
+        if raw == "/compact":
+            if len(agent.messages) < 6:
+                print("  Nothing to compact yet.")
+                continue
+            from context.memory import compact
+            print(_context_meter(agent))
+            agent.messages = compact(agent.messages, agent.client, agent.context_window)
+            print(_context_meter(agent))
+            continue
+
         if raw == "/context":
             context = build_context_message(str(cwd))
             agent.inject_context(context)
@@ -450,8 +502,26 @@ def repl(agent: Agent, inject_context: bool, one_shot: str = None):
 
         if raw == "/clear":
             agent.messages = [{"role": "system", "content": agent.messages[0]["content"]}]
-            print("  History cleared.")
+            agent.turn_count = 0
+            if skill_registry:
+                skill_registry.deactivate_all()
+            if inject_context:
+                skill_index = skill_registry.index_block() if skill_registry else ""
+                agent.inject_context(build_context_message(str(cwd), skill_index=skill_index))
+                print("  History cleared (project context re-injected).")
+            else:
+                print("  History cleared.")
             continue
+
+        # ── Auto-activate matching skill ───────────────────────────────────────
+        if skill_registry:
+            matched = skill_registry.match(raw)
+            if matched:
+                body = skill_registry.activate(matched)
+                if body:
+                    agent.messages.append({"role": "user", "content": body})
+                    agent.messages.append({"role": "assistant", "content": f"Skill '{matched}' loaded. Ready."})
+                    print(f"  {GREEN('*')} Auto-activated skill {CYAN(matched)}")
 
         # ── Normal message → agent ─────────────────────────────────────────────
         try:
@@ -480,6 +550,8 @@ def main():
         epilog=__doc__,
     )
     parser.add_argument("task", nargs="?", help="Single-shot task (non-interactive)")
+    parser.add_argument("--prompt",     metavar="FILE",
+                        help="Read single-shot task from a file (avoids shell quoting)")
     parser.add_argument("--profile",    default=cfg.profile, choices=list(PROFILES),
                         help="Model profile to use")
     parser.add_argument("--resume",     metavar="SESSION_ID",
@@ -496,13 +568,24 @@ def main():
                         help="Disable markdown rendering (plain text output)")
     parser.add_argument("--timings",    action="store_true",
                         help="Show token/sec after each call")
+    parser.add_argument("--auto-approve", action="store_true",
+                        help="Auto-approve all tool confirmations (for autonomous loops)")
     args = parser.parse_args()
+
+    # Resolve --prompt FILE → task
+    if args.prompt:
+        prompt_path = Path(args.prompt).expanduser()
+        if not prompt_path.exists():
+            print(f"Error: prompt file not found: {args.prompt}")
+            sys.exit(1)
+        args.task = prompt_path.read_text(encoding="utf-8").strip()
 
     # Apply CLI overrides to config
     cfg.profile          = args.profile
     cfg.stream_output    = not args.no_stream
     cfg.render_markdown  = not args.no_render
     cfg.show_timings     = args.timings
+    cfg.auto_approve     = args.auto_approve
 
     if args.sessions:
         sessions = list_sessions(with_description=True)
@@ -530,10 +613,16 @@ def main():
         session_id=args.resume,
     )
 
+    skill_registry = SkillRegistry(cfg.skill_dirs)
+    if skill_registry.skills:
+        count = len(skill_registry.skills)
+        print(f"  {count} skill{'s' if count != 1 else ''} discovered")
+
     repl(
         agent,
         inject_context=not args.no_context,
         one_shot=args.task,
+        skill_registry=skill_registry,
     )
 
 
