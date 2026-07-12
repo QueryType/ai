@@ -1,0 +1,7 @@
+jobs/
+.venv/
+__pycache__/
+*.egg-info/
+uv.lock
+.claude/settings.local.json
+.DS_Store

@@ -1,0 +1,24 @@
+[project]
+name = "video-subtitle-cruncher"
+version = "0.1.0"
+description = "Turn videos into queryable context: deduped keyframes + transcript + vision timeline"
+requires-python = ">=3.11"
+dependencies = [
+    "imagehash>=4.3",
+    "Pillow>=10.0",
+    "httpx>=0.27",
+    "mss>=9.0",
+]
+
+[project.optional-dependencies]
+asr = ["faster-whisper>=1.0"]
+
+[project.scripts]
+crunch = "cruncher.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["cruncher"]

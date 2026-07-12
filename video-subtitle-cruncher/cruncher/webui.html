@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>crunch — web ui</title>
+<style>
+  :root {
+    --bg: #17130f; --panel: #211b15; --panel2: #2a221a; --border: #3a2f24;
+    --text: #ece2d4; --dim: #a4937d; --accent: #e8963c; --accent-dim: #8a5a24;
+    --ok: #7bb661; --err: #d16b5f; --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font: 15px/1.5 -apple-system, "Segoe UI", sans-serif;
+    display: grid; grid-template-columns: 280px 1fr; height: 100vh;
+  }
+
+  /* ---- sidebar ---- */
+  aside { background: var(--panel); border-right: 1px solid var(--border);
+          display: flex; flex-direction: column; overflow: hidden; }
+  aside h1 { font-size: 16px; padding: 14px 16px 10px; color: var(--accent); }
+  aside h1 span { color: var(--dim); font-weight: normal; font-size: 12px; }
+  #joblist { overflow-y: auto; flex: 1; }
+  .job { padding: 10px 16px; border-bottom: 1px solid var(--border); cursor: pointer; }
+  .job:hover { background: var(--panel2); }
+  .job.active { background: var(--panel2); border-left: 3px solid var(--accent); padding-left: 13px; }
+  .job .name { font-weight: 600; }
+  .job .meta { font-size: 12px; color: var(--dim); }
+  .job .meta b { color: var(--text); font-weight: 600; }
+  #refresh { margin: 10px 16px; }
+
+  /* ---- main ---- */
+  main { display: flex; flex-direction: column; overflow: hidden; }
+  #settings { display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+              padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--border); }
+  #settings label { font-size: 12px; color: var(--dim); }
+  input, select, textarea {
+    background: var(--bg); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 6px 9px; font: inherit;
+  }
+  input:focus, select:focus, textarea:focus { outline: 1px solid var(--accent-dim); }
+  #baseUrl { width: 240px; } #model { width: 260px; }
+  #pingDot { width: 10px; height: 10px; border-radius: 50%; background: var(--dim); display: inline-block; }
+  #pingDot.ok { background: var(--ok); } #pingDot.err { background: var(--err); }
+
+  button {
+    background: var(--panel2); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 6px 14px; font: inherit; cursor: pointer;
+  }
+  button:hover { border-color: var(--accent-dim); }
+  button.primary { background: var(--accent-dim); border-color: var(--accent-dim); color: #fff; }
+  button.primary:hover { background: var(--accent); }
+  button:disabled { opacity: .45; cursor: default; }
+
+  #actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+             padding: 12px 16px; border-bottom: 1px solid var(--border); }
+  #actions .group { display: flex; gap: 6px; align-items: center; }
+  #askRow { display: flex; gap: 8px; padding: 0 16px 12px; }
+  #question { flex: 1; }
+  #status { padding: 6px 16px; font-size: 13px; color: var(--dim); min-height: 30px; }
+  #status.busy::before { content: ""; display: inline-block; width: 11px; height: 11px;
+    margin-right: 8px; border: 2px solid var(--accent-dim); border-top-color: var(--accent);
+    border-radius: 50%; animation: spin .8s linear infinite; vertical-align: -1px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #status.err { color: var(--err); }
+
+  #viewer { flex: 1; overflow-y: auto; padding: 18px 24px; }
+  #viewer .placeholder { color: var(--dim); margin-top: 40px; text-align: center; }
+  #outputTabs { display: flex; gap: 6px; flex-wrap: wrap; padding: 0 16px 10px; }
+  #outputTabs button { font-size: 12px; padding: 3px 10px; border-radius: 12px; }
+  #outputTabs button.active { background: var(--accent-dim); color: #fff; }
+
+  /* rendered markdown */
+  .md h1, .md h2, .md h3 { color: var(--accent); margin: 18px 0 8px; }
+  .md h1 { font-size: 20px; } .md h2 { font-size: 17px; } .md h3 { font-size: 15px; }
+  .md p, .md ul, .md ol { margin: 8px 0; } .md li { margin-left: 22px; }
+  .md code { font-family: var(--mono); font-size: 13px; background: var(--panel2);
+             padding: 1px 5px; border-radius: 4px; }
+  .md pre { background: var(--panel2); padding: 10px 12px; border-radius: 8px;
+            overflow-x: auto; margin: 10px 0; }
+  .md pre code { background: none; padding: 0; }
+  .md img { max-width: 100%; border-radius: 8px; border: 1px solid var(--border); margin: 8px 0; }
+  .md blockquote { border-left: 3px solid var(--accent-dim); padding-left: 12px; color: var(--dim); }
+  .md strong { color: #fff; }
+</style>
+</head>
+<body>
+
+<aside>
+  <h1>crunch <span>web ui</span></h1>
+  <div id="joblist"></div>
+  <button id="refresh" onclick="loadJobs()">↻ refresh jobs</button>
+</aside>
+
+<main>
+  <div id="settings">
+    <span id="pingDot" title="endpoint status"></span>
+    <label>endpoint</label>
+    <input id="baseUrl" placeholder="http://localhost:8080/v1">
+    <label>model</label>
+    <input id="model" list="modelList" placeholder="(load or type model id)">
+    <datalist id="modelList"></datalist>
+    <button onclick="loadModels()">load models</button>
+  </div>
+
+  <div id="actions">
+    <div class="group">
+      <button id="btnDescribe" class="primary" onclick="runDescribe()">1 · describe frames</button>
+    </div>
+    <div class="group">
+      <button id="btnSummarize" class="primary" onclick="runSummarize()">2 · summarize</button>
+      <select id="style">
+        <option value="short">short</option>
+        <option value="detailed">detailed</option>
+        <option value="chapters">chapters</option>
+      </select>
+    </div>
+  </div>
+  <div id="askRow">
+    <input id="question" placeholder="ask a question about the selected job…"
+           onkeydown="if(event.key==='Enter')runAsk()">
+    <button id="btnAsk" class="primary" onclick="runAsk()">ask</button>
+  </div>
+
+  <div id="outputTabs"></div>
+  <div id="status"></div>
+  <div id="viewer"><div class="placeholder">select a job on the left</div></div>
+</main>
+
+<script>
+let jobs = [], current = null, busy = false;
+
+const $ = id => document.getElementById(id);
+const api = async (path, opts) => {
+  const r = await fetch(path, opts);
+  const data = await r.json().catch(() => ({error: r.statusText}));
+  if (!r.ok) throw new Error(data.error || r.statusText);
+  return data;
+};
+const settings = () => ({ base_url: $('baseUrl').value.trim(), model: $('model').value.trim() });
+
+// persist endpoint settings
+for (const id of ['baseUrl', 'model'])
+  $(id).addEventListener('change', () => localStorage.setItem('crunch_' + id, $(id).value));
+
+function setStatus(msg, cls = '') { const s = $('status'); s.textContent = msg; s.className = cls; }
+function setBusy(b, msg) {
+  busy = b;
+  for (const id of ['btnDescribe', 'btnSummarize', 'btnAsk']) $(id).disabled = b || !current;
+  if (b) setStatus(msg, 'busy');
+}
+
+// ---- jobs ----
+async function loadJobs() {
+  const data = await api('/api/jobs');
+  jobs = data.jobs;
+  if (!$('baseUrl').value)
+    $('baseUrl').value = localStorage.getItem('crunch_baseUrl') || data.defaults.base_url;
+  if (!$('model').value)
+    $('model').value = localStorage.getItem('crunch_model') || data.defaults.model;
+  ping();
+  const list = $('joblist');
+  list.innerHTML = '';
+  for (const j of jobs) {
+    const div = document.createElement('div');
+    div.className = 'job' + (current === j.name ? ' active' : '');
+    const mins = `${String(Math.floor(j.duration / 60)).padStart(2,'0')}:${String(Math.floor(j.duration % 60)).padStart(2,'0')}`;
+    div.innerHTML = `<div class="name">${j.name}</div>
+      <div class="meta">${j.source_type} · ${mins} · <b>${j.frames ?? '?'}</b> frames ·
+      ${j.transcript_source || 'no'} transcript(${j.transcript_segments})<br>
+      ${j.described ? `<b>${j.described}</b> described` : 'not described yet'} ·
+      ${j.outputs.length} outputs</div>`;
+    div.onclick = () => selectJob(j.name);
+    list.appendChild(div);
+  }
+  if (current && !jobs.find(j => j.name === current)) current = null;
+}
+
+function selectJob(name) {
+  current = name;
+  loadJobs();
+  setBusy(false);
+  setStatus('');
+  renderTabs();
+  const j = jobs.find(x => x.name === name);
+  if (j && j.outputs.length) showOutput(j.outputs[0]);
+  else $('viewer').innerHTML = `<div class="placeholder">${
+    j && !j.described ? 'no timeline yet — run <b>describe frames</b> first' : 'no outputs yet'}</div>`;
+}
+
+// ---- endpoint ----
+async function ping() {
+  const dot = $('pingDot');
+  try {
+    await api('/api/models?base_url=' + encodeURIComponent($('baseUrl').value.trim()));
+    dot.className = 'ok'; dot.title = 'endpoint reachable';
+  } catch { dot.className = 'err'; dot.title = 'endpoint not reachable'; }
+}
+async function loadModels() {
+  try {
+    const data = await api('/api/models?base_url=' + encodeURIComponent($('baseUrl').value.trim()));
+    $('modelList').innerHTML = data.models.map(m => `<option value="${m}">`).join('');
+    $('pingDot').className = 'ok';
+    if (data.models.length === 1) $('model').value = data.models[0];
+    setStatus(`${data.models.length} model(s) available`);
+  } catch (e) { $('pingDot').className = 'err'; setStatus(e.message, 'err'); }
+}
+
+// ---- actions ----
+async function run(label, path, body, after) {
+  if (!current || busy) return;
+  setBusy(true, label + ' — this can take a while on a local model…');
+  try {
+    const data = await api(path, { method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ job: current, ...settings(), ...body }) });
+    setBusy(false); setStatus('done');
+    after(data);
+    loadJobs();
+  } catch (e) { setBusy(false); setStatus(e.message, 'err'); }
+}
+const runDescribe = () => run('describing keyframes', '/api/describe', {},
+  d => setStatus(`timeline built — ${d.entries} entries`));
+const runSummarize = () => run(`generating ${$('style').value} summary`, '/api/summarize',
+  { style: $('style').value }, d => { renderMd(d.text); setStatus('saved ' + d.file); });
+const runAsk = () => {
+  const q = $('question').value.trim();
+  if (!q) return;
+  run('thinking', '/api/ask', { question: q },
+    d => { renderMd(`**Q: ${q}**\n\n${d.text}`); setStatus('saved ' + d.file); });
+};
+
+// ---- outputs ----
+function renderTabs() {
+  const j = jobs.find(x => x.name === current);
+  $('outputTabs').innerHTML = '';
+  if (!j) return;
+  for (const f of j.outputs) {
+    const b = document.createElement('button');
+    b.textContent = f.replace('.md', '');
+    b.onclick = () => { showOutput(f); [...$('outputTabs').children].forEach(x => x.classList.remove('active')); b.classList.add('active'); };
+    $('outputTabs').appendChild(b);
+  }
+  if ($('outputTabs').firstChild) $('outputTabs').firstChild.classList.add('active');
+}
+async function showOutput(file) {
+  try {
+    const d = await api(`/api/output?job=${encodeURIComponent(current)}&file=${encodeURIComponent(file)}`);
+    renderMd(d.text);
+  } catch (e) { setStatus(e.message, 'err'); }
+}
+
+// ---- tiny markdown renderer (headings, lists, code, bold/italic, images, links) ----
+function renderMd(md) {
+  const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const inline = s => esc(s)
+    .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, src) =>
+      `<img alt="${alt}" src="${src.startsWith('frames/') ? `/frames/${current}/` + src.slice(7) : src}">`)
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/(^|\W)\*([^*\n]+)\*(?=\W|$)/g, '$1<em>$2</em>');
+  const out = [];
+  let list = null, code = false, codeLines = [];
+  for (const line of md.split('\n')) {
+    if (line.startsWith('```')) {
+      if (code) { out.push(`<pre><code>${esc(codeLines.join('\n'))}</code></pre>`); codeLines = []; }
+      code = !code; continue;
+    }
+    if (code) { codeLines.push(line); continue; }
+    const closeList = () => { if (list) { out.push(`</${list}>`); list = null; } };
+    let m;
+    if ((m = line.match(/^(#{1,3})\s+(.*)/))) { closeList(); out.push(`<h${m[1].length}>${inline(m[2])}</h${m[1].length}>`); }
+    else if ((m = line.match(/^\s*[-*]\s+(.*)/))) { if (list !== 'ul') { closeList(); out.push('<ul>'); list = 'ul'; } out.push(`<li>${inline(m[1])}</li>`); }
+    else if ((m = line.match(/^\s*\d+[.)]\s+(.*)/))) { if (list !== 'ol') { closeList(); out.push('<ol>'); list = 'ol'; } out.push(`<li>${inline(m[1])}</li>`); }
+    else if ((m = line.match(/^>\s?(.*)/))) { closeList(); out.push(`<blockquote>${inline(m[1])}</blockquote>`); }
+    else if (line.trim() === '') { closeList(); }
+    else { closeList(); out.push(`<p>${inline(line)}</p>`); }
+  }
+  if (list) out.push(`</${list}>`);
+  $('viewer').innerHTML = `<div class="md">${out.join('\n')}</div>`;
+  $('viewer').scrollTop = 0;
+}
+
+loadJobs();
+</script>
+</body>
+</html>
