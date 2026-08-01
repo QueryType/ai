@@ -1,0 +1,852 @@
+[
+  {
+    "label": "gemma-12b",
+    "model": "gemma-12b",
+    "task": "Write a Python function to check if a number is prime, with tests.",
+    "response": "To determine if a number is prime, the most efficient standard approach is to check for divisibility up to the square root of the number. If a number $n$ is divisible by any integer $d$ where $1 < d \\le \\sqrt{n}$, it is not prime.\n\n### Python Implementation\n\n```python\nimport math\n\ndef is_prime(n: int) -> bool:\n    \"\"\"\n    Determines if a given integer is a prime number.\n    \n    Args:\n        n (int): The integer to check.\n        \n    Returns:\n        bool: True if n is prime, False otherwise.\n    \"\"\"\n    # Prime numbers must be greater than 1\n    if n <= 1:\n        return False\n    \n    # 2 and 3 are prime numbers\n    if n <= 3:\n        return True\n    \n    # Eliminate even numbers and multiples of 3\n    if n % 2 == 0 or n % 3 == 0:\n        return False\n    \n    # Check divisibility starting from 5\n    # We use a step of 6 (checking i and i + 2) because all \n    # primes greater than 3 are of the form 6k \u00b1 1.\n    limit = int(math.sqrt(n))\n    for i in range(5, limit + 1, 6):\n        if n % i == 0 or n % (i + 2) == 0:\n            return False\n            \n    return True\n\ndef run_tests():\n    \"\"\"\n    Executes a suite of test cases to verify the is_prime function.\n    \"\"\"\n    test_cases = [\n        (-5, False),   # Negative numbers\n        (0, False),    # Zero\n        (1, False),    # One\n        (2, True),     # Smallest prime\n        (3, True),     # Odd prime\n        (4, False),    # Even composite\n        (9, False),    # Square of prime\n        (11, True),    # Prime\n        (15, False),   # Composite\n        (25, False),   # Square of prime\n        (97, True),    # Large prime\n        (100, False),  # Large composite\n        (101, True),   # Large prime\n    ]\n\n    print(f\"{'Input':<10} | {'Expected':<10} | {'Result':<10} | {'Status'}\")\n    print(\"-\" * 50)\n    \n    for num, expected in test_cases:\n        result = is_prime(num)\n        status = \"PASS\" if result == expected else \"FAIL\"\n        print(f\"{num:<10} | {str(expected):<10} | {str(result):<10} | {status}\")\n\nif __name__ == \"__main__\":\n    run_tests()\n```\n\n### Analytical Breakdown\n\n1.  **Time Complexity**: $O(\\sqrt{n})$. By iterating only up to the square root of $n$, we significantly reduce the number of operations compared to a linear $O(n)$ check.\n2.  **Space Complexity**: $O(1)$. The function uses a constant amount of memory regardless of the input size.\n3.  **Optimization Logic**:\n    *   **Early Exits**: The function immediately handles numbers $\\le 1$ and the smallest primes (2, 3).\n    *   **Wheel Factorization**: By checking `n % 2` and `n % 3` first, we can skip all even numbers and multiples of 3 in the main loop. The loop then increments by 6, checking numbers in the form $6k \\pm 1$ (e.g., 5, 7, 11, 13, 17, 19...). This reduces the number of iterations by approximately 66% compared to checking every odd number.",
+    "elapsed_s": 32.85,
+    "completion_tokens": 880,
+    "tokens_per_sec": 26.8,
+    "quality_total": 9.8,
+    "quality_scores": {
+      "accuracy": 10,
+      "completeness": 10,
+      "clarity": 10,
+      "depth": 9,
+      "relevance": 10
+    }
+  },
+  {
+    "label": "gemma-12b",
+    "model": "gemma-12b",
+    "task": "Explain the difference between TCP and UDP in simple terms.",
+    "response": "To understand the difference between TCP and UDP, it is helpful to think of them as two different methods of delivering a package.\n\n### 1. TCP (Transmission Control Protocol)\n**The \"Registered Mail\" Approach**\n\nTCP is designed for **reliability**. It ensures that every piece of data arrives exactly as it was sent, in the correct order, and without errors.\n\n*   **How it works:** Before sending data, TCP establishes a connection between the sender and the receiver (a \"handshake\"). It numbers every packet sent. If a packet goes missing or arrives out of order, the receiver asks the sender to re-transmit it.\n*   **Key Characteristic:** It is \"connection-oriented.\"\n*   **Pros:** Guaranteed delivery; data integrity.\n*   **Cons:** Slower, because the system must wait for acknowledgments and re-send lost data.\n*   **Best for:** Web browsing (HTTP/HTTPS), Email, File transfers (FTP), and Streaming video (where you need every frame to be perfect).\n\n### 2. UDP (User Datagram Protocol)\n**The \"Regular Mail\" Approach**\n\nUDP is designed for **speed**. It sends data out as fast as possible without checking to see if the receiver actually got it.\n\n*   **How it works:** UDP simply \"fires and forgets.\" It sends a stream of packets (datagrams) to the destination. If a packet is lost in transit, it is gone forever; the protocol does not try to recover it.\n*   **Key Characteristic:** It is \"connectionless.\"\n*   **Pros:** Extremely fast; very low overhead.\n*   **Cons:** No guarantee of delivery; data can arrive out of order or be lost entirely.\n*   **Best for:** Online gaming, Live video calls (Zoom/Skype), and Live audio streaming. In these cases, a tiny bit of lost data (a flicker in video or a millisecond of audio) is better than the delay caused by waiting for a re-transmission.\n\n---\n\n### Summary Comparison Table\n\n| Feature | TCP | UDP |\n| :--- | :--- | :--- |\n| **Reliability** | Guaranteed | Not Guaranteed |\n| **Speed** | Slower (due to overhead) | Faster (minimal overhead) |\n| **Ordering** | Delivers in correct order | No specific order |\n| **Connection** | Requires a \"handshake\" | No handshake required |\n| **Analogy** | A phone call (both must be present) | A postcard (sent and forgotten) |",
+    "elapsed_s": 18.37,
+    "completion_tokens": 541,
+    "tokens_per_sec": 29.5,
+    "quality_total": 9.6,
+    "quality_scores": {
+      "accuracy": 10,
+      "completeness": 10,
+      "clarity": 10,
+      "depth": 8,
+      "relevance": 10
+    }
+  },
+  {
+    "label": "gemma-12b",
+    "model": "gemma-12b",
+    "task": "Summarize the causes of the 2008 financial crisis in 200 words.",
+    "response": "The 2008 financial crisis was a systemic collapse driven by a confluence of predatory lending, financial innovation, and regulatory failure. At its core was the **subprime mortgage bubble**, where lenders issued high-interest loans to borrowers with poor credit histories. These loans were often structured with \"teaser\" rates that later reset to unaffordable levels.\n\nFinancial institutions bundled these risky mortgages into complex **mortgage-backed securities (MBS)** and **collateralized debt obligations (CDOs)**. Credit rating agencies frequently assigned these products \"AAA\" ratings, misleading investors into believing they were safe assets. This created a massive demand for high-yield debt, fueled by a period of historically low interest rates and excessive liquidity.\n\nThe crisis was exacerbated by **excessive leverage** and the proliferation of **credit default swaps (CDS)**\u2014insurance products against default that lacked adequate oversight. When housing prices peaked and began to decline in 2006\u20132007, mass defaults triggered a liquidity crunch. Because these toxic assets were interconnected across the global banking system, the collapse of major firms like Lehman Brothers sparked a systemic panic, leading to a severe global recession.",
+    "elapsed_s": 8.3,
+    "completion_tokens": 238,
+    "tokens_per_sec": 28.7,
+    "quality_total": 9.8,
+    "quality_scores": {
+      "accuracy": 10,
+      "completeness": 10,
+      "clarity": 10,
+      "depth": 9,
+      "relevance": 10
+    }
+  },
+  {
+    "label": "gemma-12b",
+    "model": "gemma-12b",
+    "task": "Write a short story opening (150 words) about a lighthouse keeper who finds a message in a bottle.",
+    "response": "The salt spray had crusted into a white rind on the lantern room glass, blurring the horizon into a smudge of charcoal and slate. Elias wiped a streak clear with a calloused palm, his breath hitching in the rhythmic pulse of the rotating beam. Below, the Atlantic churned like a boiling cauldron, hungry and indifferent.\n\nHe descended the spiral stairs, his knees popping in the silence of the stone tower. On the shoreline, the tide had retreated, leaving behind a graveyard of kelp and driftwood. There, wedged between two jagged teeth of granite, sat a glint of amber glass.\n\nHe retrieved it, the bottle heavy and cold as a drowned man\u2019s heart. He pried the wax seal\u2014a jagged, crimson thumbprint\u2014and pulled the parchment from within. The ink was faded, but the handwriting was unmistakable: his own, dated twenty years before he had ever stepped foot on this rock.",
+    "elapsed_s": 6.71,
+    "completion_tokens": 189,
+    "tokens_per_sec": 28.2,
+    "quality_total": 9.8,
+    "quality_scores": {
+      "accuracy": 10,
+      "completeness": 10,
+      "clarity": 10,
+      "depth": 9,
+      "relevance": 10
+    }
+  },
+  {
+    "label": "gemma-12b",
+    "model": "gemma-12b",
+    "task": "What's the best way to identify a ripe avocado?",
+    "response": "To identify a ripe avocado with precision, you must evaluate three primary physical indicators: tactile firmness, visual color, and the stem test. Because avocados vary by variety (e.g., Hass vs. Fuerte), these signs should be used in combination rather than in isolation.\n\n### 1. The Tactile Test (Pressure)\nThis is the most reliable method for determining internal texture.\n*   **The Technique:** Hold the avocado in the palm of your hand and apply gentle, even pressure with your fingers across the middle of the fruit.\n*   **The Indicators:**\n    *   **Underripe:** The fruit feels hard and resists pressure, similar to a firm pear or a baseball.\n    *   **Ripe:** The fruit yields slightly to pressure but maintains its shape. It should feel like a soft ball or a ripe mango.\n    *   **Overripe:** The fruit feels mushy or \"gives\" significantly under very light pressure, indicating the interior may be bruised or brown.\n\n### 2. Visual Inspection (Color and Skin Texture)\nWhile color varies by variety, general trends provide a baseline.\n*   **Hass Avocados (Most common):** These transition from dark green to a deep, pebbly purple or black. A dark, matte finish usually indicates ripeness.\n*   **Fuerte/Reed Avocados:** These have smooth skin and remain green even when ripe. For these, look for a slight deepening of the green hue and a slight \"give\" in the skin.\n*   **Surface Texture:** Avoid avocados with large indentations, soft spots, or visible bruising on the skin, as these indicate internal decay.\n\n### 3. The Stem Test (The \"Final Check\")\nThis method confirms the ripeness of the fruit's core.\n*   **The Technique:** Gently flick or pull the small stem (pedicel) at the top of the avocado.\n*   **The Indicators:**\n    *   **Stays Firmly Attached:** The avocado is likely not ready.\n    *   **Pops Off Easily:** The avocado is likely ripe.\n    *   **Pops Off and is Brown Underneath:** The avocado is overripe.\n    *   **Pops Off and is Green Underneath:** The avocado is perfectly ripe.\n\n### Summary Matrix for Quick Identification\n\n| State | Tactile Feel | Skin Color (Hass) | Stem Test |\n| :--- | :--- | :--- | :--- |\n| **Underripe** | Hard / Firm | Bright Green | Firmly attached |\n| **Ripe** | Soft / Yielding | Dark Purple/Black | Pops off; Green underneath |\n| **Overripe** | Mushy | Dark Purple/Black | Pops off; Brown underneath |\n\n**Analytical Tip:** If you find an avocado that is slightly firm but has a dark skin, place it in a brown paper bag at room temperature for 1\u20132 days. This accelerates the ripening process by trapping ethylene gas.",
+    "elapsed_s": 21.75,
+    "completion_tokens": 627,
+    "tokens_per_sec": 28.8,
+    "quality_total": 9.8,
+    "quality_scores": {
+      "accuracy": 10,
+      "completeness": 10,
+      "clarity": 10,
+      "depth": 9,
+      "relevance": 10
+    }
+  },
+  {
+    "label": "gemma-12b",
+    "model": "gemma-12b",
+    "task": "Explain how a Bloom filter works and when to use one.",
+    "response": "### Overview\nA Bloom filter is a space-efficient, probabilistic data structure used to determine whether an element is a member of a set. It is designed to provide high-speed lookups while consuming significantly less memory than a hash table or a set.\n\nThe fundamental trade-off of a Bloom filter is **false positives**: the filter may claim an element is in the set when it is not, but it will never claim an element is *not* in the set when it actually is (zero false negatives).\n\n---\n\n### How It Works: Mechanics and Architecture\n\nA Bloom filter consists of two primary components:\n1.  **A Bit Array:** A large array of $m$ bits, all initially set to 0.\n2.  **Hash Functions:** A set of $k$ different independent hash functions. Each function must map an input to one of the $m$ positions in the bit array with a uniform distribution.\n\n#### The Operations\n*   **Insertion:** To add an element (e.g., a URL or a username) to the filter, the system passes the element through all $k$ hash functions. Each function produces an index. The bits at all resulting indices in the bit array are set to 1.\n*   **Querying:** To check if an element exists, the system passes it through the same $k$ hash functions. \n    *   If **any** of the bits at the resulting indices are 0, the element is **definitely not** in the set.\n    *   If **all** of the bits are 1, the element is **possibly** in the set. This is where the false positive occurs: multiple different elements may have mapped to the same set of bits over time.\n\n#### Mathematical Constraints\nThe accuracy of a Bloom filter depends on three variables:\n1.  **$m$ (Size of bit array):** Larger arrays reduce the probability of collisions.\n2.  **$k$ (Number of hash functions):** Too few functions increase collisions; too many functions fill the array too quickly.\n3.  **$n$ (Number of elements inserted):** As more elements are added, the density of 1s increases, raising the false positive rate.\n\n---\n\n### When to Use a Bloom Filter\n\nBloom filters are ideal for scenarios where **memory is constrained** and **false positives are acceptable**, but **false negatives are catastrophic.**\n\n#### 1. Database Query Optimization (LSM-Trees)\nIn distributed databases (like Cassandra or Google BigTable), Bloom filters are used to prevent unnecessary disk I/O. Before searching a data file on a slow disk, the system checks the Bloom filter in memory. If the filter says \"no,\" the system skips the disk read entirely. If it says \"yes,\" the system proceeds to check the disk.\n\n#### 2. Web Caching and CDNs\nContent Delivery Networks (CDNs) use Bloom filters to manage \"negative caching.\" If a user requests a URL that does not exist, the system can store that \"404\" result in a Bloom filter. Subsequent requests for that non-existent URL are rejected instantly without querying the origin server.\n\n#### 3. Malicious URL Filtering\nBrowsers and email clients use Bloom filters to check if a URL is on a massive \"blacklist\" of malicious sites. Because the blacklist is too large to store in the browser's local memory, the Bloom filter provides a fast first pass. If the filter flags a URL, the browser then performs a more intensive check against a remote server.\n\n#### 4. Reducing \"Cache Misses\"\nIn large-scale distributed systems, Bloom filters can be used to determine if a key exists in a remote cache. This prevents \"cache penetration,\" where a request for a non-existent key travels through multiple layers of the infrastructure, wasting bandwidth and CPU.\n\n---\n\n### When NOT to Use a Bloom Filter\n*   **When you need to delete items:** Standard Bloom filters do not support deletions because setting a bit to 0 might remove other elements that share that bit. (Note: *Counting Bloom Filters* exist to solve this, but they require more memory).\n*   **When you need to retrieve the actual data:** A Bloom filter only tells you if an item *might* exist; it does not store the item itself.\n*   **When zero false positives are required:** If your application cannot tolerate even a 0.1% chance of a false positive, a standard Hash Set or a B-Tree is required.",
+    "elapsed_s": 33.13,
+    "completion_tokens": 945,
+    "tokens_per_sec": 28.5,
+    "quality_total": 9.8,
+    "quality_scores": {
+      "accuracy": 10,
+      "completeness": 10,
+      "clarity": 10,
+      "depth": 9,
+      "relevance": 10
+    }
+  },
+  {
+    "label": "gemma-12b",
+    "model": "gemma-12b",
+    "task": "Write a SQL query to find the second-highest salary in an employees table.",
+    "response": "To find the second-highest salary from an `employees` table, you can use several different approaches depending on the specific SQL dialect (e.g., MySQL, PostgreSQL, SQL Server) and how you wish to handle duplicate salaries.\n\n### Option 1: Using `OFFSET` and `LIMIT` (MySQL, PostgreSQL, SQLite)\nThis is the most common and readable approach. It sorts the unique salaries in descending order and skips the first one.\n\n```sql\nSELECT DISTINCT salary \nFROM employees \nORDER BY salary DESC \nLIMIT 1 OFFSET 1;\n```\n\n### Option 2: Using a Subquery (Standard SQL)\nThis approach is highly portable and works across almost all relational databases. It finds the maximum salary that is strictly less than the overall maximum salary.\n\n```sql\nSELECT MAX(salary) AS SecondHighestSalary\nFROM employees\nWHERE salary < (SELECT MAX(salary) FROM employees);\n```\n\n### Option 3: Using `DENSE_RANK()` (SQL Server, Oracle, PostgreSQL)\nThis is the most robust method for production environments. It correctly handles cases where multiple employees share the same top salary and ensures you get the actual second-highest value.\n\n```sql\nWITH SalaryRanking AS (\n    SELECT salary, \n           DENSE_RANK() OVER (ORDER BY salary DESC) as rank_num\n    FROM employees\n)\nSELECT salary \nFROM SalaryRanking \nWHERE rank_num = 2\nLIMIT 1;\n```\n*(Note: In SQL Server, replace `LIMIT 1` with `TOP 1` at the start of the SELECT statement).*\n\n### Analytical Considerations:\n1.  **Duplicates:** Using `DISTINCT` or `DENSE_RANK()` is critical. If two employees earn the highest salary (e.g., \\$100k, \\$100k, \\$90k), a simple `LIMIT 1 OFFSET 1` might return \\$100k instead of \\$90k.\n2.  **Null Handling:** If there is only one record in the table, the subquery method (Option 2) will correctly return `NULL`, whereas the `LIMIT` method (Option 1) might return an empty result set.\n3.  **Performance:** For large datasets, ensure there is an index on the `salary` column to optimize the sorting and filtering operations.",
+    "elapsed_s": 17.53,
+    "completion_tokens": 502,
+    "tokens_per_sec": 28.6,
+    "quality_total": 9.8,
+    "quality_scores": {
+      "accuracy": 10,
+      "completeness": 10,
+      "clarity": 10,
+      "depth": 9,
+      "relevance": 10
+    }
+  },
+  {
+    "label": "gemma-12b",
+    "model": "gemma-12b",
+    "task": "Compare REST and GraphQL for a mobile app backend.",
+    "response": "To determine the optimal backend architecture for a mobile application, one must evaluate REST and GraphQL based on network efficiency, developer experience, and scalability. Mobile environments impose unique constraints\u2014specifically limited bandwidth, high latency, and the need for rapid UI iteration.\n\nThe following analysis compares the two architectures across five critical dimensions.\n\n### 1. Data Fetching Efficiency\n*   **REST (Over-fetching and Under-fetching):** REST endpoints return a fixed data structure. If a mobile screen only requires a user\u2019s \"Username,\" but the `/user` endpoint returns 50 fields, the app suffers from **over-fetching**, wasting bandwidth. Conversely, if a screen requires \"User Info\" and \"Recent Posts,\" it may require two separate requests (**under-fetching**), increasing latency.\n*   **GraphQL (Precise Fetching):** GraphQL allows the mobile client to request exactly the fields it needs in a single request. This is highly advantageous for mobile apps where minimizing payload size directly improves performance on 3G/4G networks.\n\n### 2. Network Latency and Round Trips\n*   **REST:** Because REST is resource-oriented, complex views often require multiple sequential requests (e.g., Fetch Profile $\\rightarrow$ Fetch Friends $\\rightarrow$ Fetch Posts). Each request incurs the overhead of a TCP/TLS handshake (unless persistent connections are perfectly managed).\n*   **GraphQL:** By aggregating multiple resources into a single query, GraphQL reduces the number of round trips. For mobile users on high-latency networks, reducing the number of requests is often more impactful than reducing the size of a single request.\n\n### 3. Development Velocity and Versioning\n*   **REST:** Versioning is typically handled via the URL (e.g., `/v1/`, `/v2/`). As the mobile app evolves, backend teams must maintain multiple versions of endpoints to avoid breaking older app builds. This can lead to \"endpoint bloat.\"\n*   **GraphQL:** GraphQL is versionless. You can add new fields to the schema without affecting existing queries. Deprecation is handled at the field level. This allows the mobile team to iterate on the UI independently of the backend team, provided the schema is well-documented.\n\n### 4. Caching and Infrastructure\n*   **REST:** Leverages standard HTTP caching mechanisms (ETags, Cache-Control). Because each URL is a unique resource, CDNs and browser caches can easily store and serve responses. This makes REST superior for content that is frequently accessed but rarely changed (e.g., a news feed or public product catalog).\n*   **GraphQL:** Since most queries are sent via `POST` to a single `/graphql` endpoint, standard HTTP caching is ineffective. Caching must be handled on the client side (e.g., Apollo Client, Relay) or via complex persisted queries. This adds architectural complexity to the mobile frontend.\n\n### 5. Error Handling and Type Safety\n*   **REST:** Uses standard HTTP status codes (200, 404, 500). Errors are often handled globally or via custom bodies.\n*   **GraphQL:** Usually returns a `200 OK` status even if the query contains errors, with a detailed `errors` array in the JSON body. While this provides granular feedback, it requires the mobile team to implement robust logic to parse and handle partial successes (where some data loads but other parts fail). However, GraphQL\u2019s **strongly typed schema** provides excellent \"IntelliSense\" and compile-time safety for mobile developers.\n\n---\n\n### Summary Comparison Table\n\n| Feature | REST | GraphQL |\n| :--- | :--- | :--- |\n| **Data Fetching** | Fixed (Over/Under-fetching) | Flexible (Precise) |\n| **Network Requests** | Multiple per view (usually) | Single per view (usually) |\n| **Caching** | Native HTTP Caching | Client-side / Persisted Queries |\n| **Versioning** | URL-based (v1, v2) | Versionless (Field Deprecation) |\n| **Learning Curve** | Low (Standardized) | High (Schema/Query Language) |\n| **Best Use Case** | Simple CRUD, Public APIs, High Cacheability | Complex UIs, Rapid Iteration, Diverse Devices |\n\n### Final Recommendation\n\n**Choose REST if:**\n*   Your mobile app is relatively simple with predictable data requirements.\n*   You rely heavily on CDN caching for performance.\n*   Your team is already proficient with REST and needs to ship a Minimum Viable Product (MVP) quickly.\n\n**Choose GraphQL if:**\n*   Your mobile app has complex, nested data requirements (e.g., Social Media, E-commerce).\n*   You need to support multiple different screen layouts from a single backend.\n*   You want to minimize mobile data usage by eliminating over-fetching.\n*   You have",
+    "elapsed_s": 35.74,
+    "completion_tokens": 1024,
+    "tokens_per_sec": 28.7,
+    "quality_total": 9.6,
+    "quality_scores": {
+      "accuracy": 10,
+      "completeness": 9,
+      "clarity": 10,
+      "depth": 9,
+      "relevance": 10
+    }
+  },
+  {
+    "label": "gemma-12b",
+    "model": "gemma-12b",
+    "task": "Explain photosynthesis to a 10-year-old.",
+    "response": "Think of photosynthesis as the way plants \"cook\" their own food. Since plants can\u2019t go to a grocery store or a restaurant, they have to make their own meals using ingredients from the world around them.\n\nTo understand how this works, you can think of a plant as a tiny, solar-powered factory. Here is how the factory operates:\n\n### 1. The Ingredients\nTo make their food, plants need three main things:\n*   **Sunlight:** This is the energy source (like the electricity for the factory).\n*   **Water:** Plants soak this up from the ground through their roots.\n*   **Carbon Dioxide (CO2):** This is a gas in the air that humans breathe out. Plants \"breathe\" it in through tiny holes in their leaves.\n\n### 2. The Kitchen (Chloroplasts)\nInside the plant's leaves are millions of tiny \"kitchens\" called **chloroplasts**. These are filled with a green pigment called **chlorophyll**. \n*   **Chlorophyll** is what makes plants green. \n*   Its job is to act like a solar panel, catching the sunlight and turning it into power the plant can use to mix its ingredients.\n\n### 3. The Cooking Process\nOnce the plant has the energy from the sun, it uses that power to break apart the water and carbon dioxide molecules. It then rearranges them into something new: **Glucose.**\n\n**Glucose** is a type of sugar. It is the plant's \"food.\" It gives the plant the energy it needs to grow taller, sprout new leaves, and produce flowers or fruit.\n\n### 4. The Leftovers (Oxygen)\nJust like when you cook dinner and there might be some steam or scraps left over, photosynthesis creates a byproduct. When the plant finishes making its sugar, it releases **Oxygen** back into the air.\n\nThis is why photosynthesis is so important for us: **Plants take in the gas we don't need (carbon dioxide) and give out the gas we do need to survive (oxygen).**\n\n***\n\n### Summary Equation\nIf you were to write this out like a math problem, it would look like this:\n\n**Sunlight + Water + Carbon Dioxide $\\rightarrow$ Glucose (Food) + Oxygen**",
+    "elapsed_s": 16.56,
+    "completion_tokens": 478,
+    "tokens_per_sec": 28.9,
+    "quality_total": 9.6,
+    "quality_scores": {
+      "accuracy": 10,
+      "completeness": 10,
+      "clarity": 10,
+      "depth": 8,
+      "relevance": 10
+    }
+  },
+  {
+    "label": "gemma-12b",
+    "model": "gemma-12b",
+    "task": "Draft a polite email declining a meeting invite due to a scheduling conflict.",
+    "response": "Subject: Meeting Invitation: [Meeting Name] - [Your Name]\n\nDear [Organizer Name],\n\nThank you very much for the invitation to meet on [Date] at [Time] to discuss [Topic].\n\nUnfortunately, I am unable to attend due to a prior scheduling conflict. I apologize for any inconvenience my absence may cause.\n\n[Optional: Choose one of the following based on your preference]\n\n*   **If you want to reschedule:** I am very interested in this discussion. Would it be possible to reschedule for [Date] at [Time] or [Date] at [Time]? Please let me know if either of those windows works for you.\n*   **If you want someone else to attend:** While I cannot join, [Colleague's Name] will be attending in my place and can provide updates on my behalf.\n*   **If you want to review the notes:** Please feel free to proceed without me. I would appreciate it if you could share any meeting minutes or action items afterward so I can stay informed.\n\nThank you for your understanding.\n\nBest regards,\n\n[Your Name]\n[Your Title]",
+    "elapsed_s": 8.34,
+    "completion_tokens": 236,
+    "tokens_per_sec": 28.3,
+    "quality_total": 9.4,
+    "quality_scores": {
+      "accuracy": 10,
+      "completeness": 10,
+      "clarity": 10,
+      "depth": 7,
+      "relevance": 10
+    }
+  },
+  {
+    "label": "gemma-26b",
+    "model": "gemma-26b",
+    "task": "Write a Python function to check if a number is prime, with tests.",
+    "response": "```python\nimport math\n\ndef is_prime(n: int) -> bool:\n    \"\"\"\n    Determines if an integer is a prime number.\n    \n    Args:\n        n: The integer to check.\n        \n    Returns:\n        True if n is prime, False otherwise.\n    \"\"\"\n    if n <= 1:\n        return False\n    if n <= 3:\n        return True\n    if n % 2 == 0 or n % 3 == 0:\n        return False\n    \n    # Optimization: All primes greater than 3 are of the form 6k \u00b1 1.\n    # We only need to check up to the square root of n.\n    limit = int(math.isqrt(n))\n    for i in range(5, limit + 1, 6):\n        if n % i == 0 or n % (i + 2) == 0:\n            return False\n            \n    return True\n\ndef run_tests():\n    \"\"\"\n    Test suite for the is_prime function.\n    \"\"\"\n    test_cases = [\n        # (input, expected_output)\n        (-5, False),\n        (0, False),\n        (1, False),\n        (2, True),\n        (3, True),\n        (4, False),\n        (5, True),\n        (9, False),\n        (11, True),\n        (13, True),\n        (15, False),\n        (17, True),\n        (25, False),\n        (29, True),\n        (97, True),\n        (100, False),\n        (101, True),\n        (7919, True),  # The 1000th prime\n        (7920, False),\n    ]\n\n    passed = 0\n    for i, (val, expected) in enumerate(test_cases):\n        result = is_prime(val)\n        if result == expected:\n            passed += 1\n        else:\n            print(f\"Test Case {i} Failed: Input {val}, Expected {expected}, Got {result}\")\n\n    print(f\"Tests Completed: {passed}/{len(test_cases)} passed.\")\n    assert passed == len(test_cases), \"Test suite failed!\"\n\nif __name__ == \"__main__\":\n    run_tests()\n```",
+    "elapsed_s": 9.84,
+    "completion_tokens": 549,
+    "tokens_per_sec": 55.8,
+    "quality_total": 9.8,
+    "quality_scores": {
+      "accuracy": 10,
+      "completeness": 10,
+      "clarity": 10,
+      "depth": 9,
+      "relevance": 10
+    }
+  },
+  {
+    "label": "gemma-26b",
+    "model": "gemma-26b",
+    "task": "Explain the difference between TCP and UDP in simple terms.",
+    "response": "To understand the difference between TCP and UDP, think of them as two different ways of sending information over the internet: **one is like a registered letter, and the other is like a megaphone.**\n\n### 1. TCP (Transmission Control Protocol)\n**The \"Reliable\" Method**\n\nTCP is designed for accuracy and order. Before any data is sent, TCP establishes a formal connection between the sender and the receiver (a \"handshake\"). It ensures that every piece of data arrives exactly as it was sent.\n\n*   **How it works:** If a piece of data gets lost in transit, TCP notices it is missing and asks the sender to resend it. It also puts the data back in the correct order if it arrives scrambled.\n*   **The Trade-off:** Because it spends time checking for errors and confirming receipt, it is slightly slower than UDP.\n*   **Best for:** Things where accuracy is non-negotiable.\n    *   **Web Browsing (HTTP/HTTPS):** You don't want half a webpage or a broken image.\n    *   **Email (SMTP):** You need the entire message to arrive intact.\n    *   **File Transfers (FTP):** A single missing bit can corrupt an entire file.\n\n### 2. UDP (User Datagram Protocol)\n**The \"Fast\" Method**\n\nUDP is designed for speed. It doesn't establish a formal connection or check to see if the receiver is ready. It simply \"blasts\" the data toward the destination.\n\n*   **How it works:** It sends data packets one after another without checking if they actually arrived. If a packet is lost or arrives out of order, UDP doesn't care; it just keeps moving to the next one.\n*   **The Trade-off:** It is much faster because there is no \"paperwork\" involved, but it is unreliable. You might lose some data along the way.\n*   **Best for:** Things where speed is more important than perfect accuracy.\n    *   **Live Video Streaming:** If a single frame is lost, the video might glitch for a millisecond, but you\u2019d rather see the live stream continue than have the video freeze while it waits for a missing frame.\n    *   **Online Gaming:** In a fast-paced shooter, you need to know where your opponent is *right now*. If a packet containing their position from half a second ago is lost, it's useless anyway.\n    *   **VoIP (Voice over IP):** In a phone call, a tiny bit of static is better than a long delay in the conversation.\n\n---\n\n### Summary Comparison\n\n| Feature | TCP | UDP |\n| :--- | :--- | :--- |\n| **Analogy** | A Registered Letter | A Megaphone |\n| **Priority** | Reliability & Accuracy | Speed & Efficiency |\n| **Connection** | Establishes a connection first | Just sends the data |\n| **Error Checking** | Yes (Resends lost data) | No (Ignores lost data) |\n| **Order** | Guarantees data arrives in order | Data can arrive out of order |\n| **Speed** | Slower (due to overhead) | Faster (minimal overhead) |",
+    "elapsed_s": 10.25,
+    "completion_tokens": 686,
+    "tokens_per_sec": 66.9,
+    "quality_total": 9.6,
+    "quality_scores": {
+      "accuracy": 10,
+      "completeness": 10,
+      "clarity": 10,
+      "depth": 8,
+      "relevance": 10
+    }
+  },
+  {
+    "label": "gemma-26b",
+    "model": "gemma-26b",
+    "task": "Summarize the causes of the 2008 financial crisis in 200 words.",
+    "response": "The 2008 financial crisis was driven by a convergence of systemic failures in the housing and financial sectors. A primary catalyst was the **housing bubble**, fueled by low interest rates and predatory lending practices. Lenders issued high-risk **subprime mortgages** to borrowers with poor credit, often utilizing adjustable-rate structures that became unaffordable when interest rates rose.\n\nThese risky loans were bundled into **mortgage-backed securities (MBS)** and **collateralized debt obligations (CDOs)**. Financial institutions sold these complex derivatives globally, spreading risk throughout the international banking system. Credit rating agencies exacerbated the issue by assigning high ratings to these toxic assets, masking their true risk levels.\n\nThe crisis was intensified by **excessive leverage** and a lack of transparency. Investment banks held massive amounts of debt relative to their capital, leaving them vulnerable to even minor market fluctuations. When housing prices plummeted and defaults surged, the value of MBS and CDOs collapsed. This triggered a liquidity crisis, as banks lost trust in one another\u2019s solvency, leading to the failure or bailout of major institutions like Lehman Brothers and AIG, ultimately precipitating a global recession.",
+    "elapsed_s": 3.62,
+    "completion_tokens": 236,
+    "tokens_per_sec": 65.1,
+    "quality_total": 9.8,
+    "quality_scores": {
+      "accuracy": 10,
+      "completeness": 10,
+      "clarity": 10,
+      "depth": 9,
+      "relevance": 10
+    }
+  },
+  {
+    "label": "gemma-26b",
+    "model": "gemma-26b",
+    "task": "Write a short story opening (150 words) about a lighthouse keeper who finds a message in a bottle.",
+    "response": "The salt spray had become Elias\u2019s only constant, a rhythmic stinging that matched the pulse of the Atlantic. At seventy, his skin was a map of brine and wind, much like the jagged coastline he was sworn to guard. The storm had passed, leaving behind a bruised purple sky and a shoreline littered with the ocean\u2019s debris.\n\nAmong the tangled kelp and shattered driftwood, a flash of green glass caught the morning light. It wasn't a shard, but a vessel\u2014a heavy, cobalt-tinted bottle, sealed with thick, black wax. \n\nHis hands, gnarled by decades of hauling oil and polishing lenses, trembled as he pried the cork loose. He expected a map or a plea for rescue, the clich\u00e9s of a lonely life. Instead, the parchment inside was bone-dry and bore a single line in his own handwriting: *The light is failing, Elias. Look behind you.*",
+    "elapsed_s": 2.97,
+    "completion_tokens": 190,
+    "tokens_per_sec": 63.9,
+    "quality_total": 9.8,
+    "quality_scores": {
+      "accuracy": 10,
+      "completeness": 10,
+      "clarity": 10,
+      "depth": 9,
+      "relevance": 10
+    }
+  },
+  {
+    "label": "gemma-26b",
+    "model": "gemma-26b",
+    "task": "What's the best way to identify a ripe avocado?",
+    "response": "The most reliable way to identify a ripe avocado is through a combination of tactile feedback and visual inspection. Because avocados vary by variety (Hass vs. others), you must use different criteria depending on the type.\n\n### 1. The \"Squeeze Test\" (Most Reliable)\nThe most effective method is to gently apply pressure to the fruit in the palm of your hand.\n*   **The Test:** Do not use your fingertips (which can bruise the flesh); instead, place the avocado in the palm of your hand and squeeze gently with your fingers.\n*   **Unripe:** It feels hard, like a rock or a potato.\n*   **Ripe:** It yields to gentle pressure, feeling similar to the firmness of your palm or a ripe peach.\n*   **Overripe:** It feels mushy or has \"give\" that feels hollow or uneven.\n\n### 2. Visual Indicators (Variety Dependent)\nVisual cues depend entirely on the skin color and texture of the specific variety you are buying.\n\n*   **Hass Avocados (Most common):** These have a thick, pebbly skin.\n    *   **Unripe:** Bright green.\n    *   **Ripe:** Dark green to almost black.\n    *   **Overripe:** Very dark/black and may show soft spots or shriveled skin.\n*   **Other Varieties (e.g., Florida/Green skin):** These often have smooth, thin skin.\n    *   **Note:** Unlike Hass, these varieties often **do not change color** significantly as they ripen. For these, you must rely almost exclusively on the **Squeeze Test**.\n\n### 3. The Stem Test (The \"Quick Check\")\nIf you are unsure about the color, you can check the stem (the small nub at the top of the fruit).\n*   **How to do it:** Gently flick off the small brown stem at the top of the avocado.\n*   **Green underneath:** If the flesh under the stem is bright green, the avocado is ripe and ready to eat.\n*   **Brown underneath:** If the flesh is brown, the avocado is likely overripe and may have internal bruising or rot.\n*   **Hard to remove:** If the stem won't budge, the avocado is still unripe.\n\n### Summary Cheat Sheet\n| State | Feel | Color (Hass) | Stem Color |\n| :--- | :--- | :--- | :--- |\n| **Unripe** | Hard/Firm | Bright Green | N/A |\n| **Perfectly Ripe** | Gentle Yield | Dark Green/Black | Bright Green |\n| **Overripe** | Mushy | Very Dark/Black | Brown |\n\n**Pro Tip:** If you have an unripe avocado, place it in a paper bag with a banana or an apple to speed up the ripening process through ethylene gas exposure.",
+    "elapsed_s": 9.06,
+    "completion_tokens": 606,
+    "tokens_per_sec": 66.9,
+    "quality_total": 9.8,
+    "quality_scores": {
+      "accuracy": 10,
+      "completeness": 10,
+      "clarity": 10,
+      "depth": 9,
+      "relevance": 10
+    }
+  },
+  {
+    "label": "gemma-26b",
+    "model": "gemma-26b",
+    "task": "Explain how a Bloom filter works and when to use one.",
+    "response": "### Overview\nA Bloom filter is a space-efficient, probabilistic data structure used to test whether an element is a member of a set. It is designed to provide high-speed membership queries with a very low memory footprint, at the cost of a small, controllable probability of **false positives**.\n\nIt is important to note that Bloom filters **never** produce false negatives. If the filter says an element is not in the set, it is definitely not in the set. If it says an element is in the set, it *might* be in the set.\n\n---\n\n### How It Works\n\n#### 1. The Components\nA Bloom filter consists of two primary components:\n*   **A Bit Array:** A large array of $m$ bits, all initially set to `0`.\n*   **Hash Functions:** A set of $k$ different hash functions. Each function must map an input element to one of the $m$ array positions with uniform distribution.\n\n#### 2. The Insertion Process\nTo add an element to the filter:\n1.  Pass the element through each of the $k$ hash functions.\n2.  Each hash function produces an index corresponding to a position in the bit array.\n3.  Set the bits at all resulting indices to `1`.\n\n#### 3. The Query Process (Membership Test)\nTo check if an element is in the set:\n1.  Pass the element through the same $k$ hash functions to get $k$ indices.\n2.  Check the bits at those indices in the array.\n3.  **If any of the bits are `0`**, the element is **definitely not** in the set.\n4.  **If all bits are `1`**, the element is **likely** in the set (subject to the false positive rate).\n\n#### 4. Why False Positives Occur\nAs more elements are added to the filter, more bits are flipped from `0` to `1`. Eventually, a query for an element that was *never* added might happen to map to a set of indices that were all flipped to `1` by a combination of other elements. This is a false positive.\n\n---\n\n### Mathematical Trade-offs\nThe performance and accuracy of a Bloom filter are governed by three variables:\n*   $m$: Number of bits in the array.\n*   $n$: Number of elements expected to be inserted.\n*   $k$: Number of hash functions.\n\n**Key Relationships:**\n*   **To decrease false positives:** Increase $m$ (more memory) or optimize $k$.\n*   **The optimal $k$:** To minimize false positives for a given $m$ and $n$, the optimal number of hash functions is approximately $k = \\frac{m}{n} \\ln 2$.\n*   **Saturation:** As $n$ (elements) increases, the density of `1`s in the array increases. Once the array is mostly `1`s, the filter becomes useless as every query will return \"true.\"\n\n---\n\n### When to Use a Bloom Filter\n\nBloom filters are ideal when **memory is a constraint** and you can tolerate **occasional false positives** to avoid expensive operations.\n\n#### 1. Reducing Expensive Disk/Network Lookups\nThis is the most common use case. Before performing a slow operation (like a database query or a disk read), check the Bloom filter.\n*   **Example:** A web cache. If a requested URL is not in the Bloom filter, the system knows immediately it isn't in the cache and can skip the database lookup entirely.\n\n#### 2. Preventing \"One-Hit Wonders\" in Caching\nTo prevent a cache from being flooded with items that are only requested once, you can use a Bloom filter to track which items have been seen before. Only items that pass the Bloom filter test are allowed into the actual cache.\n\n#### 3. Malicious URL/IP Filtering\nBrowsers use Bloom filters to check if a URL is on a list of known malicious sites.\n*   **Why:** Storing millions of malicious URLs in memory is impossible. A Bloom filter allows the browser to check a URL locally with minimal memory. If it's a \"maybe,\" the browser then performs a real-time check against a remote server.\n\n#### 4. Database Optimizations (LSM Trees)\nModern databases like Apache Cassandra and Google Bigtable use Bloom filters to avoid scanning multiple files on disk (SSTables) to find a specific key. If the Bloom filter says the key isn't in a file, the database skips that file entirely.\n\n### Summary Table\n\n| Feature | Bloom Filter Capability |\n| :--- | :--- |\n| **False Negatives** | Impossible (0% rate) |\n| **False Positives** | Possible (Controllable) |\n|",
+    "elapsed_s": 15.34,
+    "completion_tokens": 1024,
+    "tokens_per_sec": 66.7,
+    "quality_total": 9.8,
+    "quality_scores": {
+      "accuracy": 10,
+      "completeness": 10,
+      "clarity": 10,
+      "depth": 9,
+      "relevance": 10
+    }
+  },
+  {
+    "label": "gemma-26b",
+    "model": "gemma-26b",
+    "task": "Write a SQL query to find the second-highest salary in an employees table.",
+    "response": "To find the second-highest salary, you must account for two critical factors:\n1.  **Duplicates:** If multiple employees share the highest salary, the query must skip all instances of that value to find the actual second-highest value.\n2.  **Null/Existence Handling:** If there is no second-highest salary (e.g., the table has only one unique salary), the query should return `NULL`.\n\nHere are the two most efficient ways to achieve this.\n\n### Option 1: Using `OFFSET` (Most Readable)\nThis is the standard approach for most modern SQL dialects (PostgreSQL, MySQL, SQLite).\n\n```sql\nSELECT (\n    SELECT DISTINCT salary\n    FROM employees\n    ORDER BY salary DESC\n    LIMIT 1 OFFSET 1\n) AS second_highest_salary;\n```\n\n**Analysis:**\n*   `DISTINCT`: Ensures that if the top salary is repeated (e.g., 100, 100, 90), we treat the first \"100\" as the highest and \"90\" as the second highest.\n*   `ORDER BY salary DESC`: Sorts salaries from highest to lowest.\n*   `LIMIT 1 OFFSET 1`: Skips the first row (highest) and returns the next single row (second highest).\n*   **Outer `SELECT`**: Wrapping the query in a subquery ensures that if `OFFSET 1` finds no rows, the result is a single `NULL` value rather than an empty result set.\n\n---\n\n### Option 2: Using `DENSE_RANK()` (Best for Complex Requirements)\nIf you need to handle ties or want to find the $N^{th}$ highest salary easily, Window Functions are the most robust method. This works in SQL Server, PostgreSQL, Oracle, and modern versions of MySQL.\n\n```sql\nSELECT MAX(salary) AS second_highest_salary\nFROM (\n    SELECT salary, \n           DENSE_RANK() OVER (ORDER BY salary DESC) as salary_rank\n    FROM employees\n) AS ranked_salaries\nWHERE salary_rank = 2;\n```\n\n**Analysis:**\n*   `DENSE_RANK()`: Unlike `RANK()`, `DENSE_RANK()` does not skip numbers when there are ties. If salaries are `100, 100, 90`, `DENSE_RANK` assigns `1, 1, 2`. This ensures \"90\" is correctly identified as rank 2.\n*   `MAX(salary)`: This handles the \"empty set\" requirement. If no row exists with rank 2, `MAX()` will return `NULL`.\n\n### Summary Recommendation\n*   Use **Option 1** for simple, quick queries in MySQL or PostgreSQL.\n*   Use **Option 2** if you are working in an enterprise environment (SQL Server/Oracle) or if you might need to change the logic to find the 3rd, 4th, or $N^{th}$ highest salary.",
+    "elapsed_s": 9.58,
+    "completion_tokens": 644,
+    "tokens_per_sec": 67.2,
+    "quality_total": 9.8,
+    "quality_scores": {
+      "accuracy": 10,
+      "completeness": 10,
+      "clarity": 10,
+      "depth": 9,
+      "relevance": 10
+    }
+  },
+  {
+    "label": "gemma-26b",
+    "model": "gemma-26b",
+    "task": "Compare REST and GraphQL for a mobile app backend.",
+    "response": "When choosing between REST and GraphQL for a mobile app backend, the decision hinges on the trade-off between **simplicity/standardization (REST)** and **efficiency/flexibility (GraphQL)**. Mobile environments introduce specific constraints\u2014namely variable network latency, limited data plans, and battery life\u2014which heavily influence this comparison.\n\n### 1. Data Fetching Efficiency\nThe most significant differentiator for mobile development is how data is retrieved.\n\n*   **REST (Over-fetching & Under-fetching):**\n    *   **Over-fetching:** A mobile client often needs only a user's `username` and `avatar_url`, but a REST endpoint `/users/123` might return a massive JSON object containing addresses, preferences, and history. This wastes bandwidth and increases parsing time.\n    *   **Under-fetching (The N+1 Problem):** To display a dashboard, a mobile app might need to call `/user`, then `/user/posts`, then `/posts/1/comments`. This results in multiple round-trips, which is detrimental on high-latency 3G/4G networks.\n*   **GraphQL (Declarative Fetching):**\n    *   The client specifies exactly what it needs in a single request. This eliminates over-fetching and allows the client to aggregate multiple resources (User + Posts + Comments) into one single network round-trip, significantly improving perceived performance on mobile.\n\n### 2. Network Performance and Latency\n*   **REST:** Multiple requests mean multiple TCP handshakes and TLS negotiations. On mobile networks where latency is high, the \"chattiness\" of REST can make an app feel sluggish, even if the payload size is small.\n*   **GraphQL:** By collapsing multiple requests into one, GraphQL minimizes the impact of high latency. However, because GraphQL requests are typically sent via `POST` to a single endpoint, they are harder to cache at the HTTP/CDN level compared to REST's `GET` requests.\n\n### 3. Caching Strategies\n*   **REST:** Leverages standard HTTP caching. Using `ETag`, `Cache-Control`, and standard CDN infrastructure is straightforward. This is highly efficient for static or semi-static data (e.g., a list of countries).\n*   **GraphQL:** Caching is more complex. Since most queries are `POST` requests, standard HTTP caching doesn't work. Caching must be handled on the client side (e.g., Apollo Client's normalized cache) or via complex persisted queries. This increases the complexity of the mobile client implementation.\n\n### 4. Development Velocity and Type Safety\n*   **REST:** Requires manual documentation (e.g., Swagger/OpenAPI). If the backend changes a field name, the mobile app will crash unless the client is updated simultaneously. This often leads to \"versioning hell\" (e.g., `/v1/`, `/v2/`).\n*   **GraphQL:** Uses a strongly-typed schema. Tools like Apollo or Relay can automatically generate TypeScript types for the mobile client based on the schema. This provides \"end-to-end type safety,\" meaning if a field is removed from the schema, the mobile app code will fail to compile, preventing runtime errors.\n\n### 5. Summary Comparison Table\n\n| Feature | REST | GraphQL |\n| :--- | :--- | :--- |\n| **Data Fetching** | Fixed endpoints; prone to over/under-fetching. | Client-driven; precise data retrieval. |\n| **Network Round-trips** | Multiple (High latency impact). | Single (Low latency impact). |\n| **Caching** | Easy (Native HTTP/CDN support). | Complex (Requires client-side logic). |\n| **Versioning** | Manual (e.g., `/v1/`, `/v2/`). | Versionless (Deprecate fields instead). |\n| **Learning Curve** | Low (Standardized, widely understood). | High (Requires schema design & tooling). |\n| **Error Handling** | Standard HTTP status codes (404, 500). | Usually `200 OK` with an `errors` array. |\n\n### Final Recommendation\n\n**Choose REST if:**\n*   Your app is data-light and the resource relationships are simple.\n*   You rely heavily on CDN caching to reduce server load.\n*   Your team is small and wants to use standard, well-documented patterns.\n*   You are building a public API where you want to strictly control how users interact with your data.\n\n**Choose GraphQL if:**\n*   **The app is data-intensive** with complex, nested relationships (e.g., Social Media, E-commerce).\n*   **Mobile performance is critical:** You need to minimize round-trips and payload sizes to accommodate poor network conditions.\n*   You have multiple clients (iOS",
+    "elapsed_s": 15.36,
+    "completion_tokens": 1024,
+    "tokens_per_sec": 66.6,
+    "quality_total": 9.6,
+    "quality_scores": {
+      "accuracy": 10,
+      "completeness": 9,
+      "clarity": 10,
+      "depth": 9,
+      "relevance": 10
+    }
+  },
+  {
+    "label": "gemma-26b",
+    "model": "gemma-26b",
+    "task": "Explain photosynthesis to a 10-year-old.",
+    "response": "Imagine you are a chef, but instead of using a stove and a pan, you use sunlight and leaves to make your own food. That is exactly what plants do through a process called **photosynthesis**.\n\nSince plants can\u2019t walk to a grocery store when they get hungry, they have to make their own \"sugar snacks\" right inside their bodies. To do this, they need three main ingredients:\n\n### 1. The Ingredients\n*   **Sunlight:** This is the energy (the \"heat\" for the stove).\n*   **Water:** Absorbed from the ground through the plant's roots.\n*   **Carbon Dioxide:** This is a gas in the air that humans breathe out. Plants \"breathe\" it in through tiny little holes in their leaves.\n\n### 2. The Kitchen (The Chloroplast)\nInside a plant's leaves, there are millions of tiny green \"kitchens\" called **chloroplasts**. These kitchens contain something called **chlorophyll**. \n\nChlorophyll is what makes plants green, and its job is to catch the sunlight, just like a solar panel on a roof. Without chlorophyll, the plant couldn't grab the energy it needs to start cooking.\n\n### 3. The Cooking Process\nOnce the plant has the sunlight, the water, and the carbon dioxide, it performs a chemical reaction. It uses the energy from the sun to break the water and gas apart and mix them back together into something new.\n\n### 4. The Finished Meal\nAfter the \"cooking\" is done, the plant produces two things:\n1.  **Glucose (Sugar):** This is the plant's food. It uses this sugar to grow taller, grow new leaves, and make flowers or fruit.\n2.  **Oxygen:** This is actually a \"leftover\" for the plant, so it releases it back into the air. \n\n### Why it matters to YOU\nPhotosynthesis is the reason we are alive! \n*   **We need to breathe:** Plants release the oxygen that we need to inhale.\n*   **We need to eat:** Every time you eat a vegetable (like a carrot) or a fruit (like an apple), you are eating the energy that the plant made from the sun. Even if you eat meat, that animal originally got its energy from eating plants!\n\n**Summary: Sunlight + Water + Carbon Dioxide = Sugar (Food) + Oxygen (Air for us!)**",
+    "elapsed_s": 7.8,
+    "completion_tokens": 510,
+    "tokens_per_sec": 65.4,
+    "quality_total": 9.8,
+    "quality_scores": {
+      "accuracy": 10,
+      "completeness": 10,
+      "clarity": 10,
+      "depth": 9,
+      "relevance": 10
+    }
+  },
+  {
+    "label": "gemma-26b",
+    "model": "gemma-26b",
+    "task": "Draft a polite email declining a meeting invite due to a scheduling conflict.",
+    "response": "Since you did not specify the recipient or the nature of the meeting, I have provided three versions: a **standard professional** version, a **formal** version (for clients or executives), and a **casual** version (for close colleagues).\n\n### Option 1: Standard Professional\n*Best for: Managers, teammates, or general business contacts.*\n\n**Subject:** Re: [Meeting Name]\n\nHi [Name],\n\nThank you for the invitation to discuss [Meeting Topic].\n\nUnfortunately, I have a scheduling conflict during the proposed time and will be unable to attend. \n\n[Optional: I am very interested in this topic, so please feel free to share any meeting notes or action items afterward. / I would be happy to reschedule; I am free on [Day] at [Time] or [Day] at [Time].]\n\nBest regards,\n\n[Your Name]\n\n***\n\n### Option 2: Formal\n*Best for: Clients, senior leadership, or external partners.*\n\n**Subject:** Regarding the meeting invitation: [Meeting Name]\n\nDear [Name],\n\nThank you for the invitation to meet regarding [Meeting Topic].\n\nPlease accept my apologies, as I am unable to attend at the scheduled time due to a prior commitment. \n\n[Optional: If my presence is required for a specific portion of the agenda, please let me know and I will do my best to adjust my schedule. Otherwise, I look forward to reviewing the summary of the discussion.]\n\nSincerely,\n\n[Your Name]\n\n***\n\n### Option 3: Casual/Short\n*Best for: Close teammates or via instant messaging (Slack/Teams).*\n\n**Subject:** Re: [Meeting Name]\n\nHi [Name],\n\nThanks for the invite! I have a conflict at that time, so I won't be able to make it.\n\n[Optional: Could you send over the recording/notes afterward? / Can we move this to [Time] instead?]\n\nBest,\n\n[Your Name]",
+    "elapsed_s": 6.31,
+    "completion_tokens": 412,
+    "tokens_per_sec": 65.3,
+    "quality_total": 9.6,
+    "quality_scores": {
+      "accuracy": 10,
+      "completeness": 10,
+      "clarity": 10,
+      "depth": 8,
+      "relevance": 10
+    }
+  },
+  {
+    "label": "gemma-31b",
+    "model": "gemma-31b",
+    "task": "Write a Python function to check if a number is prime, with tests.",
+    "response": "```python\nimport math\n\ndef is_prime(n: int) -> bool:\n    \"\"\"\n    Determines if a given integer is a prime number.\n    \n    Args:\n        n (int): The number to check.\n        \n    Returns:\n        bool: True if n is prime, False otherwise.\n    \"\"\"\n    # Prime numbers must be greater than 1\n    if n <= 1:\n        return False\n    \n    # 2 and 3 are prime\n    if n <= 3:\n        return True\n    \n    # Eliminate even numbers and multiples of 3\n    if n % 2 == 0 or n % 3 == 0:\n        return False\n    \n    # Check divisors from 5 up to sqrt(n)\n    # All primes > 3 are of the form 6k \u00b1 1\n    limit = int(math.isqrt(n))\n    for i in range(5, limit + 1, 6):\n        if n % i == 0 or n % (i + 2) == 0:\n            return False\n            \n    return True\n\ndef test_is_prime():\n    \"\"\"\n    Test suite for is_prime function.\n    \"\"\"\n    test_cases = {\n        # Edge cases\n        -5: False,\n        0: False,\n        1: False,\n        2: True,\n        3: True,\n        # Small primes\n        5: True,\n        7: True,\n        11: True,\n        13: True,\n        # Small composites\n        4: False,\n        6: False,\n        9: False,\n        15: False,\n        25: False,\n        # Larger primes\n        101: True,\n        103: True,\n        107: True,\n        # Larger composites\n        100: False,\n        121: False, # 11 * 11\n    }\n\n    passed = 0\n    for num, expected in test_cases.items():\n        result = is_prime(num)\n        if result == expected:\n            passed += 1\n        else:\n            print(f\"Failed: is_prime({num}) expected {expected}, got {result}\")\n\n    print(f\"Tests passed: {passed}/{len(test_cases)}\")\n\nif __name__ == \"__main__\":\n    test_is_prime()\n```\n\n### Analytical Notes:\n1.  **Time Complexity**: $O(\\sqrt{n})$. The loop iterates up to the square root of $n$, reducing the number of checks significantly for large inputs.\n2.  **Space Complexity**: $O(1)$. No additional data structures are used regardless of the input size.\n3.  **Optimization**: The implementation uses a **6k \u00b1 1 optimization**. Since all primes greater than 3 are of the form $6k \\pm 1$, we skip all multiples of 2 and 3, reducing the number of iterations by approximately 66% compared to a basic trial division.\n4.  **Edge Case Handling**: The function explicitly handles negative numbers, zero, and one, which are not prime by definition.",
+    "elapsed_s": 91.72,
+    "completion_tokens": 716,
+    "tokens_per_sec": 7.8,
+    "quality_total": 10.0,
+    "quality_scores": {
+      "accuracy": 10,
+      "completeness": 10,
+      "clarity": 10,
+      "depth": 10,
+      "relevance": 10
+    }
+  },
+  {
+    "label": "gemma-31b",
+    "model": "gemma-31b",
+    "task": "Explain the difference between TCP and UDP in simple terms.",
+    "response": "To understand the difference between TCP and UDP, it is helpful to think of them as two different ways of delivering information across a network.\n\n### TCP (Transmission Control Protocol)\n**The \"Certified Letter\" Approach**\n\nTCP is designed for **reliability**. It ensures that every single piece of data arrives in the correct order and without errors.\n\n*   **How it works:** Before sending data, TCP performs a \"three-way handshake.\" The sender asks, \"Are you ready?\" the receiver says, \"Yes, I am,\" and the sender says, \"Great, here it comes.\"\n*   **Error Checking:** If a packet of data is lost or corrupted during transmission, TCP notices it is missing and asks the sender to send it again.\n*   **Ordering:** If data arrives out of order, TCP rearranges it into the correct sequence before showing it to the user.\n*   **Best for:** Tasks where accuracy is non-negotiable.\n    *   *Examples:* Web browsing (HTTP), Email (SMTP), File transfers (FTP). You wouldn't want a website to load with half the text missing.\n\n### UDP (User Datagram Protocol)\n**The \"Postcard\" Approach**\n\nUDP is designed for **speed**. It sends data as fast as possible without checking to see if the receiver actually got it.\n\n*   **How it works:** UDP simply \"fires and forgets.\" It pushes data out onto the network without establishing a formal connection first.\n*   **No Error Recovery:** If a packet is lost, it is gone forever. UDP does not ask for a re-send.\n*   **No Ordering:** Packets are processed in the order they arrive, regardless of how they were sent.\n*   **Best for:** Tasks where speed is more important than perfect accuracy.\n    *   *Examples:* Live video streaming, Online gaming, VoIP (Internet calls). If one frame of a video call is lost, it's better to skip it and keep the call live than to pause the entire conversation to recover a single pixel.\n\n---\n\n### Summary Comparison Table\n\n| Feature | TCP | UDP |\n| :--- | :--- | :--- |\n| **Reliability** | Guaranteed delivery | No guarantee |\n| **Speed** | Slower (due to overhead) | Faster (minimal overhead) |\n| **Connection** | Connection-oriented (Handshake) | Connectionless |\n| **Order** | Maintains strict sequence | No guaranteed order |\n| **Analogy** | A phone call (Two-way confirmation) | A megaphone (Broadcasting) |",
+    "elapsed_s": 44.44,
+    "completion_tokens": 545,
+    "tokens_per_sec": 12.3,
+    "quality_total": 9.6,
+    "quality_scores": {
+      "accuracy": 10,
+      "completeness": 10,
+      "clarity": 10,
+      "depth": 8,
+      "relevance": 10
+    }
+  },
+  {
+    "label": "gemma-31b",
+    "model": "gemma-31b",
+    "task": "Summarize the causes of the 2008 financial crisis in 200 words.",
+    "response": "The 2008 financial crisis was triggered by a systemic collapse of the U.S. housing market, fueled by a combination of predatory lending and financial deregulation. \n\nLow interest rates and government policies encouraged \"subprime mortgages,\" granting loans to borrowers with poor credit. These high-risk loans were bundled into complex financial instruments called Mortgage-Backed Securities (MBS) and Collateralized Debt Obligations (CDOs). Credit rating agencies erroneously labeled these securities as safe, misleading investors globally.\n\nFinancial institutions leveraged these assets heavily, creating a fragile web of interdependence. When the housing bubble burst in 2006-2007, home prices plummeted and defaults surged. The resulting devaluation of MBS caused massive losses for banks, leading to a severe liquidity crunch. \n\nThe crisis peaked in September 2008 with the bankruptcy of Lehman Brothers, which triggered a global panic. Trust between financial institutions vanished, freezing credit markets and precipitating the Great Recession. Ultimately, the crisis revealed the dangers of excessive leverage, inadequate oversight of \"shadow banking,\" and the systemic risk posed by institutions deemed \"too big to fail.\"",
+    "elapsed_s": 19.55,
+    "completion_tokens": 231,
+    "tokens_per_sec": 11.8,
+    "quality_total": 9.8,
+    "quality_scores": {
+      "accuracy": 10,
+      "completeness": 10,
+      "clarity": 10,
+      "depth": 9,
+      "relevance": 10
+    }
+  },
+  {
+    "label": "gemma-31b",
+    "model": "gemma-31b",
+    "task": "Write a short story opening (150 words) about a lighthouse keeper who finds a message in a bottle.",
+    "response": "Elias lived by the rhythm of the rotating lens and the relentless percussion of the Atlantic against the basalt cliffs. For twenty years, his only companions were the screaming gulls and the salt-crusted silence of the gallery. \n\nDuring the low tide of a bruised July morning, a flash of emerald glass caught the light amidst a tangle of kelp. Elias retrieved the bottle, its surface pitted by years of oceanic abrasion. Inside, a single slip of parchment remained dry, tied with a fraying silk ribbon. \n\nHe uncorked it, expecting the desperate plea of a shipwrecked soul or a child\u2019s whimsical daydream. Instead, the ink was fresh, the handwriting an exact mirror of his own. It contained a single sentence: *\u201cStop looking at the horizon; the door is finally unlocked.\u201d* \n\nElias looked back at his tower, where the heavy iron bolt had been rusted shut for decades.",
+    "elapsed_s": 16.41,
+    "completion_tokens": 189,
+    "tokens_per_sec": 11.5,
+    "quality_total": 9.8,
+    "quality_scores": {
+      "accuracy": 10,
+      "completeness": 10,
+      "clarity": 10,
+      "depth": 9,
+      "relevance": 10
+    }
+  },
+  {
+    "label": "gemma-31b",
+    "model": "gemma-31b",
+    "task": "What's the best way to identify a ripe avocado?",
+    "response": "To identify a ripe avocado, use a combination of tactile, visual, and auditory cues. The most reliable method is the \"gentle squeeze\" combined with checking the stem.\n\n### 1. The Gentle Squeeze (Primary Method)\nPlace the avocado in the palm of your hand and apply light pressure.\n*   **Ripe:** It should yield to gentle pressure, feeling slightly soft but not mushy. It should feel similar to the consistency of a ripe peach or the tip of your nose.\n*   **Unripe:** It will feel hard and firm, like a baseball.\n*   **Overripe:** It will feel hollow, mushy, or leave a permanent indentation when pressed.\n\n### 2. The Stem Test (The \"Peek\" Method)\nLocate the small brown stem (the cap) at the top of the fruit. Gently flick it upward with your thumbnail.\n*   **Green/Yellow underneath:** The avocado is ripe and ready to eat.\n*   **Brown underneath:** The avocado is overripe and likely has brown spots inside.\n*   **Stem won't budge:** The avocado is unripe.\n\n### 3. Visual Cues (Secondary Method)\nWhile color varies by variety (Hass is the most common), it is a helpful initial indicator.\n*   **Bright Green:** Usually unripe.\n*   **Dark Green to Purplish-Black:** Usually ripe.\n*   **Shriveled/Dull Black:** Likely overripe.\n\n### Summary Checklist for the Perfect Avocado\n| Indicator | Unripe | Ripe | Overripe |\n| :--- | :--- | :--- | :--- |\n| **Feel** | Hard/Firm | Soft/Yielding | Mushy/Hollow |\n| **Stem** | Stuck fast | Pops off $\\rightarrow$ Green | Pops off $\\rightarrow$ Brown |\n| **Color** | Bright Green | Dark Green/Black | Dull Black/Shriveled |\n\n### Pro Tips for Management\n*   **To Speed Up Ripening:** Place the avocado in a brown paper bag with a banana or apple. These fruits release ethylene gas, which accelerates the ripening process.\n*   **To Slow Down Ripening:** Once an avocado reaches your desired ripeness, place it in the refrigerator. This can preserve the peak state for an additional 2\u20133 days.",
+    "elapsed_s": 41.08,
+    "completion_tokens": 495,
+    "tokens_per_sec": 12.1,
+    "quality_total": 9.8,
+    "quality_scores": {
+      "accuracy": 10,
+      "completeness": 10,
+      "clarity": 10,
+      "depth": 9,
+      "relevance": 10
+    }
+  },
+  {
+    "label": "gemma-31b",
+    "model": "gemma-31b",
+    "task": "Explain how a Bloom filter works and when to use one.",
+    "response": "### What is a Bloom Filter?\n\nA Bloom filter is a **space-efficient probabilistic data structure** used to test whether an element is a member of a set. \n\nThe defining characteristic of a Bloom filter is that it can yield **false positives**, but never **false negatives**. \n*   **False Positive:** The filter says an item is in the set, but it actually isn't.\n*   **False Negative:** The filter says an item is not in the set, but it actually is. (This is impossible in a standard Bloom filter).\n\n---\n\n### How It Works\n\n#### 1. The Structure\nA Bloom filter consists of two components:\n1.  **A Bit Array:** A fixed-size array of $n$ bits, all initially set to 0.\n2.  **Hash Functions:** A set of $k$ different hash functions. Each function must take an input and map it to one of the $n$ positions in the bit array with a uniform distribution.\n\n#### 2. Adding an Element\nTo add an item to the filter:\n1.  Pass the item through each of the $k$ hash functions.\n2.  Each hash function produces an index (a position in the bit array).\n3.  Set the bits at all these resulting indices to **1**.\n\n#### 3. Querying an Element\nTo check if an item is in the set:\n1.  Pass the item through the same $k$ hash functions to get $k$ indices.\n2.  Inspect the bits at those indices:\n    *   **If any of the bits are 0**, the item is **definitely not** in the set (because if it had been added, all those bits would have been flipped to 1).\n    *   **If all bits are 1**, the item **might** be in the set. However, it is possible that other items were added that collectively flipped those specific bits to 1, creating a false positive.\n\n#### 4. Deletion\nStandard Bloom filters **do not support deletion**. You cannot simply flip a 1 back to a 0 because that bit might be shared by multiple other elements. To support deletion, one must use a *Counting Bloom Filter*, which replaces the bit array with an array of counters.\n\n---\n\n### When to Use a Bloom Filter\n\nBloom filters are used when the cost of a \"false positive\" is low (e.g., a slightly slower request), but the cost of a \"false negative\" is unacceptable, and the dataset is too large to fit in memory.\n\n#### Common Use Cases:\n1.  **Database Query Optimization (LSM Trees/Cassandra/BigTable):**\n    Before performing a costly disk read to see if a row exists in a SSTable, the system checks a Bloom filter. If the filter says \"not present,\" the system skips the disk read entirely.\n2.  **Web Browsers (Malicious URL Filtering):**\n    Browsers can store a Bloom filter of millions of malicious URLs locally. If a URL triggers a positive match, the browser then performs a network request to a server to verify if the site is actually dangerous.\n3.  **Content Delivery Networks (CDNs):**\n    To avoid \"one-hit wonders\" (caching an object that is only requested once), a CDN can use a Bloom filter to track requested items. An item is only cached on the second time it is seen.\n4.  **Blockchain (SPV Clients):**\n    Simplified Payment Verification (SPV) clients use Bloom filters to request only the transactions relevant to their wallet from a full node without revealing their entire address list.\n\n### Summary Table\n\n| Feature | Bloom Filter | Hash Set / Bit Map |\n| :--- | :--- | :--- |\n| **Space Complexity** | Extremely Low (Constant) | High (Grows with elements) |\n| **Time Complexity** | $O(k)$ (Constant) | $O(1)$ (Average) |\n| **False Positives** | Possible | Impossible |\n| **False Negatives** | Impossible | Impossible |\n| **Deletion** | Not supported (Standard) | Supported |",
+    "elapsed_s": 73.66,
+    "completion_tokens": 888,
+    "tokens_per_sec": 12.1,
+    "quality_total": 9.8,
+    "quality_scores": {
+      "accuracy": 10,
+      "completeness": 10,
+      "clarity": 10,
+      "depth": 9,
+      "relevance": 10
+    }
+  },
+  {
+    "label": "gemma-31b",
+    "model": "gemma-31b",
+    "task": "Write a SQL query to find the second-highest salary in an employees table.",
+    "response": "Depending on the SQL dialect you are using, there are two primary ways to achieve this. Both methods handle the possibility of duplicate salaries by using `DISTINCT`.\n\n### Option 1: Using `OFFSET` (MySQL, PostgreSQL, SQLite)\nThis is the most concise method. It sorts the unique salaries in descending order and skips the first record to retrieve the second.\n\n```sql\nSELECT DISTINCT salary \nFROM employees \nORDER BY salary DESC \nLIMIT 1 OFFSET 1;\n```\n\n### Option 2: Using a Subquery (Standard SQL / SQL Server)\nThis method is highly portable across almost all relational databases. It finds the maximum salary that is strictly less than the overall maximum salary.\n\n```sql\nSELECT MAX(salary) \nFROM employees \nWHERE salary < (SELECT MAX(salary) FROM employees);\n```\n\n### Analytical Notes:\n*   **Handling Duplicates:** The use of `DISTINCT` or the `<` operator is critical. If two employees share the highest salary, a simple `LIMIT 1 OFFSET 1` without `DISTINCT` would return the highest salary again rather than the second-highest.\n*   **Null Handling:** If the table has fewer than two unique salaries, both queries will correctly return `NULL` (or an empty result set), which is the standard expected behavior for this problem.\n*   **Complexity:** Both queries operate at $O(N \\log N)$ if an index is not present (due to sorting) or $O(1)$ if there is a descending index on the `salary` column.",
+    "elapsed_s": 27.96,
+    "completion_tokens": 331,
+    "tokens_per_sec": 11.8,
+    "quality_total": 9.8,
+    "quality_scores": {
+      "accuracy": 10,
+      "completeness": 10,
+      "clarity": 10,
+      "depth": 9,
+      "relevance": 10
+    }
+  },
+  {
+    "label": "gemma-31b",
+    "model": "gemma-31b",
+    "task": "Compare REST and GraphQL for a mobile app backend.",
+    "response": "When choosing between REST and GraphQL for a mobile app backend, the primary trade-off is between **architectural simplicity (REST)** and **data fetching efficiency (GraphQL)**. Mobile apps are particularly sensitive to network latency and data usage, making this choice critical.\n\n### 1. REST (Representational State Transfer)\nREST is an architectural style based on resources identified by URLs. It uses standard HTTP methods (GET, POST, PUT, DELETE).\n\n**Advantages for Mobile:**\n*   **Caching:** Leverages native HTTP caching. Mobile clients can cache responses at the network level, reducing server load and improving speed for static data.\n*   **Predictability:** Standardized status codes (200, 404, 500) make error handling straightforward.\n*   **Ecosystem:** Massive tooling support for testing, documentation (Swagger/OpenAPI), and security.\n\n**Disadvantages for Mobile:**\n*   **Over-fetching:** The server defines the response. A mobile app might only need a user's `username`, but the `/users/1` endpoint returns 50 fields, wasting bandwidth.\n*   **Under-fetching (N+1 Problem):** To display a \"Post\" and its \"Comments,\" the app must make one call to `/posts/1` and then separate calls to `/posts/1/comments`, leading to multiple network round-trips.\n\n---\n\n### 2. GraphQL\nGraphQL is a query language and runtime that allows the client to request exactly the data it needs in a single request.\n\n**Advantages for Mobile:**\n*   **Precise Data Fetching:** Eliminates over-fetching. The mobile client specifies the fields required for a specific UI view, reducing the payload size.\n*   **Single Round-trip:** Aggregates multiple resources into one request. A single query can fetch a user, their posts, and their followers simultaneously.\n*   **Strongly Typed Schema:** The schema acts as a contract between frontend and backend, enabling better tooling (e.g., Apollo Client) and reducing integration bugs.\n*   **Rapid Iteration:** Frontend developers can change the UI and the data they request without needing the backend team to create new endpoints.\n\n**Disadvantages for Mobile:**\n*   **Caching Complexity:** Since most requests are POSTs to a single `/graphql` endpoint, standard HTTP caching is bypassed. Caching must be handled on the client side (e.g., using Normalized Caches in Apollo).\n*   **Server Overhead:** The server must parse and validate complex queries, which can be more CPU-intensive than serving a static REST resource.\n*   **Query Complexity:** Malicious or poorly written queries (deeply nested) can crash a server if \"query depth limiting\" is not implemented.\n\n---\n\n### Comparison Summary\n\n| Feature | REST | GraphQL |\n| :--- | :--- | :--- |\n| **Data Fetching** | Fixed (Server-defined) | Flexible (Client-defined) |\n| **Network Calls** | Multiple (often) | Single (usually) |\n| **Payload Size** | Larger (Over-fetching) | Minimal (Optimized) |\n| **Caching** | Easy (HTTP/CDN level) | Complex (Client-side/Application level) |\n| **Versioning** | Versioned URLs (`/v1/`, `/v2/`) | Versionless (Field deprecation) |\n| **Learning Curve** | Low | Moderate |\n\n### Final Recommendation\n\n**Choose REST if:**\n*   Your app has simple data structures with few relationships.\n*   You rely heavily on CDN caching for performance.\n*   Your team is small and wants to leverage standard HTTP tooling without adding architectural complexity.\n\n**Choose GraphQL if:**\n*   Your app has complex, nested data relationships (e.g., a social network or e-commerce platform).\n*   You are targeting users in regions with poor network connectivity (where reducing round-trips is critical).\n*   You have multiple clients (iOS, Android, Web) that all require slightly different data views from the same backend.",
+    "elapsed_s": 72.24,
+    "completion_tokens": 863,
+    "tokens_per_sec": 11.9,
+    "quality_total": 9.8,
+    "quality_scores": {
+      "accuracy": 10,
+      "completeness": 10,
+      "clarity": 10,
+      "depth": 9,
+      "relevance": 10
+    }
+  },
+  {
+    "label": "gemma-31b",
+    "model": "gemma-31b",
+    "task": "Explain photosynthesis to a 10-year-old.",
+    "response": "Imagine that plants have a superpower: they can make their own food out of thin air and sunlight. This process is called **photosynthesis**.\n\nSince plants can\u2019t go to the grocery store or cook in a kitchen, they turn their leaves into tiny \"food factories.\" Here is how it works:\n\n### 1. The Ingredients\nTo make a meal, a plant needs three basic things:\n*   **Sunlight:** This provides the energy (like the heat from a stove).\n*   **Water:** Collected by the roots from the soil.\n*   **Carbon Dioxide:** A gas that plants breathe in from the air (this is the stuff humans breathe *out*).\n\n### 2. The Secret Ingredient: Chlorophyll\nPlants have something special in their leaves called **chlorophyll**. This is a green pigment that acts like a solar panel. It catches the sunlight and uses that energy to mix the water and carbon dioxide together. This is also why most plants are green!\n\n### 3. The Cooking Process\nOnce the plant has the sunlight, water, and gas, it performs a chemical reaction. It breaks the water and carbon dioxide apart and puts them back together to create two things:\n1.  **Sugar (Glucose):** This is the plant's food. It gives the plant energy to grow taller, grow flowers, or make fruit.\n2.  **Oxygen:** The plant doesn't need this, so it breathes it out into the air.\n\n### Why it matters to you\nPhotosynthesis is one of the most important things happening on Earth for two reasons:\n*   **We can breathe:** Almost all the oxygen in our atmosphere is made by plants. Without them, we wouldn't have air to breathe.\n*   **We can eat:** Whether you eat a carrot (a root) or an apple (a fruit), you are eating the energy that the plant originally captured from the sun.\n\n**In short: Plants take sunlight, water, and air $\\rightarrow$ turn them into sugar for food $\\rightarrow$ and give us oxygen to breathe.**",
+    "elapsed_s": 36.47,
+    "completion_tokens": 433,
+    "tokens_per_sec": 11.9,
+    "quality_total": 9.6,
+    "quality_scores": {
+      "accuracy": 10,
+      "completeness": 10,
+      "clarity": 10,
+      "depth": 8,
+      "relevance": 10
+    }
+  },
+  {
+    "label": "gemma-31b",
+    "model": "gemma-31b",
+    "task": "Draft a polite email declining a meeting invite due to a scheduling conflict.",
+    "response": "Depending on your relationship with the sender, choose one of the following options:\n\n### Option 1: Professional & Standard\n*Best for clients, senior management, or external partners.*\n\n**Subject:** Re: [Meeting Name]\n\nDear [Name],\n\nThank you for the invitation to meet regarding [Project/Topic].\n\nUnfortunately, I have a scheduling conflict at that time and will be unable to attend. I am very interested in the discussion, however; would you be open to rescheduling, or could you please share the meeting notes and any action items with me afterward?\n\nI am available at the following times if you would like to move the call:\n* [Date/Time]\n* [Date/Time]\n\nBest regards,\n\n[Your Name]\n\n***\n\n### Option 2: Short & Casual\n*Best for immediate teammates or close colleagues.*\n\n**Subject:** Re: [Meeting Name]\n\nHi [Name],\n\nThanks for the invite! I have a conflict during this slot and won't be able to make it. \n\nFeel free to record the session or send over a summary. If my input is required for a specific agenda item, let me know and I'll send over my notes in advance.\n\nBest,\n\n[Your Name]\n\n***\n\n### Option 3: Firm/Protective of Time\n*Best when you cannot reschedule and the meeting is not a priority.*\n\n**Subject:** Re: [Meeting Name]\n\nDear [Name],\n\nThank you for reaching out. Unfortunately, my schedule is fully committed during the proposed time, and I am unable to join.\n\nIf there is a specific question you need me to answer or a document you need me to review, please send it over via email and I will get back to you as soon as possible.\n\nRegards,\n\n[Your Name]",
+    "elapsed_s": 32.07,
+    "completion_tokens": 381,
+    "tokens_per_sec": 11.9,
+    "quality_total": 9.8,
+    "quality_scores": {
+      "accuracy": 10,
+      "completeness": 10,
+      "clarity": 10,
+      "depth": 9,
+      "relevance": 10
+    }
+  },
+  {
+    "label": "qwen-35b",
+    "model": "qwen-35b",
+    "task": "Write a Python function to check if a number is prime, with tests.",
+    "response": "```python\ndef is_prime(n: int) -> bool:\n    \"\"\"\n    Check if a number is prime.\n    \n    Args:\n        n: The number to check.\n        \n    Returns:\n        True if n is a prime number, False otherwise.\n    \"\"\"\n    if n < 2:\n        return False\n    if n == 2:\n        return True\n    if n % 2 == 0:\n        return False\n    for i in range(3, int(n**0.5) + 1, 2):\n        if n % i == 0:\n            return False\n    return True\n\n\ndef test_is_prime():\n    # Test cases: (input, expected_output)\n    test_cases = [\n        (0, False),\n        (1, False),\n        (2, True),\n        (3, True),\n        (4, False),\n        (5, True),\n        (9, False),\n        (11, True),\n        (15, False),\n        (17, True),\n        (25, False),\n        (29, True),\n        (97, True),\n        (100, False),\n        (-1, False),\n        (-5, False),\n        (2, True),\n        (3, True),\n        (4, False),\n        (1000000007, True),  # Large prime\n        (1000000000, False),  # Large composite\n    ]\n    \n    all_passed = True\n    for n, expected in test_cases:\n        result = is_prime(n)\n        if result != expected:\n            print(f\"FAIL: is_prime({n}) returned {result}, expected {expected}\")\n            all_passed = False\n    \n    if all_passed:\n        print(\"All tests passed!\")\n    else:\n        print(\"Some tests failed.\")\n\n\nif __name__ == \"__main__\":\n    test_is_prime()\n```",
+    "elapsed_s": 51.16,
+    "completion_tokens": 451,
+    "tokens_per_sec": 8.8,
+    "quality_total": 9.4,
+    "quality_scores": {
+      "accuracy": 10,
+      "completeness": 10,
+      "clarity": 10,
+      "depth": 7,
+      "relevance": 10
+    }
+  },
+  {
+    "label": "qwen-35b",
+    "model": "qwen-35b",
+    "task": "Explain the difference between TCP and UDP in simple terms.",
+    "response": "To understand the difference between TCP (Transmission Control Protocol) and UDP (User Datagram Protocol), it is best to use an analogy involving the delivery of mail or packages. Both are methods for sending data across the internet, but they prioritize different things: **reliability** versus **speed**.\n\n### 1. TCP: The \"Certified Mail\" Approach\nTCP is designed for **reliability**. It ensures that every single piece of data arrives at its destination, in the correct order, and without errors.\n\n*   **How it works:** Before sending data, TCP establishes a connection (like a phone call). It breaks data into small packets, numbers them, and sends them one by one. The receiver sends back an \"acknowledgment\" for each packet. If a packet is lost or arrives out of order, the sender retransmits it.\n*   **Analogy:** Imagine sending a valuable document via certified mail. The postal service tracks every step, requires a signature upon delivery, and will resend the document if it gets lost. It takes longer, but you are guaranteed it arrives.\n*   **Best for:** Activities where accuracy is critical, such as:\n    *   Web browsing (HTTP/HTTPS)\n    *   Email (SMTP, IMAP)\n    *   File transfers (FTP)\n    *   Online banking\n\n### 2. UDP: The \"Postcard\" Approach\nUDP is designed for **speed**. It sends data without checking if it arrives or if it\u2019s in order. It\u2019s \"fire and forget.\"\n\n*   **How it works:** UDP does not establish a connection. It just blasts packets out toward the destination. It doesn\u2019t care if packets are lost, duplicated, or arrive out of order. There is no overhead for acknowledgments or error correction.\n*   **Analogy:** Imagine shouting information to a crowd or sending a postcard. You don\u2019t know if the recipient got it, and you don\u2019t wait for a reply. It\u2019s fast and simple, but you might lose some information.\n*   **Best for:** Activities where speed is more important than perfect accuracy, and where slight data loss is acceptable or can be handled by the application:\n    *   Video streaming (a few dropped frames are better than buffering)\n    *   Online gaming (real-time movement is more important than perfect data integrity)\n    *   Voice over IP (VoIP) / Video calls (latency causes more disruption than minor audio glitches)\n    *   DNS queries (quick lookups)\n\n### Key Differences at a Glance\n\n| Feature | TCP | UDP |\n| :--- | :--- | :--- |\n| **Connection** | Connection-oriented (must establish a link first) | Connectionless (sends data immediately) |\n| **Reliability** | High (guarantees delivery and order) | Low (no guarantee of delivery or order) |\n| **Speed** | Slower (due to error-checking and overhead) | Faster (minimal overhead) |\n| **Data Integrity** | Ensures no data loss or duplication | May lose, duplicate, or reorder data |\n| **Use Case** | Web, email, files | Streaming, gaming, VoIP |\n\n### In Simple Terms:\n*   Use **TCP** when you need to be sure the data gets there correctly (like a letter).\n*   Use **UDP** when you need it to get there as fast as possible, even if some data is lost (like a live broadcast).",
+    "elapsed_s": 15.46,
+    "completion_tokens": 735,
+    "tokens_per_sec": 47.6,
+    "quality_total": 9.6,
+    "quality_scores": {
+      "accuracy": 10,
+      "completeness": 10,
+      "clarity": 10,
+      "depth": 8,
+      "relevance": 10
+    }
+  },
+  {
+    "label": "qwen-35b",
+    "model": "qwen-35b",
+    "task": "Summarize the causes of the 2008 financial crisis in 200 words.",
+    "response": "The 2008 financial crisis was a multifaceted collapse driven by interconnected failures in regulation, lending practices, and financial engineering. At its core was the U.S. housing bubble, fueled by historically low interest rates and aggressive lending standards. Lenders issued subprime mortgages to borrowers with poor credit histories, often offering adjustable-rate mortgages with low initial teaser rates that later skyrocketed.\n\nSimultaneously, financial institutions engaged in risky securitization, bundling these toxic mortgages into complex mortgage-backed securities (MBS) and collateralized debt obligations (CDOs). Credit rating agencies erroneously assigned high safety ratings to these risky assets, misleading investors. The widespread use of credit default swaps (CDS) allowed entities like AIG to insure against defaults without holding sufficient capital, creating a shadow banking system with massive, unregulated leverage.\n\nWhen housing prices peaked and began to fall in 2006, borrowers defaulted en masse. The value of MBS and CDOs plummeted, revealing the true extent of the losses. Major financial institutions, heavily invested in these assets and highly leveraged, faced insolvency. The failure of Lehman Brothers in September 2008 triggered a global credit freeze, as banks lost confidence in each other\u2019s solvency. This liquidity crisis spread rapidly, causing a severe recession worldwide. Ultimately, the crisis resulted from a combination of lax regulatory oversight, predatory lending, flawed risk management, and the systemic interconnectedness of the global financial system, which amplified the initial shock into a catastrophic economic downturn.",
+    "elapsed_s": 6.75,
+    "completion_tokens": 315,
+    "tokens_per_sec": 46.7,
+    "quality_total": 9.8,
+    "quality_scores": {
+      "accuracy": 10,
+      "completeness": 10,
+      "clarity": 10,
+      "depth": 9,
+      "relevance": 10
+    }
+  },
+  {
+    "label": "qwen-35b",
+    "model": "qwen-35b",
+    "task": "Write a short story opening (150 words) about a lighthouse keeper who finds a message in a bottle.",
+    "response": "The salt crusted Elias\u2019s knuckles as he pried the glass neck free from the churning surf. For forty years, the Blackwood Light had been his only companion, its beam a steady, lonely eye against the Atlantic\u2019s fury. He expected driftwood, perhaps a dead crab, but the object was too smooth, too deliberate. Inside, a scroll of thick, cream-colored parchment was tightly wound, sealed with wax the color of dried blood. His heart hammered a frantic rhythm against his ribs, a sensation long forgotten in this isolated tower. The storm outside howled, rattling the lantern room\u2019s glass, but Elias barely heard it. He broke the seal with trembling fingers. The paper was dry, impossibly so. As he unrolled it, the scent of lavender and old paper drifted up, cutting through the brine. The handwriting was elegant, looping, and unmistakably modern. It wasn\u2019t a plea for help. It was an invitation. And it was addressed to him.",
+    "elapsed_s": 4.45,
+    "completion_tokens": 203,
+    "tokens_per_sec": 45.6,
+    "quality_total": 9.6,
+    "quality_scores": {
+      "accuracy": 10,
+      "completeness": 10,
+      "clarity": 10,
+      "depth": 8,
+      "relevance": 10
+    }
+  },
+  {
+    "label": "qwen-35b",
+    "model": "qwen-35b",
+    "task": "What's the best way to identify a ripe avocado?",
+    "response": "The best way to identify a ripe avocado is by combining **visual inspection** with **gentle tactile feedback**. Relying on just one method can be misleading, as color varies by variety and ripening speed can be deceptive.\n\nHere is the most reliable step-by-step approach:\n\n### 1. Check the Color (Visual)\n*   **Hass Avocados** (the most common variety): Look for a **dark green to nearly black** skin. Bright green avocados are typically underripe.\n*   **Other Varieties** (e.g., Fuerte, Bacon): These often remain green even when ripe. For these, rely more heavily on the feel test below.\n*   **Note:** Color alone is not foolproof. An avocado can look dark but still be hard, or look green but be soft if it\u2019s a different variety or was picked early.\n\n### 2. Apply Gentle Pressure (Tactile)\nThis is the most critical step.\n*   **Hold the avocado in your palm** (not your fingertips, which can bruise it).\n*   **Squeeze gently** with your whole hand.\n*   **Ideal Feel:** It should yield to gentle pressure, feeling **slightly soft but not mushy**. It should have a slight \"give,\" similar to the feel of the fleshy part of your palm just below your thumb when your hand is relaxed.\n*   **Underripe:** Feels hard and does not yield at all.\n*   **Overripe:** Feels very soft, mushy, or has indentations that don\u2019t spring back.\n\n### 3. Inspect the Stem (The \"Nose\" Test)\nIf the avocado passes the color and feel tests, check the small stem or cap at the top.\n*   **Remove the stem gently** (if it\u2019s loose, you can flick it off; if not, don\u2019t force it).\n*   **Green underneath:** The avocado is perfectly ripe and ready to eat.\n*   **Brown underneath:** The avocado is likely overripe or bruised inside.\n*   **Won\u2019t come off:** The avocado is likely underripe.\n\n### 4. Check for Surface Imperfections\n*   Avoid avocados with large sunken spots, cracks, or significant discoloration, as these indicate internal damage or rot.\n*   Minor surface blemishes are usually fine and don\u2019t affect the flesh inside.\n\n### Summary of Ripeness Levels:\n| Ripeness | Color (Hass) | Feel | Stem Test |\n| :--- | :--- | :--- | :--- |\n| **Underripe** | Bright Green | Hard, no give | Won\u2019t remove |\n| **Perfectly Ripe** | Dark Green/Black | Yields gently | Green underneath |\n| **Overripe** | Very Dark/Black | Mushy, soft | Brown underneath |\n\n### Pro Tips:\n*   **Store wisely:** Keep unripe avocados at room temperature to ripen. Once ripe, store them in the refrigerator to slow down further ripening for 1\u20132 days.\n*   **Ripening hack:** To speed up ripening, place avocados in a paper bag with a banana or apple. The ethylene gas they emit accelerates the process.\n*   **Cut test:** If you\u2019re unsure, cut the avocado open. If the flesh is bright green and firm, it\u2019s underripe. If it\u2019s creamy and evenly colored, it\u2019s ripe. If it has brown streaks or spots, it\u2019s overripe.",
+    "elapsed_s": 15.82,
+    "completion_tokens": 753,
+    "tokens_per_sec": 47.6,
+    "quality_total": 9.8,
+    "quality_scores": {
+      "accuracy": 10,
+      "completeness": 10,
+      "clarity": 10,
+      "depth": 9,
+      "relevance": 10
+    }
+  },
+  {
+    "label": "qwen-35b",
+    "model": "qwen-35b",
+    "task": "Explain how a Bloom filter works and when to use one.",
+    "response": "A Bloom filter is a space-efficient probabilistic data structure used to test whether an element is a member of a set. It was invented by Burton Howard Bloom in 1970.\n\n### How It Works\n\nA Bloom filter consists of two main components:\n1.  **A bit array** of size $m$, initially set to all zeros.\n2.  **$k$ independent hash functions**, each mapping an element to one of the $m$ positions in the bit array.\n\n#### Insertion Process\nTo add an element to the set:\n1.  Apply each of the $k$ hash functions to the element.\n2.  Each hash function produces an index in the bit array.\n3.  Set the bits at these $k$ indices to `1`.\n\n#### Query Process\nTo check if an element is in the set:\n1.  Apply the same $k$ hash functions to the element.\n2.  Check the bits at the corresponding indices in the bit array.\n3.  **If any of the bits is `0`**, the element is **definitely not** in the set.\n4.  **If all of the bits are `1`**, the element is **probably** in the set.\n\n### Key Characteristics\n\n*   **False Positives:** A Bloom filter can return \"true\" for an element that is not actually in the set. This happens when the bits for a non-member have been set to `1` by other inserted elements.\n*   **No False Negatives:** If a Bloom filter returns \"false,\" the element is definitely not in the set.\n*   **No Deletion:** Standard Bloom filters do not support deletion because setting a bit back to `0` might incorrectly remove other elements. (Variants like Counting Bloom Filters exist to support deletion.)\n*   **Space Efficiency:** Bloom filters are significantly more space-efficient than hash tables or balanced trees for large sets, especially when the set size is known in advance.\n\n### When to Use a Bloom Filter\n\nUse a Bloom filter when:\n1.  **Memory is constrained:** You need to store a very large set of elements but cannot afford the memory overhead of a hash table or similar structure.\n2.  **You can tolerate false positives:** Your application can handle occasional incorrect \"yes\" answers but cannot afford incorrect \"no\" answers.\n3.  **You need fast lookups:** Insertion and query operations are $O(k)$, where $k$ is the number of hash functions, making them very fast.\n4.  **You want to avoid expensive operations:** For example, in a database, you can use a Bloom filter to quickly rule out disk blocks that do not contain the requested data, avoiding costly disk I/O.\n\n### Common Use Cases\n\n*   **Web Caching:** Checking if a URL has been previously fetched to avoid redundant network requests.\n*   **Database Systems:** Optimizing queries by quickly identifying which disk pages do not contain the required data.\n*   **Spam Filtering:** Checking if an email address or content is in a known spam list.\n*   **Spell Checkers:** Quickly verifying if a word exists in a dictionary.\n*   **Network Routers:** Checking if an IP address is in a list of known malicious addresses.\n\n### Choosing Parameters\n\nThe performance of a Bloom filter depends on:\n*   **$m$ (size of the bit array):** Larger arrays reduce false positive rates.\n*   **$k$ (number of hash functions):** Optimal $k$ minimizes the false positive rate. The optimal number of hash functions is $k = \\frac{m}{n} \\ln 2$, where $n$ is the number of elements expected to be inserted.\n*   **$n$ (number of elements):** The expected number of elements to be inserted.\n\nThe false positive rate $p$ is approximately:\n$$ p \\approx \\left(1 - e^{-kn/m}\\right)^k $$\n\nBy tuning $m$, $k$, and $n$, you can achieve a desired false positive rate.",
+    "elapsed_s": 18.12,
+    "completion_tokens": 862,
+    "tokens_per_sec": 47.6,
+    "quality_total": 9.8,
+    "quality_scores": {
+      "accuracy": 10,
+      "completeness": 10,
+      "clarity": 10,
+      "depth": 9,
+      "relevance": 10
+    }
+  },
+  {
+    "label": "qwen-35b",
+    "model": "qwen-35b",
+    "task": "Write a SQL query to find the second-highest salary in an employees table.",
+    "response": "To find the second-highest salary in an `employees` table, the most robust and standard approach uses a subquery with `DISTINCT` and `ORDER BY`. This handles cases where multiple employees might have the same highest salary (ensuring we don't just return the highest salary again) and works across most SQL dialects (MySQL, PostgreSQL, SQL Server, Oracle).\n\n### \u2705 Recommended Query (Standard SQL)\n\n```sql\nSELECT MAX(salary) AS second_highest_salary\nFROM employees\nWHERE salary < (SELECT MAX(salary) FROM employees);\n```\n\n### \ud83d\udd0d How It Works:\n1. `(SELECT MAX(salary) FROM employees)` finds the **highest** salary.\n2. `WHERE salary < ...` filters out all employees earning that highest salary.\n3. `MAX(salary)` on the remaining rows gives the **second-highest** salary.\n4. If there is no second-highest salary (e.g., only one distinct salary or no rows), this returns `NULL`, which is the correct behavior.\n\n---\n\n### \ud83d\udd04 Alternative: Using `LIMIT` and `OFFSET` (MySQL/PostgreSQL)\n\nIf you prefer using `LIMIT`/`OFFSET` (common in MySQL and PostgreSQL):\n\n```sql\nSELECT DISTINCT salary AS second_highest_salary\nFROM employees\nORDER BY salary DESC\nLIMIT 1 OFFSET 1;\n```\n\n- `DISTINCT` ensures duplicate highest salaries don\u2019t cause issues.\n- `ORDER BY salary DESC` sorts salaries from highest to lowest.\n- `LIMIT 1 OFFSET 1` skips the first (highest) and returns the next one.\n\n> \u26a0\ufe0f **Note:** If there is no second-highest salary, this query returns an empty result set (no rows), whereas the first query returns `NULL`. Choose based on your application\u2019s needs.\n\n---\n\n### \ud83c\udfc6 Alternative: Using `DENSE_RANK()` (SQL Server, PostgreSQL, Oracle, MySQL 8+)\n\n```sql\nSELECT salary AS second_highest_salary\nFROM (\n    SELECT salary, DENSE_RANK() OVER (ORDER BY salary DESC) AS rank\n    FROM employees\n) ranked\nWHERE rank = 2;\n```\n\n- `DENSE_RANK()` assigns ranks without gaps (so if two employees tie for first, the next rank is 2, not 3).\n- This is ideal if you want to generalize to the *Nth* highest salary easily.\n\n---\n\n### \ud83d\udccc Summary\n\n| Method | Handles Ties? | Returns `NULL` if no 2nd? | Dialect Support |\n|---|---|---|---|\n| `MAX()` + subquery | \u2705 Yes | \u2705 Yes | All |\n| `LIMIT` + `OFFSET` | \u2705 Yes (with `DISTINCT`) | \u274c No (empty set) | MySQL, PostgreSQL |\n| `DENSE_RANK()` | \u2705 Yes | \u274c No (empty set) | Modern SQL (8+) |\n\n**Use the first query (`MAX` + subquery) for maximum compatibility and correct `NULL` handling.**",
+    "elapsed_s": 13.72,
+    "completion_tokens": 650,
+    "tokens_per_sec": 47.4,
+    "quality_total": 9.8,
+    "quality_scores": {
+      "accuracy": 10,
+      "completeness": 10,
+      "clarity": 10,
+      "depth": 9,
+      "relevance": 10
+    }
+  },
+  {
+    "label": "qwen-35b",
+    "model": "qwen-35b",
+    "task": "Compare REST and GraphQL for a mobile app backend.",
+    "response": "For a mobile app backend, the choice between REST and GraphQL hinges primarily on **network efficiency** and **development velocity**, given the constraints of mobile devices (variable bandwidth, high latency, battery life) and the need for rapid UI iteration.\n\nHere is a comparative analysis tailored to mobile development.\n\n### 1. Core Architectural Differences\n\n| Feature | REST (Representational State Transfer) | GraphQL (Graph Query Language) |\n| :--- | :--- | :--- |\n| **Data Fetching** | Multiple endpoints. You fetch specific resources (e.g., `/users`, `/users/1/posts`). | Single endpoint (`/graphql`). Clients request exactly the data they need in a single query. |\n| **Over-fetching** | **High.** Often returns full objects with fields the mobile UI doesn\u2019t need (e.g., fetching a user profile just to get their name). | **None.** The client defines the shape of the response. |\n| **Under-fetching** | **High.** If a screen needs user data + recent posts + comments, you may need 3+ API calls. | **None.** All related data can be fetched in one request via nested queries. |\n| **Versioning** | **Explicit.** Requires URL versioning (e.g., `/v1/`, `/v2/`) or breaking changes. | **Implicit.** Schema evolution is additive. New fields don\u2019t break old clients; deprecated fields can be hidden. |\n| **Caching** | **HTTP-native.** Leverages standard HTTP caching headers (ETag, Cache-Control). Simple and robust. | **Complex.** No standard HTTP caching for nested data. Requires client-side cache normalization (e.g., Apollo, Relay) or CDN workarounds. |\n\n### 2. Mobile-Specific Advantages & Disadvantages\n\n#### **GraphQL for Mobile**\n\n**Advantages:**\n*   **Bandwidth Efficiency:** Critical for users on metered connections or poor signal. Sending only required fields reduces payload size significantly.\n*   **Fewer Round Trips:** Reduces latency by combining multiple data needs into one request. This improves perceived app performance.\n*   **Frontend-Backend Decoupling:** Mobile teams can iterate on UI components without waiting for backend API changes. The mobile app defines what it needs; the backend provides it.\n*   **Strong Typing:** GraphQL schemas provide a contract that can be used to auto-generate types for iOS (Swift) and Android (Kotlin), reducing serialization bugs.\n\n**Disadvantages:**\n*   **Complex Caching:** HTTP caching is powerful but doesn\u2019t work well with GraphQL\u2019s dynamic queries. You must implement a normalized cache (e.g., Apollo Client, Urql), which adds complexity and memory overhead on the device.\n*   **Learning Curve:** Developers must learn query language, schema design, and resolver patterns.\n*   **Debugging:** Tracing issues can be harder because a single endpoint handles all requests. Tools like Apollo Studio or GraphiQL are essential.\n*   **DDoS/Abuse Risk:** Complex nested queries can be exploited to create expensive queries. Requires query depth limiting, complexity analysis, and caching strategies on the server.\n\n#### **REST for Mobile**\n\n**Advantages:**\n*   **Simple Caching:** Leverages browser/OS-level HTTP caching. Easy to implement with standard tools (CDNs, reverse proxies).\n*   **Maturity & Ecosystem:** Well-understood patterns, extensive tooling, and easier to hire for.\n*   **Simplicity:** Easier to set up and debug for simple apps. No need for complex client-side cache normalization.\n*   **Predictable Performance:** Each endpoint has a known cost. No risk of \"expensive\" queries unless poorly designed.\n\n**Disadvantages:**\n*   **Over-fetching/Under-fetching:** Leads to larger payloads and more network requests, which hurts battery life and performance on mobile.\n*   **Versioning Overhead:** Managing multiple API versions for different app versions can become cumbersome.\n*   **Tight Coupling:** Frontend and backend teams must coordinate closely on API contracts. Changes to the backend can break mobile apps.\n\n### 3. When to Choose Which?\n\n#### **Choose GraphQL if:**\n*   **Your app has complex UIs** with many data sources (e.g., social media, e-commerce, dashboards).\n*   **Network conditions are unpredictable** (e.g., global user base, mobile-first).\n*   **You have multiple client types** (iOS, Android, Web) that need different data shapes from the same backend.\n*   **You prioritize development speed** and want to decouple frontend/backend teams.\n*   **You can invest in infrastructure** for caching, query complexity analysis, and monitoring.\n\n#### **Choose REST if:**\n*   **Your app is simple** with few screens and",
+    "elapsed_s": 21.6,
+    "completion_tokens": 1024,
+    "tokens_per_sec": 47.4,
+    "quality_total": 9.6,
+    "quality_scores": {
+      "accuracy": 10,
+      "completeness": 9,
+      "clarity": 10,
+      "depth": 9,
+      "relevance": 10
+    }
+  },
+  {
+    "label": "qwen-35b",
+    "model": "qwen-35b",
+    "task": "Explain photosynthesis to a 10-year-old.",
+    "response": "Imagine plants are like tiny, green chefs that cook their own food using sunlight. This special cooking process is called **photosynthesis** (say: *fo-toh-SIN-thuh-sis*).\n\nHere is how it works:\n\n### \ud83c\udf31 What Plants Need to \"Cook\"\nJust like you need ingredients to make a sandwich, plants need three main things to make their food:\n1.  **Sunlight** (from the sun)\n2.  **Water** (sucked up from the soil through their roots)\n3.  **Carbon Dioxide** (a gas we breathe out, which plants take in from the air)\n\n### \ud83c\udf43 How It Happens\nPlants have a special green stuff inside their leaves called **chlorophyll**. You can think of chlorophyll like a solar panel. It catches sunlight and uses that energy to mix the water and carbon dioxide together.\n\n### \ud83c\udf6c What They Make\nWhen the plant mixes these ingredients, it makes **sugar** (glucose). This sugar is the plant\u2019s food! It gives the plant energy to grow big, strong, and beautiful.\n\n### \ud83d\udca8 What They Give Back\nWhile making food, plants also make a gas called **oxygen**. They release it into the air through their leaves. This is great news for us because **we need oxygen to breathe!**\n\n### \ud83c\udf0d Why It\u2019s Important\n- **Plants** get food to grow.\n- **Animals and humans** get oxygen to breathe.\n- It helps keep our planet healthy.\n\nSo, every time you see a green leaf, remember: it\u2019s busy making food for itself and giving us fresh air to breathe! \ud83c\udf3f\u2600\ufe0f\ud83d\udca7",
+    "elapsed_s": 7.94,
+    "completion_tokens": 363,
+    "tokens_per_sec": 45.7,
+    "quality_total": 9.6,
+    "quality_scores": {
+      "accuracy": 10,
+      "completeness": 10,
+      "clarity": 10,
+      "depth": 8,
+      "relevance": 10
+    }
+  },
+  {
+    "label": "qwen-35b",
+    "model": "qwen-35b",
+    "task": "Draft a polite email declining a meeting invite due to a scheduling conflict.",
+    "response": "Subject: Re: Meeting Invitation - [Meeting Topic/Date]\n\nDear [Name],\n\nThank you for inviting me to meet on [Date] at [Time].\n\nUnfortunately, I have a scheduling conflict at that time and will not be able to attend. I apologize for any inconvenience this may cause.\n\nI am still very interested in connecting. Would you be available on [Alternative Date 1] or [Alternative Date 2] instead? Alternatively, please let me know if there is another time later in the week that might work for you.\n\nBest regards,\n\n[Your Name]",
+    "elapsed_s": 2.84,
+    "completion_tokens": 122,
+    "tokens_per_sec": 43.0,
+    "quality_total": 9.0,
+    "quality_scores": {
+      "accuracy": 10,
+      "completeness": 10,
+      "clarity": 10,
+      "depth": 5,
+      "relevance": 10
+    }
+  },
+  {
+    "label": "qwen-27b",
+    "model": "qwen-27b",
+    "task": "Write a Python function to check if a number is prime, with tests.",
+    "response": "```python\ndef is_prime(n: int) -> bool:\n    \"\"\"\n    Check if a number is prime.\n    \n    Args:\n        n: The integer to check.\n        \n    Returns:\n        True if n is prime, False otherwise.\n    \"\"\"\n    if n < 2:\n        return False\n    if n == 2:\n        return True\n    if n % 2 == 0:\n        return False\n    if n == 3:\n        return True\n    if n % 3 == 0:\n        return False\n    \n    # Check for factors of the form 6k \u00b1 1 up to sqrt(n)\n    i = 5\n    while i * i <= n:\n        if n % i == 0 or n % (i + 2) == 0:\n            return False\n        i += 6\n    return True\n\n\ndef test_is_prime():\n    # Test negative numbers\n    assert is_prime(-1) == False\n    assert is_prime(-10) == False\n    assert is_prime(-100) == False\n    \n    # Test zero and one\n    assert is_prime(0) == False\n    assert is_prime(1) == False\n    \n    # Test two (smallest prime)\n    assert is_prime(2) == True\n    \n    # Test three\n    assert is_prime(3) == True\n    \n    # Test four (smallest composite)\n    assert is_prime(4) == False\n    \n    # Test small primes\n    assert is_prime(5) == True\n    assert is_prime(7) == True\n    assert is_prime(11) == True\n    assert is_prime(13) == True\n    assert is_prime(17) == True\n    assert is_prime(19) == True\n    assert is_prime(23) == True\n    \n    # Test small composites\n    assert is_prime(6) == False\n    assert is_prime(8) == False\n    assert is_prime(9) == False\n    assert is_prime(10) == False\n    assert is_prime(12) == False\n    assert is_prime(14) == False\n    assert is_prime(15) == False\n    assert is_prime(16) == False\n    assert is_prime(18) == False\n    assert is_prime(20) == False\n    assert is_prime(21) == False\n    assert is_prime(22) == False\n    assert is_prime(24) == False\n    assert is_prime(25) == False\n    \n    # Test larger primes\n    assert is_prime(29) == True\n    assert is_prime(31) == True\n    assert is_prime(37) == True\n    assert is_prime(41) == True\n    assert is_prime(43) == True\n    assert is_prime(47) == True\n    assert is_prime(53) == True\n    assert is_prime(59) == True\n    assert is_prime(61) == True\n    assert is_prime(67) == True\n    assert is_prime(71) == True\n    assert is_prime(73) == True\n    assert is_prime(79) == True\n    assert is_prime(83) == True\n    assert is_prime(89) == True\n    assert is_prime(97) == True\n    \n    # Test larger composites\n    assert is_prime(26) == False\n    assert is_prime(27) == False\n    assert is_prime(28) == False\n    assert is_prime(30) == False\n    assert is_prime(32) == False\n    assert is_prime(33) == False\n    assert is_prime(34) == False\n    assert is_prime(35) == False\n    assert is_prime(36) == False\n    assert is_prime(38) == False\n    assert is_prime(39) == False\n    assert is_prime(40) == False\n    assert is_prime(42) == False\n    assert is_prime(44) == False\n    assert is_prime(45) == False\n    assert is_prime(46) == False\n    assert is_prime(48) == False\n    assert is_prime(49) == False  # 7*7\n    assert is_prime(50) == False\n    assert is_prime(51) == False  # 3*17\n    assert is_prime(52) == False\n    assert is_prime(54) == False\n    assert is_prime(55) == False  # 5*11",
+    "elapsed_s": 147.46,
+    "completion_tokens": 1024,
+    "tokens_per_sec": 6.9,
+    "quality_total": 9.8,
+    "quality_scores": {
+      "accuracy": 10,
+      "completeness": 10,
+      "clarity": 10,
+      "depth": 9,
+      "relevance": 10
+    }
+  },
+  {
+    "label": "qwen-27b",
+    "model": "qwen-27b",
+    "task": "Explain the difference between TCP and UDP in simple terms.",
+    "response": "Think of TCP and UDP as two different ways to send a package through the mail system.\n\n### **TCP (Transmission Control Protocol): The Certified Mail**\nTCP is like sending a package via **Certified Mail with a Return Receipt**.\n\n*   **Reliability:** It guarantees that your package arrives. If it gets lost, the system automatically resends it.\n*   **Order:** It ensures the pages of your book arrive in the correct order (Page 1, then Page 2, etc.).\n*   **Speed:** It is slower because it spends time checking for errors, confirming receipt, and reordering data.\n*   **Best for:** Things where accuracy is more important than speed.\n    *   *Examples:* Loading a website, sending an email, online banking, or downloading a file. You don\u2019t want missing pixels on a webpage or a corrupted bank transaction.\n\n### **UDP (User Datagram Protocol): The Regular Mail**\nUDP is like throwing a letter in the mailbox and hoping it gets there.\n\n*   **Reliability:** It does **not** guarantee delivery. If the letter gets lost, it\u2019s gone. No resend.\n*   **Order:** It doesn\u2019t care if the letters arrive out of order.\n*   **Speed:** It is very fast because it skips all the checking, confirming, and reordering steps.\n*   **Best for:** Things where speed is more important than perfect accuracy.\n    *   *Examples:* Video streaming, online gaming, or live voice calls. If a few frames of video are lost or a word is skipped in a voice call, you don\u2019t want the entire stream to pause while it tries to fix the error. You just want it to keep going.\n\n### **Simple Summary**\n*   **TCP** = **Slow but Safe**. Use it when you need every single piece of data to arrive correctly.\n*   **UDP** = **Fast but Risky**. Use it when you need data to arrive quickly, even if some pieces get lost.",
+    "elapsed_s": 47.82,
+    "completion_tokens": 423,
+    "tokens_per_sec": 8.8,
+    "quality_total": 9.6,
+    "quality_scores": {
+      "accuracy": 10,
+      "completeness": 10,
+      "clarity": 10,
+      "depth": 8,
+      "relevance": 10
+    }
+  },
+  {
+    "label": "qwen-27b",
+    "model": "qwen-27b",
+    "task": "Summarize the causes of the 2008 financial crisis in 200 words.",
+    "response": "The 2008 financial crisis stemmed from a complex interplay of lax regulation, risky lending practices, and excessive leverage within the global financial system. Central to the collapse was the U.S. housing bubble, fueled by low interest rates and aggressive subprime mortgage lending. Lenders issued high-risk loans to borrowers with poor credit histories, often with adjustable rates that became unaffordable when interest rates rose.\n\nThese mortgages were bundled into complex financial instruments known as mortgage-backed securities (MBS) and collateralized debt obligations (CDOs). Credit rating agencies erroneously assigned high safety ratings to these toxic assets, encouraging widespread investment by banks, pension funds, and insurers globally. Financial institutions heavily leveraged their balance sheets to maximize returns, relying on short-term funding markets to finance long-term, illiquid assets.\n\nWhen housing prices peaked and began to decline in 2006, mortgage defaults surged. The value of MBS and CDOs plummeted, causing massive losses for major financial institutions. The crisis was exacerbated by the widespread use of credit default swaps (CDS), particularly by AIG, which failed to hedge against the collapse of these securities. As trust evaporated, interbank lending froze, triggering a liquidity crisis. The failure of Lehman Brothers in September 2008 marked a turning point, leading to a global credit crunch and severe recession. Ultimately, the crisis highlighted systemic vulnerabilities, including inadequate regulatory oversight, excessive risk-taking, and the dangerous interconnectedness of global financial markets.",
+    "elapsed_s": 35.02,
+    "completion_tokens": 307,
+    "tokens_per_sec": 8.8,
+    "quality_total": 9.8,
+    "quality_scores": {
+      "accuracy": 10,
+      "completeness": 10,
+      "clarity": 10,
+      "depth": 9,
+      "relevance": 10
+    }
+  },
+  {
+    "label": "qwen-27b",
+    "model": "qwen-27b",
+    "task": "Write a short story opening (150 words) about a lighthouse keeper who finds a message in a bottle.",
+    "response": "The salt spray had long since eaten away the iron railing, leaving only rusted skeletons against the churning Atlantic. Elias wiped the condensation from the lantern glass, his breath fogging the cold air. Another night, another endless vigil. The storm had broken hours ago, leaving behind a debris field of kelp and splintered driftwood.\n\nSomething glinted near the base of the tower, half-buried in wet sand. Elias descended the spiral stairs, his boots heavy with fatigue. It was a bottle, thick green glass, sealed with wax that had somehow survived the battering waves. He pried the cork loose with a trembling hand. Inside, a single sheet of parchment, brittle and stained. The handwriting was frantic, the ink blurred by time or tears. *\u201cThey are coming. Do not trust the sky.\u201d*\n\nElias looked up. The clouds were parting, revealing a sky that was too clear, too bright for this hour. A cold dread, sharper than the winter wind, settled in his chest. He had kept the light burning for thirty years, but for the first time, he wondered what he was actually warning away.",
+    "elapsed_s": 27.27,
+    "completion_tokens": 237,
+    "tokens_per_sec": 8.7,
+    "quality_total": 9.6,
+    "quality_scores": {
+      "accuracy": 10,
+      "completeness": 10,
+      "clarity": 10,
+      "depth": 8,
+      "relevance": 10
+    }
+  },
+  {
+    "label": "qwen-27b",
+    "model": "qwen-27b",
+    "task": "What's the best way to identify a ripe avocado?",
+    "response": "The most reliable method for identifying a ripe avocado is a combination of **gentle pressure** and **visual inspection**, as color alone can be misleading depending on the variety.\n\n### 1. The Gentle Squeeze Test (Primary Method)\n*   **How to do it:** Hold the avocado in the palm of your hand (not with your fingertips, which can bruise the fruit) and apply gentle, even pressure.\n*   **Ripe:** It should yield slightly to pressure, feeling like the tip of your nose. It will have a slight \"give\" but not feel mushy.\n*   **Unripe:** It feels hard and does not yield at all.\n*   **Overripe:** It feels very soft, mushy, or leaves an indentation when pressed. The skin may also feel slimy.\n\n### 2. Visual Inspection (Secondary Method)\n*   **Color:**\n    *   **Hass Avocados (most common):** Change from bright green to a deep, dark purple-black when ripe. *Note: Some varieties remain green when ripe, so color is less reliable for non-Hass types.*\n    *   **Other Varieties (e.g., Fuerte, Bacon):** Often remain green or turn yellowish-green. Rely more on the squeeze test for these.\n*   **Skin Texture:** The skin of a ripe Hass avocado may appear slightly duller and less glossy than an unripe one.\n\n### 3. The Stem Test (Quick Check)\n*   **How to do it:** Gently flick off the small stem or cap at the top of the avocado.\n*   **Ripe:** The area underneath is **green**.\n*   **Unripe:** The area underneath is **green but hard**, or the stem doesn\u2019t come off easily.\n*   **Overripe:** The area underneath is **brown or black**.\n\n### Summary Table\n\n| State | Feel (Squeeze) | Color (Hass) | Stem Area |\n| :--- | :--- | :--- | :--- |\n| **Unripe** | Hard, no give | Bright Green | Green/Hard |\n| **Ripe** | Slight give, firm | Dark Purple-Black | Green |\n| **Overripe** | Mushy, soft | Very Dark/Black | Brown/Black |\n\n### Pro Tip:\nIf you buy an unripe avocado, you can speed up ripening by placing it in a paper bag with a banana or apple. These fruits release ethylene gas, which accelerates the ripening process. Check daily for the desired softness.",
+    "elapsed_s": 61.66,
+    "completion_tokens": 545,
+    "tokens_per_sec": 8.8,
+    "quality_total": 9.8,
+    "quality_scores": {
+      "accuracy": 10,
+      "completeness": 10,
+      "clarity": 10,
+      "depth": 9,
+      "relevance": 10
+    }
+  },
+  {
+    "label": "qwen-27b",
+    "model": "qwen-27b",
+    "task": "Explain how a Bloom filter works and when to use one.",
+    "response": "A **Bloom filter** is a space-efficient, probabilistic data structure used to test whether an element is a member of a set. It is designed for scenarios where you need to quickly check for existence and can tolerate a small probability of false positives, but **never** false negatives.\n\n### How It Works\n\nA Bloom filter consists of two main components:\n1.  **A bit array** of size $m$ (initially all bits set to 0).\n2.  **$k$ independent hash functions** that map input elements to indices in the bit array.\n\n#### 1. Adding an Element\nTo add an element $x$ to the set:\n1.  Pass $x$ through each of the $k$ hash functions.\n2.  Each hash function produces an index in the bit array.\n3.  Set the bits at these $k$ indices to **1**.\n\n#### 2. Querying an Element\nTo check if an element $x$ is in the set:\n1.  Pass $x$ through the same $k$ hash functions.\n2.  Check the bits at the resulting $k$ indices.\n3.  **If any bit is 0**: The element is **definitely not** in the set.\n4.  **If all bits are 1**: The element is **probably** in the set.\n\n### Key Properties\n\n*   **No False Negatives**: If the filter says an element is not present, it is guaranteed to be absent. This is because adding an element only turns bits from 0 to 1; it never turns them back to 0.\n*   **False Positives**: If the filter says an element is present, it might not be. This happens when the bits for a non-existent element happen to be set to 1 by other elements. The probability of false positives increases as more elements are added to the filter.\n*   **Space Efficiency**: Bloom filters use significantly less memory than storing the actual elements (e.g., in a hash set or database index).\n*   **No Deletions**: Standard Bloom filters do not support removing elements. (Counting Bloom filters exist but are more complex and memory-intensive).\n\n### When to Use a Bloom Filter\n\nUse a Bloom filter when:\n1.  **Memory is constrained**: You need to represent a large set in a small amount of memory.\n2.  **Speed is critical**: Lookups are $O(k)$, which is very fast and independent of the number of elements in the set.\n3.  **False positives are acceptable**: You can handle occasional incorrect \"yes\" answers, often by verifying with a more expensive data source.\n4.  **You need to avoid expensive operations**: Use it as a pre-filter to avoid costly database queries, disk I/O, or network requests.\n\n### Common Use Cases\n\n1.  **Database Query Optimization**:\n    *   Before querying a large database table, check a Bloom filter. If the filter says \"not present,\" skip the database query entirely. This reduces load on the database.\n    *   *Example*: Apache Cassandra and Redis use Bloom filters for this purpose.\n\n2.  **Web Caching**:\n    *   A web browser or cache server can use a Bloom filter to check if a URL has been visited or cached. If the filter says \"not cached,\" it avoids checking the full cache index.\n\n3.  **Spell Checkers**:\n    *   Store a Bloom filter of all valid words. If a word is not in the filter, it is definitely misspelled. If it is in the filter, it is likely valid (but could be a false positive).\n\n4.  **Network Routing**:\n    *   Routers use Bloom filters to quickly determine if a destination IP address is in a specific subnet or routing table, reducing the need for full table lookups.\n\n5.  **Preventing Duplicate Entries**:\n    *   In distributed systems, use a Bloom filter to quickly check if a record ID has already been processed, avoiding duplicate processing.\n\n### Tuning Parameters\n\nThe performance of a Bloom filter depends on:\n*   **$m$**: Size of the bit array (larger $m$ reduces false positives).\n*   **$n$**: Number of elements expected to be added.\n*   **$k$**: Number of hash functions.\n\nThe optimal number of hash functions $k$ is given by:\n$$ k = \\frac{m}{n} \\ln 2 $$\n\nThe probability of a false positive $p$ is approximately:\n$$ p \\approx \\left(1 - e^{-\\frac{kn}{m}}\\right)^k $$\n\nBy choosing $m$ and $k$ appropriately, you can control the false positive rate to an acceptable level (e.g., 1% or 0.",
+    "elapsed_s": 117.93,
+    "completion_tokens": 1024,
+    "tokens_per_sec": 8.7,
+    "quality_total": 9.8,
+    "quality_scores": {
+      "accuracy": 10,
+      "completeness": 10,
+      "clarity": 10,
+      "depth": 9,
+      "relevance": 10
+    }
+  },
+  {
+    "label": "qwen-27b",
+    "model": "qwen-27b",
+    "task": "Write a SQL query to find the second-highest salary in an employees table.",
+    "response": "Here are the most common and robust ways to write this query, depending on your SQL dialect.\n\n### Option 1: Using `DENSE_RANK()` (Recommended for most modern SQL databases)\nThis method is standard in SQL Server, PostgreSQL, Oracle, MySQL 8.0+, and SQLite 3.25+. It correctly handles ties (if two people share the highest salary, the next distinct salary is still considered the \"second highest\").\n\n```sql\nSELECT DISTINCT salary\nFROM (\n    SELECT salary,\n           DENSE_RANK() OVER (ORDER BY salary DESC) as rank\n    FROM employees\n) ranked_salaries\nWHERE rank = 2;\n```\n\n### Option 2: Using `LIMIT` and `OFFSET` (MySQL, PostgreSQL, SQLite)\nThis is a concise approach for databases that support `LIMIT`. Note that this returns the second row in the sorted list, which may be the same as the highest salary if there are ties.\n\n```sql\nSELECT DISTINCT salary\nFROM employees\nORDER BY salary DESC\nLIMIT 1 OFFSET 1;\n```\n\n### Option 3: Using a Subquery with `MAX()` (Universal Compatibility)\nThis works on almost all SQL databases, including older versions of MySQL and SQL Server. It finds the maximum salary that is strictly less than the overall maximum salary.\n\n```sql\nSELECT MAX(salary) AS second_highest_salary\nFROM employees\nWHERE salary < (SELECT MAX(salary) FROM employees);\n```\n\n**Key Considerations:**\n- **Ties:** If multiple employees have the same highest salary, Option 1 (`DENSE_RANK`) and Option 3 (`MAX < MAX`) will correctly return the next distinct salary value. Option 2 (`LIMIT/OFFSET`) might return the same highest salary again if you don't use `DISTINCT`.\n- **No Second Highest:** If there is only one distinct salary in the table, Option 1 and 2 will return an empty result set. Option 3 will return `NULL`.",
+    "elapsed_s": 48.62,
+    "completion_tokens": 419,
+    "tokens_per_sec": 8.6,
+    "quality_total": 9.8,
+    "quality_scores": {
+      "accuracy": 10,
+      "completeness": 10,
+      "clarity": 10,
+      "depth": 9,
+      "relevance": 10
+    }
+  },
+  {
+    "label": "qwen-27b",
+    "model": "qwen-27b",
+    "task": "Compare REST and GraphQL for a mobile app backend.",
+    "response": "Choosing between REST and GraphQL for a mobile app backend is a strategic decision that impacts development speed, network efficiency, and long-term maintainability. Mobile environments present unique constraints\u2014unreliable networks, limited battery life, and varying screen sizes\u2014that make this choice particularly critical.\n\nHere is a detailed comparison tailored specifically for mobile app development.\n\n### 1. Core Philosophy & Data Fetching\n\n| Feature | REST | GraphQL |\n| :--- | :--- | :--- |\n| **Endpoint Structure** | Multiple endpoints (e.g., `/users`, `/posts`, `/comments`). Each endpoint returns a fixed data structure. | Single endpoint (usually `/graphql`). The client specifies exactly what data it needs in the query. |\n| **Data Over-fetching** | **High Risk.** If an endpoint returns a full user object but the mobile UI only needs the name and avatar, the app downloads unnecessary data. | **Eliminated.** The client requests only `name` and `avatar`, receiving exactly that. |\n| **Data Under-fetching** | **High Risk.** To display a feed with user details and post comments, the app may need to make 3+ sequential API calls (N+1 problem). | **Eliminated.** A single query can fetch nested data (User \u2192 Posts \u2192 Comments) in one round trip. |\n| **Versioning** | Requires versioned endpoints (e.g., `/v1/users`, `/v2/users`) to avoid breaking changes. | Schema evolution allows adding new fields without breaking existing clients. No URL versioning needed. |\n\n### 2. Mobile-Specific Advantages\n\n#### **GraphQL Wins For:**\n*   **Network Efficiency:** Mobile users often switch between Wi-Fi, 4G, and 5G. GraphQL\u2019s ability to reduce payload size and number of requests saves bandwidth and battery.\n*   **Offline-First Architecture:** GraphQL clients (like Apollo Client or Urql) have mature caching strategies that map directly to the schema, making offline support easier to implement.\n*   **Rapid UI Iteration:** Mobile UIs change frequently. With GraphQL, frontend developers can fetch new data fields without waiting for backend engineers to create new endpoints.\n*   **Aggregating Data Sources:** If your mobile app needs data from multiple microservices (e.g., user profile from Service A, order history from Service B), GraphQL can act as a unified gateway, simplifying the mobile client\u2019s logic.\n\n#### **REST Wins For:**\n*   **Simplicity & Debugging:** REST is intuitive. You can test endpoints directly in a browser or Postman. Debugging network issues is straightforward.\n*   **Caching:** HTTP caching (using `ETag`, `Last-Modified`, `Cache-Control`) is built into the web stack and well-understood. GraphQL requires custom caching logic on the client or server.\n*   **Performance for Simple Reads:** For simple, static data (e.g., fetching a list of countries), REST with HTTP caching can be faster than GraphQL due to lower server-side processing overhead.\n*   **File Uploads:** REST has standardized, simple multipart form-data uploads. GraphQL file uploads require additional specifications (e.g., `graphql-multipart-request-spec`) and are less universally supported.\n\n### 3. Development & Operational Complexity\n\n| Aspect | REST | GraphQL |\n| :--- | :--- | :--- |\n| **Learning Curve** | Low. Most developers understand HTTP methods and JSON. | Moderate to High. Requires understanding of schemas, resolvers, and query language. |\n| **Backend Complexity** | Low. Each endpoint maps to a controller/action. | Higher. Requires schema design, resolver logic, and potentially a gateway if aggregating services. |\n| **Tooling** | Mature but generic (Swagger/OpenAPI). | Excellent developer experience (GraphiQL, Apollo Studio, automatic code generation for mobile clients). |\n| **Security** | Easier to secure with standard HTTP middleware (CORS, rate limiting per endpoint). | Requires careful schema design to prevent malicious queries (depth limiting, query complexity analysis). |\n\n### 4. When to Choose Which?\n\n#### **Choose GraphQL if:**\n*   Your mobile app has complex, nested data requirements (e.g., social feeds, dashboards).\n*   You have multiple client platforms (iOS, Android, Web) that need different data shapes from the same backend.\n*   Network efficiency is a top priority (e.g., users in regions with poor connectivity).\n*   Your team is comfortable with a steeper initial learning curve for long-term flexibility.\n*   You are building a microservices architecture and need a unified API layer.\n\n#### **Choose REST if:**\n*   Your app is simple with straightforward CRUD operations (e.g., a to-do list, a basic e-commerce catalog).\n*   You need robust, built-in HTTP caching for static or rarely changing data.\n*",
+    "elapsed_s": 116.7,
+    "completion_tokens": 1024,
+    "tokens_per_sec": 8.8,
+    "quality_total": 9.6,
+    "quality_scores": {
+      "accuracy": 10,
+      "completeness": 9,
+      "clarity": 10,
+      "depth": 9,
+      "relevance": 10
+    }
+  },
+  {
+    "label": "qwen-27b",
+    "model": "qwen-27b",
+    "task": "Explain photosynthesis to a 10-year-old.",
+    "response": "Imagine you are a plant. You don\u2019t have a mouth to eat pizza or a stomach to digest it. So, how do you get energy to grow tall, make flowers, and produce fruit?\n\nYou make your own food! This superpower is called **photosynthesis**.\n\nHere is how it works, broken down into simple steps:\n\n### 1. The Ingredients\nPlants need three main things to make their food:\n*   **Sunlight:** This is the energy source, like the battery that powers the process.\n*   **Water:** The plant drinks this up through its roots from the soil.\n*   **Carbon Dioxide (CO\u2082):** This is a gas in the air. You breathe it out when you exhale, and plants breathe it in through tiny holes in their leaves.\n\n### 2. The Kitchen: The Leaf\nThe leaf is the plant\u2019s kitchen. Inside the leaf, there are tiny green workers called **chloroplasts**. They contain a green substance called **chlorophyll**. Chlorophyll is what makes plants look green, and it\u2019s really good at catching sunlight.\n\n### 3. The Recipe\nWhen sunlight hits the chlorophyll, it acts like a switch that turns on the cooking process. The plant mixes the **water** (from the roots) and the **carbon dioxide** (from the air) using the energy from the **sun**.\n\n### 4. The Result: Sugar and Oxygen\nAfter the \"cooking\" is done, two things come out:\n*   **Sugar (Glucose):** This is the plant\u2019s food! It gives the plant energy to grow strong stems, big leaves, and tasty fruits.\n*   **Oxygen:** This is the leftover gas. The plant releases it back into the air through those tiny holes in the leaves.\n\n### Why Should You Care?\nThis is the best part: **The oxygen the plant releases is exactly what you need to breathe!**\n\nSo, every time you take a deep breath, you are thanking a plant for its hard work. And every time you breathe out, you are giving the plant the carbon dioxide it needs to make more food. It\u2019s a perfect team effort between you and the plants! \ud83c\udf31\u2600\ufe0f\ud83d\udca8",
+    "elapsed_s": 53.72,
+    "completion_tokens": 470,
+    "tokens_per_sec": 8.7,
+    "quality_total": 9.6,
+    "quality_scores": {
+      "accuracy": 10,
+      "completeness": 10,
+      "clarity": 10,
+      "depth": 8,
+      "relevance": 10
+    }
+  },
+  {
+    "label": "qwen-27b",
+    "model": "qwen-27b",
+    "task": "Draft a polite email declining a meeting invite due to a scheduling conflict.",
+    "response": "Subject: Re: Meeting Invitation - [Meeting Topic/Date]\n\nDear [Name],\n\nThank you for the invitation to meet on [Date/Time]. I appreciate you reaching out and would have enjoyed discussing [specific topic, if applicable].\n\nUnfortunately, I have a prior scheduling conflict at that time and will not be able to attend.\n\nIf you are open to rescheduling, I am available on [Alternative Date/Time 1] or [Alternative Date/Time 2]. Please let me know if either of those works for you, or feel free to suggest another time that fits your schedule.\n\nBest regards,\n\n[Your Name]",
+    "elapsed_s": 15.85,
+    "completion_tokens": 133,
+    "tokens_per_sec": 8.4,
+    "quality_total": 9.0,
+    "quality_scores": {
+      "accuracy": 10,
+      "completeness": 10,
+      "clarity": 10,
+      "depth": 5,
+      "relevance": 10
+    }
+  }
+]

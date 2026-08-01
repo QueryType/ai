@@ -1,0 +1,116 @@
+<svg width="620" height="760" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI', system-ui, -apple-system, sans-serif">
+  <defs>
+    <marker id="a" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <polygon points="0 0,8 3,0 6" fill="#94a3b8"/>
+    </marker>
+    <marker id="ab" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <polygon points="0 0,8 3,0 6" fill="#2563eb"/>
+    </marker>
+    <marker id="ag" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <polygon points="0 0,8 3,0 6" fill="#16a34a"/>
+    </marker>
+    <marker id="ar" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <polygon points="0 0,8 3,0 6" fill="#7c3aed"/>
+    </marker>
+  </defs>
+
+  <!-- canvas -->
+  <rect width="620" height="760" rx="14" fill="#f8fafc"/>
+
+  <!-- title -->
+  <text x="310" y="32" text-anchor="middle" font-size="17" font-weight="700" fill="#0f172a">Optimization Loop Flow</text>
+  <text x="310" y="50" text-anchor="middle" font-size="11" fill="#94a3b8">generate → critique → refine until threshold or max iterations</text>
+
+  <!-- ── START ──────────────────────────────────────────── -->
+  <rect x="160" y="64" width="300" height="40" rx="20" fill="#0f172a"/>
+  <text x="310" y="89" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">START — Task + Initial Prompt</text>
+
+  <line x1="310" y1="104" x2="310" y2="120" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#a)"/>
+
+  <!-- ── Pre-search (optional) ──────────────────────────── -->
+  <rect x="150" y="122" width="320" height="58" rx="8" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5" stroke-dasharray="6,3"/>
+  <text x="310" y="143" text-anchor="middle" font-size="10" font-weight="700" fill="#2563eb">⬡  Optional pre-search  (--search flag)</text>
+  <text x="310" y="159" text-anchor="middle" font-size="9" fill="#374151">web_search(task, depth) → ctx</text>
+  <text x="310" y="171" text-anchor="middle" font-size="9" fill="#64748b">runs once before the loop · ctx reused every iteration</text>
+
+  <line x1="310" y1="180" x2="310" y2="196" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#a)"/>
+
+  <!-- ── Loop boundary ─────────────────────────────────── -->
+  <rect x="46" y="196" width="426" height="404" rx="10" fill="none" stroke="#e2e8f0" stroke-width="1.5" stroke-dasharray="7,4"/>
+  <text x="58" y="211" font-size="9" font-weight="600" fill="#94a3b8" letter-spacing="1">LOOP  (i = 1 … max_iterations)</text>
+
+  <!-- ── GENERATE ───────────────────────────────────────── -->
+  <rect x="170" y="214" width="260" height="62" rx="8" fill="#2563eb"/>
+  <text x="300" y="237" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">GENERATE</text>
+  <text x="300" y="253" text-anchor="middle" font-size="9" fill="#bfdbfe">generate(task, prompt, profile, ctx)</text>
+  <text x="300" y="266" text-anchor="middle" font-size="9" fill="#bfdbfe">fast model (gemma-12b, temp 0.3)</text>
+
+  <line x1="300" y1="276" x2="300" y2="292" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#a)"/>
+  <text x="319" y="287" font-size="8" fill="#94a3b8">response text</text>
+
+  <!-- ── CRITIQUE ───────────────────────────────────────── -->
+  <rect x="170" y="294" width="260" height="62" rx="8" fill="#dc2626"/>
+  <text x="300" y="317" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">CRITIQUE</text>
+  <text x="300" y="333" text-anchor="middle" font-size="9" fill="#fecaca">critique(task, prompt, response, profile)</text>
+  <text x="300" y="346" text-anchor="middle" font-size="9" fill="#fecaca">smart model (gemma-26b, temp 0.1)</text>
+
+  <line x1="300" y1="356" x2="300" y2="372" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#a)"/>
+  <text x="319" y="367" font-size="8" fill="#94a3b8">scores JSON</text>
+
+  <!-- ── Diamond: score threshold ──────────────────────── -->
+  <polygon points="300,374 420,410 300,446 180,410" fill="#fff" stroke="#16a34a" stroke-width="2"/>
+  <text x="300" y="406" text-anchor="middle" font-size="10" font-weight="700" fill="#15803d">score ≥ threshold?</text>
+  <text x="300" y="419" text-anchor="middle" font-size="9" fill="#374151">(default 8.0 / 10)</text>
+
+  <!-- YES → right (end early) -->
+  <line x1="420" y1="410" x2="466" y2="410" stroke="#16a34a" stroke-width="1.5" marker-end="url(#ag)"/>
+  <text x="440" y="404" text-anchor="middle" font-size="9" font-weight="600" fill="#16a34a">YES</text>
+  <rect x="468" y="388" width="118" height="44" rx="7" fill="#dcfce7" stroke="#86efac" stroke-width="1.5"/>
+  <text x="527" y="408" text-anchor="middle" font-size="9" font-weight="700" fill="#15803d">Best found</text>
+  <text x="527" y="422" text-anchor="middle" font-size="8" fill="#374151">save + end loop</text>
+
+  <!-- NO → down -->
+  <line x1="300" y1="446" x2="300" y2="462" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#a)"/>
+  <text x="318" y="457" font-size="9" font-weight="600" fill="#dc2626">NO</text>
+
+  <!-- ── Diamond: max iterations ───────────────────────── -->
+  <polygon points="300,464 414,498 300,532 186,498" fill="#fff" stroke="#d97706" stroke-width="2"/>
+  <text x="300" y="494" text-anchor="middle" font-size="10" font-weight="700" fill="#b45309">i ≥ max_iterations?</text>
+  <text x="300" y="507" text-anchor="middle" font-size="9" fill="#374151">(default 6)</text>
+
+  <!-- YES → right -->
+  <line x1="414" y1="498" x2="466" y2="498" stroke="#d97706" stroke-width="1.5" marker-end="url(#ag)"/>
+  <text x="438" y="492" text-anchor="middle" font-size="9" font-weight="600" fill="#d97706">YES</text>
+  <rect x="468" y="476" width="118" height="44" rx="7" fill="#fef3c7" stroke="#fcd34d" stroke-width="1.5"/>
+  <text x="527" y="496" text-anchor="middle" font-size="9" font-weight="700" fill="#b45309">Max reached</text>
+  <text x="527" y="510" text-anchor="middle" font-size="8" fill="#374151">save + end loop</text>
+
+  <!-- NO → down -->
+  <line x1="300" y1="532" x2="300" y2="548" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#a)"/>
+  <text x="318" y="544" font-size="9" font-weight="600" fill="#dc2626">NO</text>
+
+  <!-- ── REFINE ─────────────────────────────────────────── -->
+  <rect x="170" y="550" width="260" height="62" rx="8" fill="#6d28d9"/>
+  <text x="300" y="573" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">REFINE</text>
+  <text x="300" y="589" text-anchor="middle" font-size="9" fill="#ddd6fe">refine(task, prompt, response, crit, profile)</text>
+  <text x="300" y="602" text-anchor="middle" font-size="9" fill="#ddd6fe">smart model (gemma-26b, temp 0.4)</text>
+
+  <!-- loop-back arrow: left side -->
+  <path d="M 170,581 L 80,581 L 80,245 L 170,245" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="5,3" fill="none" marker-end="url(#a)"/>
+  <text x="68" y="416" text-anchor="middle" font-size="8" fill="#94a3b8" transform="rotate(-90 68 416)">improved prompt → next iteration</text>
+
+  <!-- ── END ────────────────────────────────────────────── -->
+  <line x1="310" y1="622" x2="310" y2="680" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="5,3"/>
+
+  <!-- connector lines from YES boxes to END -->
+  <line x1="527" y1="432" x2="527" y2="640" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4,3"/>
+  <line x1="527" y1="520" x2="527" y2="640" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4,3"/>
+  <line x1="310" y1="680" x2="527" y2="680" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4,3"/>
+  <line x1="527" y1="640" x2="527" y2="700" stroke="#94a3b8" stroke-width="1" marker-end="url(#a)"/>
+  <line x1="310" y1="680" x2="310" y2="700" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#a)"/>
+
+  <rect x="148" y="700" width="324" height="44" rx="22" fill="#0f172a"/>
+  <text x="310" y="719" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">END — best result saved to sessions/</text>
+  <text x="310" y="734" text-anchor="middle" font-size="9" fill="#64748b">sessions/TIMESTAMP.json · full history + best prompt + score</text>
+
+</svg>

@@ -1,0 +1,73 @@
+# ── Model Profiles ────────────────────────────────────────────────────────────
+#
+# OPTION 1 — Single model (simplest)
+#   All three profiles share the same model. Good for quick experiments.
+#
+# OPTION 2 — Router mode (recommended for quality)
+#   Run llama-server in router mode so it hot-swaps models on demand:
+#
+#     llama-server --router \
+#       --models-dir /Volumes/d/aimodels \
+#       --models-preset /path/to/preset.ini \
+#       --models-max 1 \          # LRU: unload old before loading new
+#       --host 0.0.0.0 --port 8080
+#
+#   preset.ini example:
+#     [gemma-12b]
+#     --model lmstudio-community/gemma-4-12B-it-QAT-GGUF/gemma-4-12B-it-QAT-Q4_0.gguf
+#     --ctx-size 32768
+#
+#     [gemma-26b]
+#     --model lmstudio-community/gemma-4-26B-A4B-it-QAT-GGUF/gemma-4-26B-A4B-it-QAT-Q4_0.gguf
+#     --ctx-size 16384
+#
+#   Then set each profile's model to match the [section name] in the preset.
+#   The router loads/unloads automatically based on the model field in each request.
+#   No code changes needed — phases.py already passes model per call.
+#
+# OPTION 3 — Two server instances on different ports
+#   generator → port 8080 (12B loaded)
+#   critic    → port 8081 (26B/Qwen loaded)
+#   Set base_url per profile accordingly.
+
+profiles:
+  generator:
+    base_url: "http://192.168.1.2:8080/v1"
+    model: "gemma-12b"          # matches router-preset.ini section name
+    temperature: 0.3
+    max_tokens: 2048
+
+  critic:
+    base_url: "http://192.168.1.2:8080/v1"
+    model: "gemma-26b"          # swap to "gemma-31b" or "qwen-35b" for better critique
+    temperature: 0.1            # low temp → consistent scores
+    max_tokens: 2048            # thinking is disabled per-request (see phases._call);
+                                 # this is headroom for the JSON answer only
+
+  refiner:
+    base_url: "http://192.168.1.2:8080/v1"
+    model: "gemma-26b"          # same as critic recommended
+    temperature: 0.4            # slightly higher → creative rewrites
+    max_tokens: 2048
+
+# ── Loop Settings ─────────────────────────────────────────────────────────────
+loop:
+  max_iterations: 6          # hard cap on generate→critique→refine cycles
+  score_threshold: 8.0       # stop early when critic total >= this (out of 10)
+  plateau_patience: 2        # stop early after this many consecutive iterations with no score improvement
+  sessions_dir: "sessions"   # relative to this file
+
+# ── Rubric Dimensions ─────────────────────────────────────────────────────────
+# These are injected into the critic system prompt at load time.
+# Add, remove, or rename dimensions here to change what gets scored.
+rubric:
+  - name: accuracy
+    description: "Factual correctness and logical soundness of claims"
+  - name: completeness
+    description: "All meaningful aspects of the task are addressed"
+  - name: clarity
+    description: "Well-structured, readable, no unnecessary jargon"
+  - name: depth
+    description: "Goes beyond surface-level; genuine analysis or insight"
+  - name: relevance
+    description: "Stays on task; no padding, repetition, or tangents"

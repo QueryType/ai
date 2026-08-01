@@ -1,0 +1,180 @@
+<svg width="940" height="580" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI', system-ui, -apple-system, sans-serif">
+  <defs>
+    <marker id="a" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+      <polygon points="0 0,9 3.5,0 7" fill="#94a3b8"/>
+    </marker>
+    <marker id="ab" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+      <polygon points="0 0,9 3.5,0 7" fill="#2563eb"/>
+    </marker>
+    <marker id="ar" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+      <polygon points="0 0,9 3.5,0 7" fill="#dc2626"/>
+    </marker>
+    <marker id="ap" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+      <polygon points="0 0,9 3.5,0 7" fill="#7c3aed"/>
+    </marker>
+  </defs>
+
+  <!-- canvas -->
+  <rect width="940" height="580" rx="14" fill="#f8fafc"/>
+
+  <!-- title -->
+  <text x="470" y="34" text-anchor="middle" font-size="17" font-weight="700" fill="#0f172a">Phase Internals</text>
+  <text x="470" y="52" text-anchor="middle" font-size="11" fill="#94a3b8">what each LLM call receives, processes, and produces</text>
+
+  <!-- ═══════════════════════════════════════════════════════
+       COLUMN 1: GENERATE
+       x: 14–314, cx: 164
+  ════════════════════════════════════════════════════════ -->
+
+  <!-- header -->
+  <rect x="14" y="66" width="300" height="46" rx="8" fill="#2563eb"/>
+  <text x="164" y="88" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">① GENERATE</text>
+  <text x="164" y="104" text-anchor="middle" font-size="10" fill="#bfdbfe">fast model · gemma-12b · temp 0.3 · 2048 tok</text>
+
+  <!-- inputs box -->
+  <rect x="14" y="122" width="300" height="168" rx="7" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.5"/>
+  <text x="28" y="140" font-size="9" font-weight="700" fill="#2563eb" letter-spacing="1">INPUTS</text>
+
+  <rect x="26" y="146" width="276" height="22" rx="4" fill="#dbeafe"/>
+  <text x="38" y="162" font-size="9" font-weight="700" fill="#1d4ed8">system</text>
+  <text x="164" y="162" text-anchor="middle" font-size="9" fill="#1e3a8a">generator_system.md</text>
+
+  <rect x="26" y="174" width="276" height="22" rx="4" fill="#dbeafe"/>
+  <text x="38" y="190" font-size="9" font-weight="700" fill="#1d4ed8">task</text>
+  <text x="164" y="190" text-anchor="middle" font-size="9" fill="#1e3a8a">the fixed task description</text>
+
+  <rect x="26" y="202" width="276" height="22" rx="4" fill="#dbeafe"/>
+  <text x="38" y="218" font-size="9" font-weight="700" fill="#1d4ed8">prompt</text>
+  <text x="164" y="218" text-anchor="middle" font-size="9" fill="#1e3a8a">current prompt (refined each iteration)</text>
+
+  <rect x="26" y="230" width="276" height="22" rx="4" fill="#dbeafe" stroke="#93c5fd" stroke-width="1" stroke-dasharray="3,2"/>
+  <text x="38" y="246" font-size="9" font-weight="700" fill="#1d4ed8">ctx</text>
+  <text x="164" y="246" text-anchor="middle" font-size="9" fill="#1e3a8a">web context if --search (optional)</text>
+
+  <text x="26" y="272" font-size="8" fill="#64748b">Message to LLM: system + [ctx] + prompt + task</text>
+
+  <!-- LLM call -->
+  <rect x="14" y="300" width="300" height="46" rx="7" fill="#fff" stroke="#2563eb" stroke-width="2"/>
+  <text x="164" y="321" text-anchor="middle" font-size="11" font-weight="700" fill="#2563eb">LLM call</text>
+  <text x="164" y="337" text-anchor="middle" font-size="9" fill="#374151">openai_client.chat.completions.create()</text>
+
+  <!-- output -->
+  <rect x="14" y="356" width="300" height="76" rx="7" fill="#dcfce7" stroke="#86efac" stroke-width="1.5"/>
+  <text x="28" y="374" font-size="9" font-weight="700" fill="#15803d" letter-spacing="1">OUTPUT</text>
+  <rect x="26" y="380" width="276" height="40" rx="4" fill="#fff" stroke="#86efac" stroke-width="1"/>
+  <text x="164" y="397" text-anchor="middle" font-size="11" font-weight="700" fill="#374151">response: str</text>
+  <text x="164" y="411" text-anchor="middle" font-size="9" fill="#64748b">plain text — the model's answer to the task</text>
+
+  <!-- arrow right from generate output -->
+  <line x1="314" y1="396" x2="326" y2="396" stroke="#94a3b8" stroke-width="2" marker-end="url(#a)"/>
+
+  <!-- ═══════════════════════════════════════════════════════
+       COLUMN 2: CRITIQUE
+       x: 320–620, cx: 470
+  ════════════════════════════════════════════════════════ -->
+
+  <!-- header -->
+  <rect x="320" y="66" width="300" height="46" rx="8" fill="#dc2626"/>
+  <text x="470" y="88" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">② CRITIQUE</text>
+  <text x="470" y="104" text-anchor="middle" font-size="10" fill="#fecaca">smart model · gemma-26b · temp 0.1 · 1024 tok</text>
+
+  <!-- inputs box -->
+  <rect x="320" y="122" width="300" height="168" rx="7" fill="#fff1f2" stroke="#fecdd3" stroke-width="1.5"/>
+  <text x="334" y="140" font-size="9" font-weight="700" fill="#dc2626" letter-spacing="1">INPUTS</text>
+
+  <rect x="332" y="146" width="276" height="22" rx="4" fill="#fee2e2"/>
+  <text x="344" y="162" font-size="9" font-weight="700" fill="#b91c1c">system</text>
+  <text x="470" y="162" text-anchor="middle" font-size="9" fill="#7f1d1d">critic_system.md + rubric injected</text>
+
+  <rect x="332" y="174" width="276" height="22" rx="4" fill="#fee2e2"/>
+  <text x="344" y="190" font-size="9" font-weight="700" fill="#b91c1c">task</text>
+  <text x="470" y="190" text-anchor="middle" font-size="9" fill="#7f1d1d">the fixed task description</text>
+
+  <rect x="332" y="202" width="276" height="22" rx="4" fill="#fee2e2"/>
+  <text x="344" y="218" font-size="9" font-weight="700" fill="#b91c1c">prompt</text>
+  <text x="470" y="218" text-anchor="middle" font-size="9" fill="#7f1d1d">the prompt used this iteration</text>
+
+  <rect x="332" y="230" width="276" height="22" rx="4" fill="#fee2e2"/>
+  <text x="344" y="246" font-size="9" font-weight="700" fill="#b91c1c">response</text>
+  <text x="470" y="246" text-anchor="middle" font-size="9" fill="#7f1d1d">the generated answer (from phase ①)</text>
+
+  <text x="332" y="272" font-size="8" fill="#64748b">Instructed to output ONLY valid JSON</text>
+
+  <!-- LLM call -->
+  <rect x="320" y="300" width="300" height="46" rx="7" fill="#fff" stroke="#dc2626" stroke-width="2"/>
+  <text x="470" y="321" text-anchor="middle" font-size="11" font-weight="700" fill="#dc2626">LLM call</text>
+  <text x="470" y="337" text-anchor="middle" font-size="9" fill="#374151">low temp → consistent, repeatable scores</text>
+
+  <!-- output JSON -->
+  <rect x="320" y="356" width="300" height="132" rx="7" fill="#fef9c3" stroke="#fde047" stroke-width="1.5"/>
+  <text x="334" y="374" font-size="9" font-weight="700" fill="#854d0e" letter-spacing="1">OUTPUT  (parsed JSON)</text>
+  <rect x="332" y="380" width="276" height="96" rx="5" fill="#fff" stroke="#fde047" stroke-width="1"/>
+  <text x="344" y="396" font-size="8" fill="#374151" font-family="'Courier New', monospace">{</text>
+  <text x="356" y="410" font-size="8" fill="#374151" font-family="'Courier New', monospace">"scores": { "accuracy": 7, "depth": 5, … },</text>
+  <text x="356" y="424" font-size="8" fill="#374151" font-family="'Courier New', monospace">"total": 6.8,</text>
+  <text x="356" y="438" font-size="8" fill="#374151" font-family="'Courier New', monospace">"reasoning": "Good structure, lacks depth…",</text>
+  <text x="356" y="452" font-size="8" fill="#374151" font-family="'Courier New', monospace">"improvements": [ "Add root-cause …", … ]</text>
+  <text x="344" y="466" font-size="8" fill="#374151" font-family="'Courier New', monospace">}</text>
+
+  <!-- arrow right from critique output -->
+  <line x1="620" y1="420" x2="632" y2="420" stroke="#94a3b8" stroke-width="2" marker-end="url(#a)"/>
+  <!-- also arrow up from critique output back to loop check -->
+  <text x="352" y="504" font-size="8" fill="#64748b">total ≥ threshold? → stop   else → refine</text>
+
+  <!-- ═══════════════════════════════════════════════════════
+       COLUMN 3: REFINE
+       x: 626–926, cx: 776
+  ════════════════════════════════════════════════════════ -->
+
+  <!-- header -->
+  <rect x="626" y="66" width="300" height="46" rx="8" fill="#6d28d9"/>
+  <text x="776" y="88" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">③ REFINE</text>
+  <text x="776" y="104" text-anchor="middle" font-size="10" fill="#ddd6fe">smart model · gemma-26b · temp 0.4 · 1024 tok</text>
+
+  <!-- inputs box -->
+  <rect x="626" y="122" width="300" height="168" rx="7" fill="#f5f3ff" stroke="#ddd6fe" stroke-width="1.5"/>
+  <text x="640" y="140" font-size="9" font-weight="700" fill="#6d28d9" letter-spacing="1">INPUTS</text>
+
+  <rect x="638" y="146" width="276" height="22" rx="4" fill="#ede9fe"/>
+  <text x="650" y="162" font-size="9" font-weight="700" fill="#5b21b6">system</text>
+  <text x="776" y="162" text-anchor="middle" font-size="9" fill="#3b0764">refiner_system.md (prompt engineer)</text>
+
+  <rect x="638" y="174" width="276" height="22" rx="4" fill="#ede9fe"/>
+  <text x="650" y="190" font-size="9" font-weight="700" fill="#5b21b6">task</text>
+  <text x="776" y="190" text-anchor="middle" font-size="9" fill="#3b0764">the fixed task description</text>
+
+  <rect x="638" y="202" width="276" height="22" rx="4" fill="#ede9fe"/>
+  <text x="650" y="218" font-size="9" font-weight="700" fill="#5b21b6">prompt</text>
+  <text x="776" y="218" text-anchor="middle" font-size="9" fill="#3b0764">current prompt (to be improved)</text>
+
+  <rect x="638" y="230" width="276" height="22" rx="4" fill="#ede9fe"/>
+  <text x="650" y="246" font-size="9" font-weight="700" fill="#5b21b6">critique</text>
+  <text x="776" y="246" text-anchor="middle" font-size="9" fill="#3b0764">scores + reasoning + improvements[]</text>
+
+  <text x="638" y="272" font-size="8" fill="#64748b">Output ONLY the improved prompt — no preamble</text>
+
+  <!-- LLM call -->
+  <rect x="626" y="300" width="300" height="46" rx="7" fill="#fff" stroke="#6d28d9" stroke-width="2"/>
+  <text x="776" y="321" text-anchor="middle" font-size="11" font-weight="700" fill="#6d28d9">LLM call</text>
+  <text x="776" y="337" text-anchor="middle" font-size="9" fill="#374151">higher temp → creative prompt rewrites</text>
+
+  <!-- output -->
+  <rect x="626" y="356" width="300" height="76" rx="7" fill="#ede9fe" stroke="#c4b5fd" stroke-width="1.5"/>
+  <text x="640" y="374" font-size="9" font-weight="700" fill="#5b21b6" letter-spacing="1">OUTPUT</text>
+  <rect x="638" y="380" width="276" height="40" rx="4" fill="#fff" stroke="#c4b5fd" stroke-width="1"/>
+  <text x="776" y="397" text-anchor="middle" font-size="11" font-weight="700" fill="#374151">improved_prompt: str</text>
+  <text x="776" y="411" text-anchor="middle" font-size="9" fill="#64748b">feeds back as "prompt" in next iteration ①</text>
+
+  <!-- loop-back arrow from refine output → generate input (below the boxes) -->
+  <path d="M 776,432 L 776,520 L 164,520 L 164,444" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="6,3" fill="none" marker-end="url(#a)"/>
+  <text x="470" y="536" text-anchor="middle" font-size="9" fill="#94a3b8">improved prompt → next iteration's generate call</text>
+
+  <!-- inter-phase arrows (labeled) at the top header level -->
+  <line x1="314" y1="89" x2="320" y2="89" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#a)"/>
+  <line x1="620" y1="89" x2="626" y2="89" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#a)"/>
+
+  <!-- data flow labels between columns -->
+  <text x="317" y="83" font-size="8" fill="#94a3b8">response</text>
+  <text x="622" y="83" font-size="8" fill="#94a3b8">critique</text>
+
+</svg>

@@ -6,6 +6,7 @@ the CLI — this covers everything that talks to the model.
 """
 
 import json
+import shutil
 import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -175,6 +176,24 @@ class Handler(BaseHTTPRequestHandler):
 
         else:
             self._error(f"no route {path}", 404)
+
+    # ---- DELETE -----------------------------------------------------------
+
+    def do_DELETE(self):
+        url = urlparse(self.path)
+        q = {k: v[0] for k, v in parse_qs(url.query).items()}
+        try:
+            if url.path == "/api/job":
+                job = self._open_job(q.get("job", ""))
+                shutil.rmtree(job.root)
+                self._json({"deleted": q.get("job", "")})
+            else:
+                self._error(f"no route {url.path}", 404)
+        except FileNotFoundError as e:
+            self._error(str(e), 404)
+        except Exception as e:
+            traceback.print_exc()
+            self._error(f"{type(e).__name__}: {e}", 500)
 
 
 def serve(jobs_dir: Path, host: str = "127.0.0.1", port: int = 8765) -> None:
