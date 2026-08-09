@@ -12,6 +12,7 @@ from __future__ import annotations
 import gc
 import json
 import logging
+import os
 import re
 from dataclasses import asdict
 from datetime import datetime
@@ -37,6 +38,15 @@ logger = logging.getLogger(__name__)
 MAX_RETRIES = 3
 _NARRATOR_RESUME_SUMMARY_WINDOW = 3
 _NARRATOR_RESUME_SUMMARY_MAX_CHARS = 1200
+
+
+def skip_eval_env_default() -> bool:
+    """Read STORY_ENGINE_SKIP_EVAL as the default for --skip-eval CLI flags.
+
+    CLI callers use this as argparse's `default=` so the env var sets the
+    baseline but the flag can still be passed explicitly on the command line.
+    """
+    return os.environ.get("STORY_ENGINE_SKIP_EVAL", "").strip().lower() in ("1", "true", "yes")
 
 
 # ---------------------------------------------------------------------------
@@ -116,7 +126,7 @@ def _detach_run_log(handler: logging.FileHandler) -> None:
 # Main entry point
 # ---------------------------------------------------------------------------
 
-def run_scene(file_path: str) -> str:
+def run_scene(file_path: str, skip_eval: bool = False) -> str:
     """Run the full story engine pipeline for a scene file.
 
     Supports resume: if a previous run was interrupted, completed beats
@@ -124,10 +134,17 @@ def run_scene(file_path: str) -> str:
 
     Args:
         file_path: Path to the scene .md file.
+        skip_eval: If True, bypass the evaluator entirely — narrator output
+            is accepted as-is with no beat-coverage/style/coherence checks
+            and no retries. Roughly halves per-beat wall time (no evaluator
+            round trip) at the cost of quality gating. Summariser still runs
+            since it's needed for narrator continuity, not quality control.
 
     Returns:
         Path to the written output file.
     """
+    if skip_eval:
+        logger.info("Evaluator bypass enabled (--skip-eval): narrator output accepted unchecked")
     # --- Parse ---
     scene = parse_scene_file(file_path)
     meta = scene.meta
@@ -224,7 +241,7 @@ def run_scene(file_path: str) -> str:
 
             # 3. Narrate + evaluate loop (with retries)
             prose, retry_count, last_narrator_in, beat_start_state = _narrate_and_evaluate(
-                narrator, ctx, scene.writing_style, prior_summary
+                narrator, ctx, scene.writing_style, prior_summary, skip_eval=skip_eval
             )
 
             if retry_count >= MAX_RETRIES:
@@ -234,7 +251,7 @@ def run_scene(file_path: str) -> str:
             action = "continue"
             if mode == "interactive" or (mode == "semi-interactive" and beat.has_pause):
                 action, prose = _handle_human_input(
-                    beat, scene, prose, narrator, ctx, prior_summary, beat_start_state
+                    beat, scene, prose, narrator, ctx, prior_summary, beat_start_state, skip_eval=skip_eval
                 )
 
             if action == "stop":
@@ -693,7 +710,7 @@ def _call_evaluator(
 # ---------------------------------------------------------------------------
 
 def _narrate_and_evaluate(
-    narrator, ctx: NarratorContext, writing_style: str, prior_summary: str
+    narrator, ctx: NarratorContext, writing_style: str, prior_summary: str, skip_eval: bool = False
 ) -> tuple[str, int, int, list]:
     """Run the narrator → evaluator loop with retries.
 
@@ -704,6 +721,10 @@ def _narrate_and_evaluate(
     logger.info("Beat %d/%d: → narrator (attempt 1)", ctx.beat_index, ctx.beat_total)
     prose, last_narrator_in = _call_narrator(narrator, ctx)
     logger.info("Beat %d/%d: ← narrator (%d words)", ctx.beat_index, ctx.beat_total, len(prose.split()))
+
+    if skip_eval:
+        logger.info("Beat %d/%d: evaluator skipped (--skip-eval)", ctx.beat_index, ctx.beat_total)
+        return prose, retry_count, last_narrator_in, beat_start_state
 
     while retry_count < MAX_RETRIES:
         logger.info("Beat %d/%d: → evaluator", ctx.beat_index, ctx.beat_total)
@@ -750,7 +771,7 @@ def _narrate_and_evaluate(
 # ---------------------------------------------------------------------------
 
 def _handle_human_input(
-    beat, scene, prose, narrator, ctx, prior_summary, beat_start_state
+    beat, scene, prose, narrator, ctx, prior_summary, beat_start_state, skip_eval: bool = False
 ) -> tuple[str, str]:
     """Handle human input pause. Returns (action, final_prose)."""
     while True:
@@ -775,13 +796,16 @@ def _handle_human_input(
             logger.info("Beat %d/%d: → narrator (human retry)", beat.index, len(scene.beats))
             prose, _ = _call_narrator(narrator, ctx)
             logger.info("Beat %d/%d: ← narrator (%d words)", beat.index, len(scene.beats), len(prose.split()))
-            logger.info("Beat %d/%d: → evaluator (human retry)", beat.index, len(scene.beats))
-            gc.collect()
-            eval_result = _call_evaluator(create_evaluator(), ctx.beat_instruction, prose, scene.writing_style, prior_summary)
-            if eval_result.evaluated:
-                logger.info("Beat %d/%d: ← evaluator %s score=%.2f", beat.index, len(scene.beats), eval_result.result, eval_result.score)
+            if skip_eval:
+                logger.info("Beat %d/%d: evaluator skipped (--skip-eval)", beat.index, len(scene.beats))
             else:
-                logger.warning("Beat %d/%d: ← evaluator fallback accepted output (%s)", beat.index, len(scene.beats), eval_result.fallback_reason)
+                logger.info("Beat %d/%d: → evaluator (human retry)", beat.index, len(scene.beats))
+                gc.collect()
+                eval_result = _call_evaluator(create_evaluator(), ctx.beat_instruction, prose, scene.writing_style, prior_summary)
+                if eval_result.evaluated:
+                    logger.info("Beat %d/%d: ← evaluator %s score=%.2f", beat.index, len(scene.beats), eval_result.result, eval_result.score)
+                else:
+                    logger.warning("Beat %d/%d: ← evaluator fallback accepted output (%s)", beat.index, len(scene.beats), eval_result.fallback_reason)
             continue  # Show to human again
 
         elif human.action == "redirect":
@@ -790,13 +814,16 @@ def _handle_human_input(
             logger.info("Beat %d/%d: → narrator (human redirect)", beat.index, len(scene.beats))
             prose, _ = _call_narrator(narrator, ctx)
             logger.info("Beat %d/%d: ← narrator (%d words)", beat.index, len(scene.beats), len(prose.split()))
-            logger.info("Beat %d/%d: → evaluator (human redirect)", beat.index, len(scene.beats))
-            gc.collect()
-            eval_result = _call_evaluator(create_evaluator(), ctx.beat_instruction, prose, scene.writing_style, prior_summary)
-            if eval_result.evaluated:
-                logger.info("Beat %d/%d: ← evaluator %s score=%.2f", beat.index, len(scene.beats), eval_result.result, eval_result.score)
+            if skip_eval:
+                logger.info("Beat %d/%d: evaluator skipped (--skip-eval)", beat.index, len(scene.beats))
             else:
-                logger.warning("Beat %d/%d: ← evaluator fallback accepted output (%s)", beat.index, len(scene.beats), eval_result.fallback_reason)
+                logger.info("Beat %d/%d: → evaluator (human redirect)", beat.index, len(scene.beats))
+                gc.collect()
+                eval_result = _call_evaluator(create_evaluator(), ctx.beat_instruction, prose, scene.writing_style, prior_summary)
+                if eval_result.evaluated:
+                    logger.info("Beat %d/%d: ← evaluator %s score=%.2f", beat.index, len(scene.beats), eval_result.result, eval_result.score)
+                else:
+                    logger.warning("Beat %d/%d: ← evaluator fallback accepted output (%s)", beat.index, len(scene.beats), eval_result.fallback_reason)
             continue  # Show to human again
 
     return "continue", prose
@@ -834,7 +861,12 @@ def _prompt_human(beat_index: int, beat_total: int, prose: str) -> HumanInput:
 # ---------------------------------------------------------------------------
 
 def _save_final_output(completed_beats: list[str], meta) -> str:
-    """Write the final assembled output file."""
+    """Write the final assembled output file.
+
+    Beat markers (HTML comments) are embedded before each beat's prose so the
+    rewrite tool can parse individual beats back out. They are invisible in any
+    markdown renderer but present in the raw file.
+    """
     output_format = meta.output_format
     title = meta.title
     output_file = meta.output_file
@@ -844,15 +876,15 @@ def _save_final_output(completed_beats: list[str], meta) -> str:
     if output_format == "adventure":
         parts.append(f"# {title}\n")
         for i, prose in enumerate(completed_beats, 1):
-            parts.append(f"## Beat {i}\n\n{prose}\n")
+            parts.append(f"<!-- beat:{i} -->\n## Beat {i}\n\n{prose}\n")
     elif output_format == "script":
         parts.append(f"# {title}\n")
         for i, prose in enumerate(completed_beats, 1):
-            parts.append(f"---\n**BEAT {i}**\n\n{prose}\n")
+            parts.append(f"<!-- beat:{i} -->\n---\n**BEAT {i}**\n\n{prose}\n")
     else:
         parts.append(f"# {title}\n")
-        for prose in completed_beats:
-            parts.append(f"{prose}\n")
+        for i, prose in enumerate(completed_beats, 1):
+            parts.append(f"<!-- beat:{i} -->\n{prose}\n")
 
     content = "\n".join(parts)
 
@@ -861,6 +893,36 @@ def _save_final_output(completed_beats: list[str], meta) -> str:
     path.write_text(content, encoding="utf-8")
 
     return str(path)
+
+
+def _parse_output_beats(story_path: str) -> dict[int, str]:
+    """Parse beat prose from a story output file using embedded beat markers.
+
+    Returns {beat_index: prose_text} for all beats found.
+    Raises ValueError if no markers are found (user must run --map first).
+    """
+    text = Path(story_path).read_text(encoding="utf-8")
+    marker_re = re.compile(r"<!--\s*beat:(\d+)\s*-->")
+    matches = list(marker_re.finditer(text))
+
+    if not matches:
+        raise ValueError(
+            f"No beat markers found in {story_path}. "
+            "Run: python -m my_code.rewrite <scene.md> --map"
+        )
+
+    beats: dict[int, str] = {}
+    for idx, m in enumerate(matches):
+        beat_num = int(m.group(1))
+        content_start = m.end()
+        content_end = matches[idx + 1].start() if idx + 1 < len(matches) else len(text)
+        prose = text[content_start:content_end].strip()
+        # Strip format-specific headers that follow the marker (adventure/script)
+        prose = re.sub(r"^##\s+Beat\s+\d+\s*\n", "", prose)
+        prose = re.sub(r"^---\s*\n\*\*BEAT\s+\d+\*\*\s*\n", "", prose)
+        beats[beat_num] = prose.strip()
+
+    return beats
 
 
 # ---------------------------------------------------------------------------

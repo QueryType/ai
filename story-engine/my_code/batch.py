@@ -16,7 +16,7 @@ import sys
 import time
 from pathlib import Path
 
-from my_code.agents.orchestrator import run_scene
+from my_code.agents.orchestrator import run_scene, skip_eval_env_default
 
 
 def _collect_files(paths: list[str]) -> list[Path]:
@@ -45,6 +45,13 @@ def main(argv: list[str] | None = None) -> None:
         action="store_true",
         help="Stop the batch if any scene fails (default: skip and continue)",
     )
+    parser.add_argument(
+        "--skip-eval",
+        action="store_true",
+        default=skip_eval_env_default(),
+        help="Bypass the evaluator for all scenes — no quality checks or retries "
+        "(default from STORY_ENGINE_SKIP_EVAL env var)",
+    )
     args = parser.parse_args(argv)
 
     files = _collect_files(args.files)
@@ -68,7 +75,7 @@ def main(argv: list[str] | None = None) -> None:
 
         t0 = time.time()
         try:
-            output = run_scene(str(scene_path))
+            output = run_scene(str(scene_path), skip_eval=args.skip_eval)
             elapsed = time.time() - t0
             print(f"  DONE in {elapsed:.0f}s → {output}")
             results.append((scene_path, "ok", elapsed))

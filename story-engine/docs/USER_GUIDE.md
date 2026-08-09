@@ -16,7 +16,8 @@ A multi-agent story generation engine that reads structured scene files and prod
 8. [Stitching a Full Story](#8-stitching-a-full-story)
 9. [Resume & Checkpoints](#9-resume--checkpoints)
 10. [Story Translator](#10-story-translator)
-11. [Troubleshooting](#11-troubleshooting)
+11. [Beat Rewrite & Validation](#11-beat-rewrite--validation)
+12. [Troubleshooting](#12-troubleshooting)
 
 ---
 
@@ -101,8 +102,15 @@ Notes:
 ```
 python -m my_code <scene_file>
 python -m my_code --file <scene_file>
-python -m my_code <scene_file> --verbose    # debug logging
+python -m my_code <scene_file> --verbose      # debug logging
+python -m my_code <scene_file> --skip-eval    # bypass evaluator, accept narrator output unchecked
 ```
+
+`--skip-eval` skips the Evaluator's beat-coverage/style/coherence checks and retries entirely —
+the Narrator's first draft is used as-is. Roughly halves per-beat time since there's no evaluator
+round trip. Set `STORY_ENGINE_SKIP_EVAL=true` in `.env` to make this the default; the flag still
+works standalone to override it per run. `my_code/batch.py` supports the same flag and env var
+for multi-scene runs.
 
 ---
 
@@ -394,15 +402,19 @@ Set via `output_format:` in `[meta]`.
 
 ### `prose` (default)
 
-Seamless narrative with no beat markers. Reads like a continuous story.
+Seamless narrative. Reads like a continuous story.
 
 ```markdown
 # The Ruins of Ashenveil
 
+<!-- beat:1 -->
 The fog didn't roll in; it exhaled...
 
+<!-- beat:2 -->
 Lyra stepped from the shadows...
 ```
+
+The `<!-- beat:N -->` comments are **invisible in all markdown renderers** and most TTS pipelines. They allow the [rewrite tool](#11-beat-rewrite--validation) to locate individual beats. See [REWRITE.md](REWRITE.md) for how to strip them before TTS if needed.
 
 ### `adventure`
 
@@ -583,7 +595,43 @@ The translator reuses `STORY_ENGINE_SUMMARISER_BASE_URL` and `STORY_ENGINE_SUMMA
 
 ---
 
-## 11. Troubleshooting
+## 11. Beat Rewrite & Validation
+
+Post-run tool for editing a completed story. Three core operations:
+
+| Command | What it does |
+|---------|-------------|
+| `--show` | Print current beat marker positions with a short excerpt from each beat |
+| `--map` | Interactively mark beat boundaries in an existing output file (no LLM) |
+| `--validate` | Coherence-check all beats and report contradictions — nothing is rewritten |
+| `--beat N` | Rewrite one beat, then coherence-check subsequent beats (report only) |
+| `--beat N --from-here` | Rewrite beat N and re-narrate everything after it |
+
+```bash
+# Stories generated from now on have beat markers embedded automatically.
+# For older stories, add markers once:
+python -m my_code.rewrite scene.md --map
+
+# Check the whole story for coherence issues
+python -m my_code.rewrite scene.md --validate
+
+# Rewrite beat 3
+python -m my_code.rewrite scene.md --beat 3
+
+# Rewrite beat 3 and everything after it
+python -m my_code.rewrite scene.md --beat 3 --from-here
+
+# Check coherence starting from beat 2
+python -m my_code.rewrite scene.md --validate --from-beat 2
+```
+
+`--validate` uses only the 9B model (cheap, fast). `--beat N` uses the 31B narrator for the rewrite and 9B for evaluation and summarisation — same models as a normal run, no new configuration needed.
+
+See **[REWRITE.md](REWRITE.md)** for the full reference including TTS export, KV cache behaviour, and troubleshooting.
+
+---
+
+## 12. Troubleshooting
 
 ### Connection refused / model not responding
 

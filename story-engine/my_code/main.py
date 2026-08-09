@@ -18,10 +18,19 @@ from dotenv import load_dotenv
 def main():
     load_dotenv()
 
+    from my_code.agents.orchestrator import skip_eval_env_default
+
     parser = argparse.ArgumentParser(description="Story Engine — agentic narrative generator")
     parser.add_argument("file", nargs="?", help="Path to the scene .md file")
     parser.add_argument("--file", "-f", dest="file_flag", help="Path to the scene .md file (alternative)")
     parser.add_argument("--verbose", "-v", action="store_true", help="Enable debug logging")
+    parser.add_argument(
+        "--skip-eval",
+        action="store_true",
+        default=skip_eval_env_default(),
+        help="Bypass the evaluator — accept narrator output unchecked, no retries "
+        "(default from STORY_ENGINE_SKIP_EVAL env var)",
+    )
 
     args = parser.parse_args()
 
@@ -43,7 +52,7 @@ def main():
     print(f"   Scene: {file_path}\n")
 
     try:
-        output_path = run_scene(file_path)
+        output_path = run_scene(file_path, skip_eval=args.skip_eval)
         print(f"\n✅ Done! Output: {output_path}")
     except KeyboardInterrupt:
         print("\n\n⏹ Interrupted by user.")

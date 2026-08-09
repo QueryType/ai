@@ -1,0 +1,98 @@
+STORY ENGINE — CLI COMMAND REFERENCE
+=====================================
+
+MAIN PIPELINE
+-------------
+
+main.py — run the engine on one scene
+  python my_code/main.py path/to/scene.md
+  python my_code/main.py -f path/to/scene.md      # alternative to positional arg
+  python my_code/main.py scene.md --skip-eval      # bypass evaluator
+  python my_code/main.py scene.md -v               # verbose/debug logging
+
+batch.py — run on multiple scenes/directories
+  python -m my_code.batch scenes/story_00.md scenes/story_01.md
+  python -m my_code.batch scenes/                  # all .md files in dir, sorted
+  python -m my_code.batch scenes/ --stop-on-error   # abort batch on first failure (default: skip & continue)
+  python -m my_code.batch scenes/ --skip-eval       # apply to all scenes
+
+
+SCENE AUTHORING
+----------------
+
+scene_builder.py — interactive scene interview
+  python my_code/scene_builder.py
+  python my_code/scene_builder.py --out output/my_scene.md
+  python my_code/scene_builder.py --load existing_scene.md
+  python my_code/scene_builder.py --template [PATH]   # bare flag defaults to output/blank_scene.md
+  python my_code/scene_builder.py --theme dark|light|system
+
+story_importer.py — prose .txt -> scene .md
+  python my_code/story_importer.py story.txt
+  python my_code/story_importer.py story.txt --out output/my_scene.md
+  python my_code/story_importer.py story.txt --imagination 0-100    # 0=strict, 50=default, 100=free invention
+  python my_code/story_importer.py story.txt --beats N              # 3-10, default auto
+  python my_code/story_importer.py story.txt --pov <choice>
+  python my_code/story_importer.py story.txt --mode autonomous|<other>
+  python my_code/story_importer.py story.txt --nsfw
+  python my_code/story_importer.py story.txt --theme dark|light|system
+  python my_code/story_importer.py story.txt --yes    # -y, skip confirmation prompt
+
+extend.py — generate sequel scene file
+  python -m my_code.extend story_00.md --brief "Lyra and Aldric find a sealed chamber"
+  python -m my_code.extend story_00.md --brief "..." --output story_01.md
+  python -m my_code.extend story_00.md --brief "..." --beats 5   # default 5
+
+
+POST-RUN EDITING
+------------------
+
+rewrite.py
+  python -m my_code.rewrite scene.md --map                     # add beat markers, no LLM
+  python -m my_code.rewrite scene.md --show                    # show current marker positions
+  python -m my_code.rewrite scene.md --validate                # coherence-check all beats
+  python -m my_code.rewrite scene.md --validate --from-beat N  # start validation at beat N
+  python -m my_code.rewrite scene.md --beat 3                  # rewrite beat 3
+  python -m my_code.rewrite scene.md --beat 3 --from-here      # rewrite 3, re-narrate 4..end
+  python -m my_code.rewrite scene.md --beat 3 --story PATH     # override story output path
+
+
+TRANSLATION
+------------
+
+translate.py
+  python -m my_code.translate story.md --target Hindi
+  python -m my_code.translate story.md --target Hinglish --hint "Roman script"
+  python -m my_code.translate story.md --target Urdu --source English
+  python -m my_code.translate story.md --target French --context-paragraphs 3   # default 2
+  python -m my_code.translate story.md --target Hindi --output /tmp/out.md
+
+
+QUALITY TESTING
+-----------------
+
+roundtrip_test.py
+  python -m my_code.roundtrip_test examples/scene.md                       # full: generate+import+diff
+  python -m my_code.roundtrip_test examples/scene.md --prose output/prose.md --skip-generate
+  python -m my_code.roundtrip_test examples/scene.md --prose out.md --skip-generate --imagination 70
+  python -m my_code.roundtrip_test examples/scene.md --prose out.md --skip-generate --auto --iters 6
+  python -m my_code.roundtrip_test examples/scene.md --prose out.md --skip-generate --auto --iters 6 --commit
+
+  Model resolution for roundtrip_test.py:
+    Generate step (unless --skip-generate): normal main.py pipeline
+      - Narrator on port 8080 (STORY_ENGINE_NARRATOR_MODEL)
+      - Evaluator on port 8081 (STORY_ENGINE_EVALUATOR_MODEL)
+
+    Import step (always runs), from my_code/importers/base.py fallback chains:
+      BASE_URL:  STORY_IMPORTER_BASE_URL -> SCENE_BUILDER_BASE_URL -> STORY_ENGINE_LOCAL_BASE_URL
+                 (default http://localhost:8080/v1)
+      MODEL:     STORY_IMPORTER_MODEL -> SCENE_BUILDER_MODEL -> STORY_ENGINE_EVALUATOR_MODEL
+                 -> STORY_ENGINE_NARRATOR_MODEL (default "default")
+      API_KEY:   STORY_IMPORTER_API_KEY -> SCENE_BUILDER_API_KEY (default "none")
+
+      Printed at startup as: "importer : {BASE_URL}  [{MODEL}]"
+
+      Note: with nothing importer/builder-specific set in .env, the import step
+      lands on port 8080 (narrator's endpoint) but uses the evaluator's model
+      name (STORY_ENGINE_EVALUATOR_MODEL) — a slightly odd default combination
+      unless STORY_IMPORTER_* or SCENE_BUILDER_* overrides are set explicitly.

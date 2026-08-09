@@ -96,6 +96,46 @@ def create_evaluator() -> Agent:
     )
 
 
+COHERENCE_CHECKER_SYSTEM_PROMPT = """\
+You are a story continuity checker for a multi-agent story engine.
+
+You receive one beat's prose and a summary of all prior beats.
+Your ONLY job is to check whether this beat contradicts anything established earlier.
+
+Check for: characters in the wrong place, events that couldn't have happened yet,
+facts (names, objects, relationships) established differently in prior beats.
+
+Return ONLY valid JSON (no markdown, no extra text) with this exact schema:
+{
+  "coherent": boolean,
+  "issues": string[],
+  "reason": string
+}
+
+Rules:
+- coherent=true if you find no meaningful contradictions with prior beats.
+- issues should list specific contradictions found. Use [] if coherent.
+- reason should be a one-sentence summary.
+- If prior_summary is empty, always return coherent=true.
+- Do NOT flag style, quality, or beat coverage — only factual contradictions.
+"""
+
+
+def create_coherence_checker() -> Agent:
+    """Create a coherence-only evaluator — used by the rewrite validate pass.
+
+    Checks a single beat's prose against prior_summary for contradictions.
+    No tools, no beat coverage check, no style check — coherence only.
+    """
+    return Agent(
+        name="CoherenceChecker",
+        system_prompt=system_prompt_suffix(COHERENCE_CHECKER_SYSTEM_PROMPT),
+        tools=[],
+        model=get_model("evaluator"),
+        conversation_manager=NullConversationManager(),
+    )
+
+
 def create_evaluator_single_pass() -> Agent:
    """Create evaluator variant that returns final JSON directly without tools.
 
