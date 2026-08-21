@@ -16,7 +16,12 @@ import sys
 import time
 from pathlib import Path
 
-from my_code.agents.orchestrator import run_scene, skip_eval_env_default
+from my_code.agents.orchestrator import (
+    derive_story_coords,
+    run_scene,
+    skip_eval_env_default,
+    skip_memory_env_default,
+)
 
 
 def _collect_files(paths: list[str]) -> list[Path]:
@@ -52,6 +57,13 @@ def main(argv: list[str] | None = None) -> None:
         help="Bypass the evaluator for all scenes — no quality checks or retries "
         "(default from STORY_ENGINE_SKIP_EVAL env var)",
     )
+    parser.add_argument(
+        "--skip-memory",
+        action="store_true",
+        default=skip_memory_env_default(),
+        help="Bypass Story Memory for all scenes — no cross-file fact extraction or "
+        "retrieval (default from STORY_ENGINE_SKIP_MEMORY env var)",
+    )
     args = parser.parse_args(argv)
 
     files = _collect_files(args.files)
@@ -59,7 +71,15 @@ def main(argv: list[str] | None = None) -> None:
         print("No .md files found.", file=sys.stderr)
         sys.exit(1)
 
-    print(f"Batch: {len(files)} scene(s) queued")
+    # Cross-file continuity memory (docs/STORY_MEMORY_SPEC.md): all files in
+    # this batch share one story_id, keyed off the first file's name, so
+    # facts extracted from file 0 are retrievable while generating file 2.
+    # scene_index is the file's position in the sequence as given/sorted here
+    # (not re-derived per file), so batch order is authoritative even if a
+    # file's own [meta] output_file doesn't follow the story_NN convention.
+    batch_story_id, _ = derive_story_coords(files[0].name)
+
+    print(f"Batch: {len(files)} scene(s) queued (story_id={batch_story_id})")
     for i, f in enumerate(files, 1):
         print(f"  {i}. {f}")
     print()
@@ -75,7 +95,13 @@ def main(argv: list[str] | None = None) -> None:
 
         t0 = time.time()
         try:
-            output = run_scene(str(scene_path), skip_eval=args.skip_eval)
+            output = run_scene(
+                str(scene_path),
+                skip_eval=args.skip_eval,
+                skip_memory=args.skip_memory,
+                story_id=batch_story_id,
+                scene_index=i - 1,
+            )
             elapsed = time.time() - t0
             print(f"  DONE in {elapsed:.0f}s → {output}")
             results.append((scene_path, "ok", elapsed))

@@ -19,8 +19,11 @@ import re
 import sys
 from pathlib import Path
 
+from my_code.agents.orchestrator import derive_story_coords
 from my_code.agents.scene_extender import create_scene_extender
 from my_code.parser import get_raw_sections, parse_scene_file
+from my_code.tools import fact_store
+from my_code.tools.lore_tools import build_facts_block
 
 
 # ---------------------------------------------------------------------------
@@ -126,13 +129,20 @@ def _assemble_file(
 # LLM call
 # ---------------------------------------------------------------------------
 
-def _call_extender(prev_raw: str, brief: str, beats: int) -> dict:
-    """Call the SceneExtenderAgent and parse its JSON output."""
-    prompt = (
-        f"## Previous Scene File\n\n{prev_raw}\n\n"
-        f"## Brief for the Next Part\n\n{brief}\n\n"
-        f"Generate the next scene with exactly {beats} beats."
-    )
+def _call_extender(prev_raw: str, brief: str, beats: int, facts_block: str = "") -> dict:
+    """Call the SceneExtenderAgent and parse its JSON output.
+
+    facts_block: pre-formatted continuity facts spanning the whole story timeline
+    so far (see docs/STORY_MEMORY_SPEC.md), not just this one previous file — lets
+    the extender ground prior_context in details from earlier scenes too, not only
+    the immediately preceding one. Empty string if no facts db exists yet.
+    """
+    parts = [f"## Previous Scene File\n\n{prev_raw}"]
+    if facts_block:
+        parts.append(f"## Established Story Facts (from the full timeline so far)\n\n{facts_block}")
+    parts.append(f"## Brief for the Next Part\n\n{brief}")
+    parts.append(f"Generate the next scene with exactly {beats} beats.")
+    prompt = "\n\n".join(parts)
 
     agent = create_scene_extender()
     result = str(agent(prompt))
@@ -143,7 +153,15 @@ def _call_extender(prev_raw: str, brief: str, beats: int) -> dict:
     if json_start < 0 or json_end <= json_start:
         raise ValueError(f"SceneExtender returned no JSON.\nRaw output:\n{result[:500]}")
 
-    return json.loads(result[json_start:json_end])
+    generated = json.loads(result[json_start:json_end])
+
+    # Some models return prior_context as a JSON array of bullet strings
+    # instead of one string with embedded newlines (the prompt asks for the
+    # latter). Normalize so _assemble_file's str.strip() never breaks.
+    if isinstance(generated.get("prior_context"), list):
+        generated["prior_context"] = "\n".join(generated["prior_context"])
+
+    return generated
 
 
 # ---------------------------------------------------------------------------
@@ -177,9 +195,23 @@ def main(argv: list[str] | None = None) -> None:
     raw_sections = get_raw_sections(str(prev_path))
     prev_raw = prev_path.read_text(encoding="utf-8")
 
+    # Pull in the full story timeline's facts, not just this one previous file
+    # (see docs/STORY_MEMORY_SPEC.md). db may not exist yet if the previous file
+    # was never run through run_scene() — that's fine, facts_block stays empty.
+    story_id, prev_scene_index = derive_story_coords(prev_meta.output_file)
+    facts_db_path = fact_store.db_path_for_output(prev_meta.output_file, story_id)
+    facts_block = ""
+    if facts_db_path.exists():
+        facts_by_entity = fact_store.query_all_facts(
+            facts_db_path, story_id, before=(prev_scene_index + 1, 0)
+        )
+        facts_block = build_facts_block(json.dumps(facts_by_entity))
+        if facts_block:
+            print(f"Loaded story facts: {len(facts_by_entity)} entities from {facts_db_path}")
+
     # Generate new sections
     print("Calling SceneExtender agent...")
-    generated = _call_extender(prev_raw, args.brief, args.beats)
+    generated = _call_extender(prev_raw, args.brief, args.beats, facts_block=facts_block)
 
     new_title = generated.get("title", f"{prev_meta.title} (continued)")
     print(f"Generated title: {new_title}")

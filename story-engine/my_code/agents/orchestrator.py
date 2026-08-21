@@ -21,10 +21,12 @@ from pathlib import Path
 from strands.types.exceptions import MaxTokensReachedException
 
 from my_code.agents.evaluator import create_evaluator, create_evaluator_single_pass
+from my_code.agents.fact_extractor import call_fact_extractor
 from my_code.agents.narrator import create_narrator
 from my_code.agents.summariser import create_summariser
+from my_code.tools import fact_store
 from my_code.tools.eval_tools import pop_last_emit
-from my_code.tools.lore_tools import build_lore_block, get_character_card, scan_for_triggers
+from my_code.tools.lore_tools import build_facts_block, build_lore_block, get_character_card, scan_for_triggers
 from my_code.models.data_models import (
     EvalResult,
     HumanInput,
@@ -47,6 +49,15 @@ def skip_eval_env_default() -> bool:
     baseline but the flag can still be passed explicitly on the command line.
     """
     return os.environ.get("STORY_ENGINE_SKIP_EVAL", "").strip().lower() in ("1", "true", "yes")
+
+
+def skip_memory_env_default() -> bool:
+    """Read STORY_ENGINE_SKIP_MEMORY as the default for --skip-memory CLI flags.
+
+    CLI callers use this as argparse's `default=` so the env var sets the
+    baseline but the flag can still be passed explicitly on the command line.
+    """
+    return os.environ.get("STORY_ENGINE_SKIP_MEMORY", "").strip().lower() in ("1", "true", "yes")
 
 
 # ---------------------------------------------------------------------------
@@ -78,6 +89,21 @@ def _save_checkpoint(output_file: str, completed_beats: dict[str, str], prior_su
     cp.parent.mkdir(parents=True, exist_ok=True)
     data = {"beats": completed_beats, "prior_summary": prior_summary}
     cp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def derive_story_coords(output_file: str) -> tuple[str, int]:
+    """Derive (story_id, scene_index) from an output filename.
+
+    Files sharing a numeric-suffix prefix belong to the same story, e.g.
+    story_00.md/story_01.md -> story id "story", scene_index 0/1. Same
+    convention as extend.py's _auto_output_path. A file with no numeric
+    suffix is treated as a standalone single-scene story (scene_index 0).
+    """
+    stem = Path(output_file).stem
+    m = re.match(r"^(.+?)_(\d+)$", stem)
+    if m:
+        return m.group(1), int(m.group(2))
+    return stem, 0
 
 
 def _clear_checkpoint(output_file: str):
@@ -126,7 +152,13 @@ def _detach_run_log(handler: logging.FileHandler) -> None:
 # Main entry point
 # ---------------------------------------------------------------------------
 
-def run_scene(file_path: str, skip_eval: bool = False) -> str:
+def run_scene(
+    file_path: str,
+    skip_eval: bool = False,
+    skip_memory: bool = False,
+    story_id: str | None = None,
+    scene_index: int | None = None,
+) -> str:
     """Run the full story engine pipeline for a scene file.
 
     Supports resume: if a previous run was interrupted, completed beats
@@ -139,12 +171,26 @@ def run_scene(file_path: str, skip_eval: bool = False) -> str:
             and no retries. Roughly halves per-beat wall time (no evaluator
             round trip) at the cost of quality gating. Summariser still runs
             since it's needed for narrator continuity, not quality control.
+        skip_memory: If True, bypass Story Memory entirely for this run — no
+            fact extraction after beats, no fact retrieval/injection into the
+            narrator's lore block. See docs/STORY_MEMORY.md. Saves one
+            extraction call per beat (summariser model, port 8081); useful for
+            quick test runs or A/B comparing output with/without continuity
+            memory. Does not touch or delete any existing facts db.
+        story_id: Groups this file with others in the same story sequence for
+            cross-file fact persistence. Defaults to deriving from the output
+            filename (see derive_story_coords). Pass explicitly when driving
+            a sequence from batch.py so all files share one facts db.
+        scene_index: This file's position in the story timeline. Defaults to
+            deriving from the output filename's numeric suffix.
 
     Returns:
         Path to the written output file.
     """
     if skip_eval:
         logger.info("Evaluator bypass enabled (--skip-eval): narrator output accepted unchecked")
+    if skip_memory:
+        logger.info("Story Memory bypass enabled (--skip-memory): no fact extraction or retrieval this run")
     # --- Parse ---
     scene = parse_scene_file(file_path)
     meta = scene.meta
@@ -160,6 +206,16 @@ def run_scene(file_path: str, skip_eval: bool = False) -> str:
         checkpoint = _load_checkpoint(meta.output_file)
         checkpoint_beats: dict[str, str] = checkpoint["beats"]
         prior_summary: str = checkpoint.get("prior_summary", "")
+
+        # --- Fact store (cross-file continuity memory, see docs/STORY_MEMORY_SPEC.md) ---
+        facts_db_path = None
+        if not skip_memory:
+            derived_story_id, derived_scene_index = derive_story_coords(meta.output_file)
+            story_id = story_id if story_id is not None else derived_story_id
+            scene_index = scene_index if scene_index is not None else derived_scene_index
+            facts_db_path = fact_store.db_path_for_output(meta.output_file, story_id)
+            fact_store.init_db(facts_db_path)
+            logger.info("Fact store: story_id=%s scene_index=%d db=%s", story_id, scene_index, facts_db_path)
 
         if checkpoint_beats:
             logger.info("Resuming from checkpoint: %d/%d beats already done", len(checkpoint_beats), len(scene.beats))
@@ -215,7 +271,8 @@ def run_scene(file_path: str, skip_eval: bool = False) -> str:
 
             # 1. Lore injection (pure Python — no LLM call)
             lore_context = _call_lore_injector(
-                beat.text, beat.index, characters_json, scene.world_info
+                beat.text, beat.index, characters_json, scene.world_info,
+                facts_db_path=facts_db_path, story_id=story_id, scene_index=scene_index,
             )
 
             # 2. Build narrator context
@@ -283,6 +340,21 @@ def run_scene(file_path: str, skip_eval: bool = False) -> str:
                 beat_summary = _summarise_beat(summariser, prose, beat.index)
                 logger.info("Beat %d/%d: ← summariser", beat.index, len(scene.beats))
                 prior_summary += f"\n\n### Beat {beat.index} Summary\n{beat_summary}"
+
+            # 6b. Extract continuity facts for cross-file memory. Non-fatal —
+            # call_fact_extractor() never raises, and a store failure here must
+            # not lose an already-accepted beat. Skipped entirely under
+            # --skip-memory (see docs/STORY_MEMORY.md).
+            if not skip_memory:
+                logger.info("Beat %d/%d: → fact extractor", beat.index, len(scene.beats))
+                facts = call_fact_extractor(prose)
+                try:
+                    if facts:
+                        fact_store.insert_facts(facts_db_path, story_id, scene_index, beat.index, facts)
+                    logger.info("Beat %d/%d: ← fact extractor (%d facts)", beat.index, len(scene.beats), len(facts))
+                except Exception as exc:
+                    logger.warning("FACT STORE FALLBACK: insert failed (%s) — continuing without persisting beat %d facts", type(exc).__name__, beat.index)
+
             _save_checkpoint(meta.output_file, checkpoint_beats, prior_summary)
             logger.info("Beat %d: saved (%d words)", beat.index, len(prose.split()))
 
@@ -354,12 +426,22 @@ def _msg_role(msg) -> str:
 
 
 def _call_lore_injector(
-    beat_text: str, beat_index: int, characters_json: str, world_info: str
+    beat_text: str,
+    beat_index: int,
+    characters_json: str,
+    world_info: str,
+    facts_db_path: Path | None = None,
+    story_id: str | None = None,
+    scene_index: int | None = None,
 ) -> str:
     """Build lore context using direct Python tool calls — no LLM required.
 
-    The three lore tools are pure Python (regex, dict lookup, string assembly).
+    The lore tools are pure Python (regex, dict lookup, string assembly).
     Bypassing the agent eliminates one full KV-cache eviction per beat.
+
+    Continuity facts (see docs/STORY_MEMORY_SPEC.md) use the same constraint:
+    match_entities()/query_facts() in fact_store.py are deterministic keyword
+    matching + a parameterized SQL query, not an LLM-driven lookup.
     """
     logger.debug("Beat %d: lore injection (pure-Python)", beat_index)
     matched_names = json.loads(scan_for_triggers(beat_text, characters_json))
@@ -368,7 +450,35 @@ def _call_lore_injector(
         card = get_character_card(name, characters_json)
         if not card.startswith("Character not found"):
             cards.append(card)
-    return build_lore_block(json.dumps(cards))
+    lore_block = build_lore_block(json.dumps(cards))
+
+    facts_block = ""
+    if facts_db_path is not None:
+        matched_entities = fact_store.match_entities(facts_db_path, story_id, beat_text)
+        facts_by_entity = {}
+        for entity in matched_entities:
+            entity_facts = fact_store.query_facts(
+                facts_db_path, story_id, entity, before=(scene_index, beat_index)
+            )
+            if entity_facts:
+                facts_by_entity[entity] = [
+                    {"relation": f["relation"], "value": f["value"]} for f in entity_facts
+                ]
+        if facts_by_entity:
+            logger.info(
+                "Beat %d: fact injection matched %d entit%s: %s",
+                beat_index, len(facts_by_entity), "y" if len(facts_by_entity) == 1 else "ies",
+                ", ".join(sorted(facts_by_entity)),
+            )
+            for entity, facts in facts_by_entity.items():
+                logger.debug(
+                    "Beat %d: %s -> %s",
+                    beat_index, entity,
+                    "; ".join(f"{f['relation']}={f['value']}" for f in facts),
+                )
+        facts_block = build_facts_block(json.dumps(facts_by_entity))
+
+    return "\n".join(part for part in (lore_block, facts_block) if part)
 
 
 def _call_narrator(agent, ctx: NarratorContext) -> tuple[str, int]:

@@ -86,3 +86,38 @@ def build_lore_block(matched_cards_json: str) -> str:
         parts.append(f"\n{card}\n")
 
     return "".join(parts)
+
+
+@tool
+def build_facts_block(facts_by_entity_json: str) -> str:
+    """Assemble a compact continuity-facts block from pre-queried story facts.
+
+    Pure formatting, same as build_lore_block — the actual database lookup
+    (match_entities/query_facts in fact_store.py) happens before this is
+    called, so no LLM or I/O is involved here.
+
+    Args:
+        facts_by_entity_json: JSON object mapping entity name to a list of
+            {relation, value} dicts, e.g.
+            {"dagger": [{"relation": "found_by", "value": "Aldric"}]}
+
+    Returns:
+        Continuity-focused lore context string ready for narrator prompt
+        injection, or "" if there are no facts.
+    """
+    facts_by_entity = json.loads(facts_by_entity_json)
+
+    if not facts_by_entity:
+        return ""
+
+    parts = ["## Established So Far\n"]
+
+    for entity, facts in facts_by_entity.items():
+        if not facts:
+            continue
+        parts.append(f"\n**{entity}**")
+        for fact in facts:
+            parts.append(f"\n- {fact['relation']}: {fact['value']}")
+        parts.append("\n")
+
+    return "".join(parts)
