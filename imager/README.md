@@ -63,10 +63,10 @@ imager/
 
 ## Quick start
 
-Copy `.env.example` to `.env` and fill in your endpoints — with `.env`
-populated, running the pipeline is just:
-
 ```bash
+cd imager
+pip install -r requirements.txt
+cp .env.example .env   # fill in your LLM/ComfyUI/Draw Things endpoints
 cd src && python -m imager.cli ../path/to/story.txt --out-dir ../output
 ```
 
