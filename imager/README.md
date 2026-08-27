@@ -3,7 +3,7 @@
 A pipeline that turns a story or essay into a set of illustrations: it reads
 the text, builds a "story bible" of characters/settings/style, picks
 illustration points guided by the story's own structure, composes
-consistent image prompts, and generates images via ComfyUI.
+consistent image prompts, and generates images via ComfyUI or Draw Things.
 
 Replaces the single-file proof-of-concept in `bootstrap/story_to_images.py`,
 which only worked on short stories, had no resumability, and no
@@ -55,9 +55,10 @@ imager/
 ## Requirements
 
 - Python 3.9+
-- `pip install requests python-dotenv`
+- `pip install -r requirements.txt` (`requests`, `python-dotenv`)
 - An OpenAI-compatible LLM endpoint (e.g. `llama-server`, vLLM, LM Studio)
-- A running ComfyUI instance with an API-format workflow JSON, if you're
+- A running ComfyUI or Draw Things instance with an API-format workflow
+  JSON (ComfyUI) or the app's API Server enabled (Draw Things), if you're
   generating images (not required for `--only-stage` runs that stop earlier)
 
 ## Quick start
