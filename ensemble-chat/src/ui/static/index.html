@@ -1,0 +1,445 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ensemble-chat</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #ffffff; --panel: #f4f4f6; --border: #e2e2e6; --text: #16161a;
+    --dim: #7a7a85; --accent: #3b82f6; --bubble: #eef0f4; --user-bubble: #dbeafe;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #16161a; --panel: #1e1e24; --border: #2c2c34; --text: #e8e8ec;
+      --dim: #8a8a95; --accent: #60a5fa; --bubble: #26262e; --user-bubble: #1e3a5f;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #16161a; --panel: #1e1e24; --border: #2c2c34; --text: #e8e8ec;
+    --dim: #8a8a95; --accent: #60a5fa; --bubble: #26262e; --user-bubble: #1e3a5f;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    display: flex; flex-direction: column; height: 100vh;
+  }
+  header {
+    padding: 10px 16px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+  }
+  header h1 { font-size: 15px; margin: 0; font-weight: 700; }
+  header .meta { color: var(--dim); font-size: 12px; }
+  #theme-select {
+    margin-left: auto; font: inherit; font-size: 12px; padding: 4px 6px;
+    border-radius: 6px; border: 1px solid var(--border); background: var(--panel);
+    color: var(--text);
+  }
+  main { flex: 1; display: flex; overflow: hidden; }
+  #chat-col { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  #chat { flex: 1; overflow-y: auto; padding: 14px 16px; }
+  .row { display: flex; margin-bottom: 10px; max-width: 640px; }
+  .row.user { justify-content: flex-end; margin-left: auto; }
+  .bubble-group { display: flex; flex-direction: column; gap: 4px; max-width: 100%; }
+  .label { font-size: 11.5px; font-weight: 700; margin-bottom: 2px; }
+  .bubble {
+    background: var(--bubble); border-radius: 14px; padding: 7px 12px;
+    white-space: pre-wrap; word-wrap: break-word; opacity: 0; transform: translateY(4px);
+    animation: pop .18s ease forwards;
+  }
+  .row.user .bubble { background: var(--user-bubble); }
+  @keyframes pop { to { opacity: 1; transform: translateY(0); } }
+  .tics { color: #e05252; font-size: 11.5px; margin-top: 2px; }
+  .bubble img { display: block; max-width: 220px; border-radius: 10px; margin-top: 4px; }
+  #attach-preview {
+    display: none; align-items: center; gap: 8px; padding: 0 16px 8px;
+  }
+  #attach-preview img { height: 48px; border-radius: 6px; }
+  #attach-preview button {
+    border: none; background: var(--panel); color: var(--dim); border-radius: 999px;
+    width: 20px; height: 20px; cursor: pointer; font-size: 12px; line-height: 1;
+  }
+  #composer {
+    border-top: 1px solid var(--border); padding: 10px 16px;
+    display: flex; gap: 8px; align-items: flex-end;
+  }
+  #composer textarea {
+    flex: 1; resize: none; height: 40px; max-height: 140px; padding: 9px 10px;
+    border-radius: 8px; border: 1px solid var(--border); background: var(--panel);
+    color: var(--text); font: inherit;
+  }
+  #composer button {
+    padding: 9px 16px; border-radius: 8px; border: none; background: var(--accent);
+    color: white; font: inherit; font-weight: 600; cursor: pointer;
+  }
+  #composer button:disabled { opacity: .5; cursor: default; }
+  #composer #attach-btn {
+    background: var(--panel); color: var(--text); border: 1px solid var(--border);
+    padding: 9px 12px; font-size: 16px; line-height: 1; font-weight: 400;
+  }
+  #composer #attach-btn:hover:not(:disabled) { background: var(--border); }
+  #nudges { display: flex; gap: 6px; padding: 0 16px 8px; flex-wrap: wrap; }
+  #nudges button {
+    font-size: 11.5px; padding: 4px 9px; border-radius: 999px; cursor: pointer;
+    border: 1px solid var(--border); background: var(--panel); color: var(--text);
+  }
+  #nudges button:disabled { opacity: .5; cursor: default; }
+  aside {
+    width: 230px; border-left: 1px solid var(--border); padding: 12px;
+    overflow-y: auto; font-size: 12.5px; color: var(--dim); flex-shrink: 0;
+  }
+  aside h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--dim); margin: 14px 0 6px; }
+  aside h2:first-child { margin-top: 0; }
+  aside .line { margin-bottom: 3px; }
+  .sb-intro { font-size: 11.5px; font-style: italic; color: var(--dim); padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  .sb-intro b { color: var(--text); font-style: normal; }
+  .sb-intro-debt { margin-top: 16px; padding-bottom: 6px; border-top: 1px solid var(--border); padding-top: 12px; border-bottom: none; }
+  #error-banner {
+    display: none; background: #7a1f1f; color: #fff; padding: 6px 16px; font-size: 12.5px;
+  }
+  @media (max-width: 700px) { aside { display: none; } }
+</style>
+</head>
+<body>
+  <header>
+    <h1 id="title">ensemble-chat</h1>
+    <span class="meta" id="meta"></span>
+    <select id="theme-select" title="theme">
+      <option value="system">System</option>
+      <option value="light">Light</option>
+      <option value="dark">Dark</option>
+    </select>
+  </header>
+  <div id="error-banner"></div>
+  <main>
+    <div id="chat-col">
+      <div id="chat"></div>
+      <div id="nudges"></div>
+      <div id="attach-preview">
+        <img id="attach-preview-img" alt="">
+        <button id="attach-remove" title="remove">×</button>
+      </div>
+      <div id="composer">
+        <button id="attach-btn" title="attach an image" hidden>📎</button>
+        <input type="file" id="attach-input" accept="image/*" hidden>
+        <textarea id="input" placeholder="Message the group…" rows="1"></textarea>
+        <button id="send">Send</button>
+      </div>
+    </div>
+    <aside id="sidebar">
+      <div class="sb-intro">what the cast has picked up on <b>you</b></div>
+      <h2>affect</h2>
+      <div id="sb-affect"></div>
+      <h2>threads</h2>
+      <div id="sb-threads"></div>
+      <h2>traits</h2>
+      <div id="sb-traits"></div>
+      <h2>promises</h2>
+      <div id="sb-promises"></div>
+      <div class="sb-intro sb-intro-debt">speaking debt (the cast, not you)</div>
+      <div id="sb-debt"></div>
+    </aside>
+  </main>
+
+<script>
+/* ── Theme: system / light / dark, remembered per-browser only ────── */
+const THEME_KEY = 'ensemble-chat-theme';
+const themeSelect = document.getElementById('theme-select');
+
+function applyTheme(pref) {
+  const root = document.documentElement;
+  if (pref === 'light' || pref === 'dark') {
+    root.setAttribute('data-theme', pref);
+    root.style.colorScheme = pref;
+  } else {
+    root.removeAttribute('data-theme');
+    root.style.colorScheme = 'light dark';
+  }
+}
+
+function loadTheme() {
+  let pref = 'system';
+  try { pref = localStorage.getItem(THEME_KEY) || 'system'; } catch (e) { /* private mode etc. */ }
+  themeSelect.value = pref;
+  applyTheme(pref);
+}
+
+themeSelect.addEventListener('change', () => {
+  const pref = themeSelect.value;
+  try { localStorage.setItem(THEME_KEY, pref); } catch (e) { /* per-viewer convenience only */ }
+  applyTheme(pref);
+});
+
+loadTheme();
+
+const COLORS = ['#06b6d4', '#d946ef', '#22c55e', '#eab308', '#3b82f6'];
+let colorOf = {};
+let busy = false;
+let idleSeconds = 0;
+let idleTimer = null;
+
+const chat = document.getElementById('chat');
+const input = document.getElementById('input');
+const sendBtn = document.getElementById('send');
+const nudges = document.getElementById('nudges');
+const errorBanner = document.getElementById('error-banner');
+
+function showError(msg) {
+  errorBanner.textContent = msg;
+  errorBanner.style.display = 'block';
+  setTimeout(() => { errorBanner.style.display = 'none'; }, 6000);
+}
+
+function setBusy(v) {
+  busy = v;
+  sendBtn.disabled = v;
+  input.disabled = v;
+  [...nudges.children].forEach(b => b.disabled = v);
+}
+
+function bubbleDelay(text) {
+  return Math.min(900, 250 + text.length / 220 * 1000);
+}
+
+async function renderTurn(ev) {
+  const row = document.createElement('div');
+  row.className = 'row';
+  const group = document.createElement('div');
+  group.className = 'bubble-group';
+  const label = document.createElement('div');
+  label.className = 'label';
+  label.style.color = colorOf[ev.speaker] || 'var(--text)';
+  label.textContent = ev.speaker;
+  group.appendChild(label);
+  row.appendChild(group);
+  chat.appendChild(row);
+  chat.scrollTop = chat.scrollHeight;
+
+  for (const bubble of ev.bubbles) {
+    await new Promise(r => setTimeout(r, bubbleDelay(bubble)));
+    const el = document.createElement('div');
+    el.className = 'bubble';
+    el.textContent = bubble;
+    group.appendChild(el);
+    chat.scrollTop = chat.scrollHeight;
+  }
+  if (ev.tics && ev.tics.length) {
+    const w = document.createElement('div');
+    w.className = 'tics';
+    w.textContent = '⚠ ' + ev.tics.join(', ');
+    group.appendChild(w);
+  }
+}
+
+function renderUser(text, imageUrl) {
+  const row = document.createElement('div');
+  row.className = 'row user';
+  const group = document.createElement('div');
+  group.className = 'bubble-group';
+  const el = document.createElement('div');
+  el.className = 'bubble';
+  if (text) el.appendChild(document.createTextNode(text));
+  if (imageUrl) {
+    const img = document.createElement('img');
+    img.src = imageUrl;
+    el.appendChild(img);
+  }
+  group.appendChild(el);
+  row.appendChild(group);
+  chat.appendChild(row);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function renderState(state) {
+  if (!state) return;
+  document.getElementById('sb-affect').innerHTML =
+    `<div class="line">mood ${state.affect.mood}</div>` +
+    `<div class="line">energy ${state.affect.energy}</div>` +
+    `<div class="line">closeness ${state.affect.closeness}</div>`;
+  document.getElementById('sb-threads').innerHTML =
+    (state.threads || []).map(t => `<div class="line">${t.topic} (${t.status})</div>`).join('') || '<div class="line">—</div>';
+  document.getElementById('sb-traits').innerHTML =
+    (state.traits || []).map(t => `<div class="line">${t}</div>`).join('') || '<div class="line">—</div>';
+  document.getElementById('sb-promises').innerHTML =
+    (state.promises || []).map(p => `<div class="line">${p.fulfilled ? '✓ ' : ''}${p.text} — ${p.speaker || '?'}</div>`).join('') || '<div class="line">—</div>';
+  document.getElementById('sb-debt').innerHTML =
+    Object.entries(state.debt || {}).map(([k, v]) => `<div class="line">${k} ${v.toFixed(1)}</div>`).join('');
+}
+
+async function consumeSSE(response, handlers) {
+  const reader = response.body.getReader(), decoder = new TextDecoder();
+  let buf = '';
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    const parts = buf.split('\n\n');
+    buf = parts.pop();
+    for (const part of parts) {
+      const line = part.trim();
+      if (!line.startsWith('data: ')) continue;
+      try {
+        const ev = JSON.parse(line.slice(6));
+        const h = handlers[ev.type];
+        if (h) await h(ev);
+      } catch (e) { /* ignore malformed frame */ }
+    }
+  }
+}
+
+async function sendTurn({ text, speaker, imageFile } = {}) {
+  if (busy) return;
+  setBusy(true);
+  const localImageUrl = imageFile ? URL.createObjectURL(imageFile) : null;
+  try {
+    const fd = new FormData();
+    fd.append('text', text || '');
+    if (speaker) fd.append('speaker', speaker);
+    if (imageFile) fd.append('image', imageFile);
+    const resp = await fetch('/api/turn', { method: 'POST', body: fd });
+    if (!resp.ok) {
+      const d = await resp.json().catch(() => ({}));
+      showError(d.error || `HTTP ${resp.status}`);
+      setBusy(false);
+      resetIdleTimer();
+      return;
+    }
+    await consumeSSE(resp, {
+      user: ev => renderUser(ev.text, localImageUrl),
+      turn: ev => renderTurn(ev),
+      state: ev => renderState(ev),
+      state_error: ev => showError('state update failed: ' + ev.message),
+      error: ev => showError(ev.message),
+      done: () => setBusy(false),
+    });
+  } catch (e) {
+    showError('connection error: ' + e.message);
+    setBusy(false);
+  }
+  resetIdleTimer();
+}
+
+/* ── Image attach ───────────────────────────────────────────────── */
+const attachBtn = document.getElementById('attach-btn');
+const attachInput = document.getElementById('attach-input');
+const attachPreview = document.getElementById('attach-preview');
+const attachPreviewImg = document.getElementById('attach-preview-img');
+const attachRemove = document.getElementById('attach-remove');
+let pendingImage = null;
+
+attachBtn.addEventListener('click', () => attachInput.click());
+attachInput.addEventListener('change', () => {
+  const file = attachInput.files[0];
+  if (!file) return;
+  pendingImage = file;
+  attachPreviewImg.src = URL.createObjectURL(file);
+  attachPreview.style.display = 'flex';
+});
+attachRemove.addEventListener('click', () => {
+  pendingImage = null;
+  attachInput.value = '';
+  attachPreview.style.display = 'none';
+});
+
+/* ── Idle-timer continuations: the chat keeps going a little on its own if
+   you step away, same decide() policy as a normal continuation chain, just
+   triggered by silence instead of your message. Mirrors __main__.py's
+   on_idle callback for the terminal UI. ── */
+function resetIdleTimer() {
+  if (idleTimer) clearTimeout(idleTimer);
+  if (idleSeconds > 0) idleTimer = setTimeout(fireIdleCheck, idleSeconds * 1000);
+}
+
+async function fireIdleCheck() {
+  if (busy) { resetIdleTimer(); return; }
+  setBusy(true);
+  try {
+    const resp = await fetch('/api/idle', { method: 'POST' });
+    if (resp.ok) {
+      await consumeSSE(resp, {
+        turn: ev => renderTurn(ev),
+        state: ev => renderState(ev),
+        state_error: ev => showError('state update failed: ' + ev.message),
+        error: ev => showError(ev.message),
+        done: () => {},
+      });
+    }
+  } catch (e) { /* silent — just retry on the next tick */ }
+  setBusy(false);
+  resetIdleTimer();
+}
+
+sendBtn.addEventListener('click', () => {
+  const text = input.value.trim();
+  if (!text && !pendingImage) return;
+  const imageFile = pendingImage;
+  input.value = '';
+  input.style.height = '40px';
+  pendingImage = null;
+  attachInput.value = '';
+  attachPreview.style.display = 'none';
+  sendTurn({ text, imageFile });
+});
+
+input.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendBtn.click(); }
+});
+input.addEventListener('input', () => {
+  input.style.height = '40px';
+  input.style.height = Math.min(140, input.scrollHeight) + 'px';
+});
+
+async function init() {
+  const cast = await (await fetch('/api/cast')).json();
+  document.getElementById('title').textContent = cast.title;
+  document.getElementById('meta').textContent =
+    `${cast.characters.map(c => c.name).join(', ')} · ${cast.model} · reply≤${cast.reply_max_tokens}tok`;
+  cast.characters.forEach((c, i) => { colorOf[c.name] = COLORS[i % COLORS.length]; });
+  idleSeconds = cast.idle_seconds || 0;
+  attachBtn.hidden = !cast.vision_capable;
+
+  cast.characters.forEach(c => {
+    const b = document.createElement('button');
+    b.textContent = c.name;
+    b.title = `let ${c.name} speak unprompted`;
+    b.addEventListener('click', () => sendTurn({ speaker: c.name }));
+    nudges.appendChild(b);
+  });
+
+  const log = await (await fetch('/api/log')).json();
+  for (const e of log.entries) {
+    if (e.role === 'user') {
+      renderUser(e.text, e.image_path ? `/api/attachments/${e.image_path}` : null);
+    } else {
+      const label = document.createElement('div');
+      // replay history without the bubble stagger — it already happened
+      const row = document.createElement('div');
+      row.className = 'row';
+      const group = document.createElement('div');
+      group.className = 'bubble-group';
+      const lab = document.createElement('div');
+      lab.className = 'label';
+      lab.style.color = colorOf[e.speaker] || 'var(--text)';
+      lab.textContent = e.speaker;
+      group.appendChild(lab);
+      const el = document.createElement('div');
+      el.className = 'bubble';
+      el.style.animation = 'none';
+      el.style.opacity = '1';
+      el.textContent = e.text;
+      group.appendChild(el);
+      row.appendChild(group);
+      chat.appendChild(row);
+    }
+  }
+  chat.scrollTop = chat.scrollHeight;
+  renderState(log.state);
+  resetIdleTimer();
+}
+
+init();
+</script>
+</body>
+</html>
