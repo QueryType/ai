@@ -37,12 +37,13 @@ def _clamp(value: float, low: int, high: int) -> int:
     return max(low, min(high, int(value)))
 
 
-def derive(cfg: Config, profile: Profile | None) -> Policy:
+def derive(cfg: Config, profile: Profile | None, mode: str = "text") -> Policy:
     p = profile or _UNPROBED
+    target_reply_seconds = cfg.target_reply_seconds_f2f if mode == "f2f" else cfg.target_reply_seconds
     return Policy(
         structured_mode=p.structured_mode,
         state_block_tokens=_clamp(cfg.target_append_ms / 1000 * p.prefill_tok_s, 80, 400),
-        reply_max_tokens=_clamp(cfg.target_reply_seconds * p.decode_tok_s, 48, 400),
+        reply_max_tokens=_clamp(target_reply_seconds * p.decode_tok_s, 48, 400),
         history_strategy="full" if cfg.context_tokens >= 100_000 else "sliding",
         cache_matters=p.cache_speedup >= 3.0,
         probed=profile is not None,
@@ -50,8 +51,8 @@ def derive(cfg: Config, profile: Profile | None) -> Policy:
     )
 
 
-def load_policy(cfg: Config) -> Policy:
-    return derive(cfg, Profile.load(cfg.profile_path))
+def load_policy(cfg: Config, mode: str = "text") -> Policy:
+    return derive(cfg, Profile.load(cfg.profile_path), mode)
 
 
 if __name__ == "__main__":

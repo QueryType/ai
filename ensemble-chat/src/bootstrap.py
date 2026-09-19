@@ -18,8 +18,8 @@ from src.session import Session, attachments_dir, session_path
 def build_engine(scenario_arg: str | None, fresh: bool) -> tuple[Engine, Session, Path]:
     cfg = load_config()
     scenario_path = resolve_scenario(cfg, scenario_arg)
-    policy = load_policy(cfg)
     scenario = load_scenario(scenario_path)
+    policy = load_policy(cfg, scenario.mode)
 
     save_path = session_path(cfg, scenario_path)
     session = Session() if fresh else Session.load(save_path, policy.history_strategy)

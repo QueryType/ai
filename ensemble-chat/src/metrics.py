@@ -183,18 +183,23 @@ def evaluate(
     characters: list[Character],
     state: State,
     expect: dict[str, int] | None,
+    mode: str = "text",
 ) -> tuple[list[Metric], float]:
     names = [c.name for c in characters]
     metrics = [
         tic_free(turns),
-        brevity(turns),
         opener_variety(turns),
         question_balance(turns),
-        no_narration(turns),
         voice_integrity(turns, names),
         lexical_diversity(turns),
         turn_distribution(turns, characters),
     ]
+    # brevity and no_narration encode texting-mode expectations (short lines,
+    # no asterisk actions) that F2F's register deliberately violates on
+    # purpose — see PLAN_F2F.md.
+    if mode != "f2f":
+        metrics.append(brevity(turns))
+        metrics.append(no_narration(turns))
     if expect is not None:
         metrics.append(state_health(state, expect))
 
