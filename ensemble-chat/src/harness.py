@@ -45,6 +45,15 @@ class Suite:
     # vision-capable model; run_suite skips the suite with a clear message
     # rather than failing if the configured model doesn't support it.
     images: dict[int, bytes] | None = None
+    # character name -> synthetic replies to pre-load into RutTracker before
+    # the script runs, to bait a nudge deterministically instead of waiting
+    # for a real character to organically repeat itself. See
+    # PLAN_RUT_DETECTION.md.
+    seed_rut: dict[str, list[str]] | None = None
+    # forces every scripted turn (not just continuations) to this speaker, so
+    # the seeded character is the one actually generating when the nudge
+    # should fire.
+    force_speaker: str | None = None
 
 
 SHORT_SCRIPT = [
@@ -90,6 +99,32 @@ VISION_SCRIPT = [
     "ok random one -- what color was that pic i sent earlier?",
 ]
 
+RUT_SCRIPT = [
+    "hey you around",
+    "what are you up to",
+    "anything new",
+]
+
+# Name-agnostic, like RUT_SCRIPT, so it runs against whatever f2f-mode
+# scenario --scenario points at. See PLAN_F2F.md.
+F2F_SCRIPT = [
+    "so what actually happened tonight",
+    "nobody has to say anything",
+    "im tired of pretending im fine",
+    "this chai is disgusting by the way",
+]
+
+# Same opener and length repeated 5x — well past _MIN_SAMPLES — so the very
+# first scripted turn should already be nudged. Keyed by "__first__" rather
+# than a real name so the suite works against whatever scenario is passed via
+# --scenario, not just the repo's default cast.
+_STUCK_OPENER = "yeah so anyway whatever happens happens"
+_RUT_NUDGE_MARKERS = (
+    "open with the same phrase",
+    "end this one in a question",
+    "vary how long this reply is",
+)
+
 SUITES = {
     "short": Suite("short", SHORT_SCRIPT),
     # Only assert what the script itself guarantees as input. Turns 9-10 describe
@@ -109,6 +144,21 @@ SUITES = {
     # transcript for that; run_suite does assert the reference mechanically
     # survived in history.
     "vision": Suite("vision", VISION_SCRIPT, images={1: synthetic_png((230, 120, 20))}),
+    # Bait a nudge deterministically (see PLAN_RUT_DETECTION.md) rather than
+    # waiting for a real character to organically repeat itself. Doesn't
+    # assert the model *complies* with the nudge — that needs its
+    # cooperation, same reasoning as promises/vision-recall above — only
+    # that RutTracker actually fires and the nudge reaches the real outgoing
+    # directive.
+    "rut": Suite(
+        "rut", RUT_SCRIPT,
+        seed_rut={"__first__": [_STUCK_OPENER] * 5},
+        force_speaker="__first__",
+    ),
+    # Needs a scenario with a `mode: f2f` line (see PLAN_F2F.md); run_suite
+    # skips it with a clear message against a text-mode scenario, same
+    # pattern as vision skipping on a non-vision-capable model.
+    "f2f": Suite("f2f", F2F_SCRIPT),
 }
 
 
@@ -132,7 +182,7 @@ async def run_suite(
         cfg = replace(cfg, continuation_max=0)
     scenario_path = resolve_scenario(cfg, scenario_arg)
     scenario = load_scenario(scenario_path)
-    policy = load_policy(cfg)
+    policy = load_policy(cfg, scenario.mode)
 
     if suite.images and not policy.vision_capable:
         console.print(
@@ -141,7 +191,20 @@ async def run_suite(
         )
         return name, None
 
+    if name == "f2f" and scenario.mode != "f2f":
+        console.print(
+            f"[yellow]skipping f2f: {scenario.title!r} has no 'mode: f2f' line "
+            f"— pass --scenario pointing at an f2f scenario[/yellow]\n"
+        )
+        return name, None
+
     rng = random.Random()
+
+    # "__first__" lets a suite bait a specific character without hardcoding a
+    # name from the repo's default cast, so it still works against whatever
+    # scenario --scenario points at.
+    def _resolve(key: str) -> str:
+        return scenario.characters[0].name if key == "__first__" else key
 
     console.rule(f"[bold]{scenario.title} · {name} · {len(script)} turns[/bold]")
     console.print(f"[dim]{cfg.model} · reply≤{policy.reply_max_tokens}tok · "
@@ -161,12 +224,17 @@ async def run_suite(
             attachments_dir=Path(tmp_dir),
         )
 
+        for key, replies in (suite.seed_rut or {}).items():
+            for reply in replies:
+                engine.rut.record(_resolve(key), reply)
+        force_speaker = _resolve(suite.force_speaker) if suite.force_speaker else None
+
         turns: list[Turn] = []
         for i, line in enumerate(script):
             image = (suite.images or {}).get(i)
             console.print(f"[bold]you[/bold]      {line}{'  [dim](+ image)[/dim]' if image else ''}")
             started = time.perf_counter()
-            result = await engine.turn(line, lambda _: None, image=image)
+            result = await engine.turn(line, lambda _: None, image=image, force_speaker=force_speaker)
             elapsed = time.perf_counter() - started
             _print_turn(console, result, elapsed)
             turns.append(Turn(speaker=result.speaker.name, text=result.text, elapsed=elapsed))
@@ -200,7 +268,18 @@ async def run_suite(
                 f"{surviving}/{expected}[/{colour}]\n"
             )
 
-    metrics, composite = evaluate(turns, list(scenario.characters), engine.state, suite.expect)
+        if suite.seed_rut:
+            fired = any(
+                m["role"] == "system"
+                and any(marker in m["content"].lower() for marker in _RUT_NUDGE_MARKERS)
+                for m in engine.history
+            )
+            colour = "green" if fired else "red"
+            console.print(f"[{colour}]rut nudge reached outgoing directive: {fired}[/{colour}]\n")
+
+    metrics, composite = evaluate(
+        turns, list(scenario.characters), engine.state, suite.expect, scenario.mode
+    )
 
     table = Table(show_edge=False, pad_edge=False, box=None)
     table.add_column("metric", style="bold")
@@ -248,7 +327,9 @@ async def run(
 
 def main() -> None:
     parser = argparse.ArgumentParser(prog="ensemble-chat eval")
-    parser.add_argument("suite", nargs="?", default="all", choices=["short", "long", "vision", "all"])
+    parser.add_argument(
+        "suite", nargs="?", default="all", choices=["short", "long", "vision", "rut", "f2f", "all"]
+    )
     parser.add_argument("--scenario", help="name under SCENARIO_LOC, or a path")
     parser.add_argument("--save", type=Path, help="write the report to a file")
     parser.add_argument(

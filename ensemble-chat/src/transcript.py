@@ -15,6 +15,10 @@ class Entry:
     speaker: str | None  # character name; None for the human
     text: str
     image_path: str | None = None  # relative to Engine.attachments_dir
+    # Position among assistant replies, in production order — matches
+    # Engine._checkpoints exactly (both only count non-empty replies), so
+    # this is what Engine.delete_from() addresses. None for user entries.
+    turn_index: int | None = None
 
 
 def _user_text_and_image(content) -> tuple[str, str | None]:
@@ -30,11 +34,13 @@ def _user_text_and_image(content) -> tuple[str, str | None]:
 
 def entries(history: list[dict]) -> list[Entry]:
     out: list[Entry] = []
+    turn_index = 0
     for msg in history:
         if msg["role"] == "user":
             text, image_path = _user_text_and_image(msg["content"])
             out.append(Entry(role="user", speaker=None, text=text, image_path=image_path))
         elif msg["role"] == "assistant":
             name, _, text = msg["content"].partition(": ")
-            out.append(Entry(role="assistant", speaker=name, text=text))
+            out.append(Entry(role="assistant", speaker=name, text=text, turn_index=turn_index))
+            turn_index += 1
     return out
