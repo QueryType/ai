@@ -7,6 +7,22 @@ remember things across sessions, and follow up on things they said they'd do.
 Runs against any OpenAI-compatible endpoint. Nothing is hardcoded to a model or
 a machine.
 
+## Install
+
+```bash
+cd /Volumes/d/code/aiml/ensemble-chat
+python3 -m venv .venv && source .venv/bin/activate   # or any conda env — 3.11+
+pip install -r requirements.txt
+cp .env.example .env
+```
+
+Then edit `.env` (or export `SCENARIO_LOC` in your shell) to point at a
+scenarios directory before doing anything else — see "Writing a scenario"
+below; there is no in-project fallback, on purpose (rule 6 in `CLAUDE.md`).
+
+This repo's own dev environment already has everything installed — see
+"Run" below for the exact env it uses instead of a fresh venv.
+
 ## Run
 
 The conda env lives off the default path, and `src` is imported as a package, so
@@ -23,6 +39,9 @@ PYTHONPATH=. $PY -m src            # chat, terminal UI
 PYTHONPATH=. $PY -m src late_shift --fresh      # named scenario, ignore saved session
 PYTHONPATH=. $PY -m src late_shift --ui web     # chat, web UI at http://127.0.0.1:8000
 ```
+
+(Substitute your own venv's `python` for `$PY` if you installed fresh above —
+`$PY` here is just this dev setup's specific path, nothing the code requires.)
 
 Scenarios live outside the project, wherever `SCENARIO_LOC` points. Either
 layout works — a flat folder of `.md` files, or a parent holding one folder per
@@ -47,13 +66,38 @@ model or server.
 | `/next <name>` | make someone speak unprompted |
 | `/who` | speaking debt and history size |
 | `/state` | mood, threads, traits, promises currently tracked |
-| `/log` | replay the full chat so far (user + character lines only) |
+| `/log` | replay the full chat so far (user + character lines only), each reply tagged with its turn number for `/delete` |
+| `/regenerate [guidance]` | redo the last reply, same speaker, with an optional short nudge (e.g. `/regenerate be blunter`). Only works while it's still the last thing that happened — a new message, a continuation, or an idle hop all invalidate it |
+| `/delete <n>` | remove reply `<n>` (its turn number, from `/log`) and everything generated after it — asks for confirmation first, since it's irreversible once the session autosaves |
 | `/image <path> [caption]` | attach an image (only shown if the model supports it) |
 | `/quit` | exit (saves) |
 
 After a reply, characters may answer each other for a few turns before
 control comes back to you — addressed by name, a follow-up, or someone else
 chiming in — capped and biased to hand back. See "Continuations" below.
+
+### Autonomous / self-auto mode
+
+Two unattended modes, terminal only, both bounded by a turn cap and/or a time
+cap instead of you typing `/quit`:
+
+```bash
+PYTHONPATH=. $PY -m src late_shift --autonomous                       # no human at all
+PYTHONPATH=. $PY -m src late_shift --auto-human                       # you're generated too
+PYTHONPATH=. $PY -m src late_shift --autonomous --max-turns 20 --max-seconds 300
+```
+
+- `--autonomous` — the cast just talks to itself, no human turn ever happens.
+- `--auto-human` — you're still a participant, but your own lines are
+  generated instead of typed, using an optional `## You` persona from the
+  scenario (see below) or a generic fallback if it's not defined.
+- `--max-turns`/`--max-seconds` override `CHAT_AUTOPILOT_MAX_TURNS`/
+  `CHAT_AUTOPILOT_MAX_SECONDS` for one run. Either mode also stops on Ctrl+C,
+  saving normally on the way out.
+- Mutually exclusive with each other, and with `--ui web` — start one of
+  these against a scenario, then afterward point `--ui web` (or `/log`) at
+  the same scenario to read back what was said; the session file is the same
+  either way, so nothing extra is needed to view it once it's done.
 
 ## Web UI
 
@@ -67,8 +111,28 @@ policy — only the delivery layer differs:
   your message (`/api/turn`), not a WebSocket — which composes naturally with
   continuations: the same stream just keeps yielding turns, human or
   continuation, until the chain ends.
+- For `mode: f2f` scenarios specifically, the reply itself streams
+  token-by-token as the model generates it, rather than appearing all at once
+  when generation finishes — the engine already streams from the API either
+  way, this just forwards it live instead of buffering. Scoped to F2F because
+  it renders as one screenplay block; texting mode still delivers each reply
+  whole so its bubble-split reveal isn't disturbed. The terminal UI streams
+  F2F replies the same way, straight to the console as they arrive.
 - A button per character stands in for `/next <name>`. The side panel is
   `/state` and `/who`, always visible rather than typed.
+- A "↻ regenerate" button stands in for `/regenerate`, enabled only while
+  there's still a last reply to redo. Clicking it prompts for an optional
+  guidance nudge, then removes the old reply from the page and streams in
+  its replacement (or replaces it outright for texting mode, which doesn't
+  stream). Available once per session's worth of turns — it isn't restored
+  from a resumed session on page load, only after at least one turn happens
+  in the current browser session.
+- Hovering a reply reveals a small "🗑 delete from here" control, standing
+  in for `/delete <n>`. Confirms first (a plain browser `confirm()`), then
+  removes that reply and everything generated after it and re-renders the
+  chat from the now-shorter history. Works on any past reply, not just the
+  last one, unlike regenerate — restored correctly on page load since it's
+  driven off `/api/log`, not session-only client state.
 - One process, one in-process session — there's no login and no multi-tab
   support, on purpose; run one instance per scenario, the same as the
   terminal UI.
@@ -118,10 +182,16 @@ All of it lives in `.env` — copy `.env.example`.
 | `CHAT_REQUEST_TIMEOUT_SECONDS` | fail a stalled request loudly instead of hanging (default 60) |
 | `CHAT_CONTINUATION_MAX` | how many characters can speak in a row before control returns to you (default 2, 0 disables) |
 | `CHAT_CONTINUATION_CHANCE` | base chance of a follow-up or a third party chiming in (default 0.25) |
+| `CHAT_F2F_CONTINUATION_MAX` | same as above, for `mode: f2f` scenarios (default 4) |
+| `CHAT_F2F_CONTINUATION_CHANCE` | same as above, for `mode: f2f` scenarios (default 0.35; addressing by name is boosted but decays with depth rather than being guaranteed — see `PLAN_F2F.md`) |
+| `CHAT_TARGET_REPLY_SECONDS_F2F` | reply-length budget for `mode: f2f` scenarios (default 11.0, vs. 2.5 for texting) |
+| `CHAT_IDLE_SECONDS_F2F` | idle-timer threshold for `mode: f2f` scenarios (default 120, vs. 45 for texting — F2F's turns already run longer; 0 disables it for f2f only, same as `CHAT_IDLE_SECONDS` does for texting) |
 | `CHAT_WEB_HOST` | web UI bind address (default `127.0.0.1`) |
 | `CHAT_WEB_PORT` | web UI port (default `8000`) |
 | `CHAT_IDLE_SECONDS` | seconds of silence before the cast re-checks whether to keep talking (default 45, 0 disables) |
 | `CHAT_VISION_MAX_DIMENSION` | longest edge an attached image is downscaled to before it's saved or sent (default 1024) |
+| `CHAT_AUTOPILOT_MAX_TURNS` | stop `--autonomous`/`--auto-human` after this many replies (default 40) |
+| `CHAT_AUTOPILOT_MAX_SECONDS` | stop `--autonomous`/`--auto-human` after this long, whichever hits first (default 900) |
 
 Change the model, re-run `src.probe`, and reply length, state-block size,
 history strategy and the background-task flag all re-derive from measurement.
@@ -137,6 +207,8 @@ PYTHONPATH=. $PY -m src.harness long      # 24 turns — where repetition shows 
 PYTHONPATH=. $PY -m src.harness all --save report.txt
 PYTHONPATH=. $PY -m src.harness long --continuations   # exercise continuations too
 PYTHONPATH=. $PY -m src.harness vision    # image attached, referred back to 3 turns later
+PYTHONPATH=. $PY -m src.harness rut       # seeds a stuck opener, checks the nudge fires
+PYTHONPATH=. $PY -m src.harness f2f --scenario <a mode: f2f scenario>   # screenplay register
 ```
 
 Both `short`/`long` (and `all`, which bundles them) run a **fixed** human
@@ -157,6 +229,19 @@ working. Whether the color is actually *right* isn't asserted — that needs
 the model's cooperation — but whether the reference mechanically survived in
 history is, and prints as a pass/fail line of its own.
 
+`rut` is also separate and not part of `all` — it deliberately pre-loads
+`RutTracker` with five identical stuck-opener replies before the script runs,
+so the nudge fires on the very first turn instead of waiting for a character
+to organically repeat itself, then checks the real outgoing directive
+mechanically for the nudge text. See `PLAN_RUT_DETECTION.md`.
+
+`f2f` needs a scenario with a `mode: f2f` line (see "Writing a scenario"
+below) — pass one with `--scenario`; it skips with a clear message against a
+text-mode scenario. It scores a different metric set (`brevity` and
+`no_narration` are texting-only expectations F2F's register deliberately
+violates on purpose) and its composite isn't comparable to `short`/`long`.
+See `PLAN_F2F.md`.
+
 Continuation turns are off by default so scores stay comparable run to run;
 `--continuations` scores those turns too and expect more variance when it's on.
 
@@ -169,7 +254,7 @@ and both sides end up sounding alike.
 |---|---|
 | `tic_free` | assistant-voice leaking in ("is there anything else") |
 | `brevity` | replies drifting from texting into essays |
-| `opener_variety` | a character reusing one sentence shape — the rut failure |
+| `opener_variety` | a character reusing one sentence shape — the rut failure (a post-hoc score; `RutTracker` in `src/engine.py` now also catches and nudges this live, mid-session — see `PLAN_RUT_DETECTION.md`) |
 | `question_balance` | interrogation mode, every line ending in "?" |
 | `no_narration` | asterisk actions and stage directions |
 | `voice_integrity` | speaking as someone else, or self-labelling "Name:" |
@@ -212,6 +297,71 @@ doesn't fix typos" produces a character; "is a 34-year-old operations manager"
 produces a résumé. The single biggest quality lever in this whole system is how
 these paragraphs are written.
 
+### Giving "you" a persona
+
+Optional, and only used by `--auto-human` (see above) — everything else
+about a scenario is unaffected by whether this section exists:
+
+```markdown
+## You
+
+- name: Riya
+A tired analyst who texts in lowercase, short and a little blunt. Overshares
+about work stress, deflects with humor when called out.
+```
+
+`name:` is what the generated human is called (defaults to `"you"` if
+omitted); the rest is free-text persona, same voice-not-biography advice as a
+character. Leave the section out entirely and `--auto-human` falls back to a
+generic "ordinary participant" persona instead — every scenario written
+before this feature existed still parses and runs exactly as it did before.
+
+### F2F mode
+
+A one-line flag right after the title switches the whole register from
+texting to in-person:
+
+```markdown
+# Kitchen Table
+mode: f2f
+
+Priya, Dev and Meera end up in the kitchen after everyone else has gone to bed.
+```
+
+No other schema change — the `## Characters` block is identical either way, a
+personality doesn't change based on the medium. What does change is the
+setting prose itself: "texting because everyone's apart" and "sitting in the
+same room" are different facts about the scene, so converting a scenario to
+F2F usually means writing a different setting, not just adding the flag.
+
+With `mode: f2f`: replies read like short-story prose, not a chat
+transcript — quoted dialogue with action and attribution woven into the same
+sentence (`"Worst food I've had all year," Priya says, pushing her plate
+away.`), action optional rather than something every turn needs. Since you
+have no character block in the scenario, narration refers to you as "you" —
+the register explicitly forbids the model inventing a label like "the human"
+when it needs to mention you in third-person prose. Turns run
+longer (`CHAT_TARGET_REPLY_SECONDS_F2F`) and render as one prose block instead
+of split text bubbles. Continuations run looser
+(`CHAT_F2F_CONTINUATION_MAX`/`CHANCE`) than texting's, decaying with each hop
+rather than guaranteeing the next speaker forever — an early version made
+every address-by-name a certainty, which meant characters naming each other
+mid-conversation (completely normal dialogue) chained through the whole cast
+on nearly every human line. Its idle timer also runs longer
+(`CHAT_IDLE_SECONDS_F2F`) since F2F's turns already take longer to generate.
+The one rule that doesn't change: a line that asks *you* something still
+hands the floor back immediately, in both modes. No `mode:` line at all keeps
+every existing scenario exactly as it behaved before this feature existed.
+See `PLAN_F2F.md`.
+
+The terminal UI needs no changes for this — an F2F turn is just a single,
+longer block, so it prints as one line same as always. The web UI's
+chat-bubble CSS is scoped off for `mode: f2f` scenarios (`body.f2f` in
+`src/ui/static/index.html`): no bubble background or rounded box, the human's
+own line renders as a plain labelled line instead of a right-aligned blue
+bubble, and a stray `*aside*` (rare now that action is prose, not asterisks)
+still italicizes if the model emits one out of habit.
+
 ## Continuations
 
 Real group chats don't wait for you to reply to every line — people answer
@@ -237,7 +387,9 @@ occasionally the cast picks the thread back up on its own, the way a real
 group chat doesn't just freeze because you stepped away. Works identically in
 both UIs: the terminal races the input prompt against the timer with
 `prompt_toolkit` (so it can't corrupt whatever you're mid-typing), the web UI
-just calls `/api/idle` client-side. `CHAT_IDLE_SECONDS=0` disables it.
+just calls `/api/idle` client-side. `CHAT_IDLE_SECONDS=0` disables it — but
+`mode: f2f` scenarios use the separate `CHAT_IDLE_SECONDS_F2F` threshold, so
+set both to `0` to disable idle-triggered continuations everywhere.
 
 ## Vision
 
@@ -274,15 +426,37 @@ background → append any state change to the history for the next turn.
 The system prompt is built once and never changes. Everything volatile is
 appended. See `DESIGN.md` for why that matters more than anything else here.
 
+`/regenerate` and `/delete` are the two deliberate exceptions: `/regenerate`
+truncates history back to just before the last reply and redoes it;
+`/delete <n>` truncates back to just before an arbitrary earlier reply and
+leaves it truncated. Both only ever fire on explicit user action (`/delete`
+asks for confirmation first), and both pay a full cache-reprocess on the
+next request as a result — accepted as an occasional cost, not a hot-path
+one. `Engine` tracks a checkpoint (history position, speaking debt, last
+speaker, rut state) per reply specifically so either can roll everything
+back correctly, not just the history list.
+
 ## Status
 
 Working: multi-character turn-taking, texting register, affect/threads/traits
 tracking, cross-session memory, promise-keeping, continuations including the
-idle-timer (Tiers 1–3 — see `PLAN_CONTINUATIONS.md`), a local web UI, and
-vision (on models that support it — probed, not assumed).
+idle-timer (Tiers 1–3 — see `PLAN_CONTINUATIONS.md`), a local web UI, vision
+(on models that support it — probed, not assumed), live rut detection (see
+`PLAN_RUT_DETECTION.md`), an F2F/in-person mode (see `PLAN_F2F.md`), and
+autonomous/self-auto unattended modes (terminal only — see "Autonomous /
+self-auto mode" above, and `BACKLOG.md`).
 
-Not built yet: rut detection (catching a character collapsing into a verbal
-tic) and an F2F/in-person register mode. See `BACKLOG.md`.
+Not built yet: a scripted user-side eval harness (the fixed scripts in
+`src.harness` cover this today; a model-generated simulated human is a
+different, unbuilt thing — see `BACKLOG.md`), and F2F's web-UI styling, which
+works but still looks like a texting bubble rather than a screenplay block.
 
-Known rough edge: long sessions are untested past ~20 turns. Character voice
-drift is the thing to watch for, and there is currently nothing that detects it.
+Known rough edge: long sessions are untested past ~20 turns. `RutTracker`
+watches for one character collapsing into a repeated opener, question-heavy
+pattern, or flat reply length mid-session and nudges against it, but broader
+voice drift beyond those specific shapes is still something to watch for by
+reading the transcript.
+
+Known bug, terminal-only, cosmetic: F2F streaming can briefly show a raw
+`"Name: "` echo if the model's own output happens to start that way — the
+saved session, `/log`, and the web UI are all unaffected. See `BACKLOG.md`.
