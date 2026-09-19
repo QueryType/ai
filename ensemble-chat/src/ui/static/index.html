@@ -50,8 +50,34 @@
     animation: pop .18s ease forwards;
   }
   .row.user .bubble { background: var(--user-bubble); }
+  .row.user .label { display: none; }
   @keyframes pop { to { opacity: 1; transform: translateY(0); } }
+
+  /* F2F: prose, not a texting bubble — no chrome, full-width paragraph, "you"
+     shown like any other speaker instead of a right-aligned iMessage-style
+     bubble. The name label is dropped entirely — the prose already names its
+     speaker via attribution ("Priya said...") — replaced by a thin colored
+     left accent (set per-speaker in JS) so you can still scan who's talking
+     at a glance. Scoped to body.f2f so texting mode is untouched. */
+  body.f2f .row { max-width: 720px; }
+  body.f2f .row.user { justify-content: flex-start; margin-left: 0; }
+  body.f2f .label { display: none; }
+  body.f2f .bubble, body.f2f .row.user .bubble {
+    background: none; border-radius: 0; padding: 2px 0 2px 12px; line-height: 1.55;
+    border-left: 3px solid var(--border);
+  }
+  body.f2f .bubble em { color: var(--dim); font-style: italic; }
+  /* F2F messages run longer than a text — a single-line box that crawls up
+     to 140px is cramped for typing a paragraph. */
+  body.f2f #composer textarea { height: 90px; max-height: 320px; }
   .tics { color: #e05252; font-size: 11.5px; margin-top: 2px; }
+  .delete-turn {
+    border: none; background: none; cursor: pointer; opacity: 0;
+    font-size: 11px; padding: 1px 4px; margin-top: 2px; color: var(--dim);
+    align-self: flex-start;
+  }
+  .row:hover .delete-turn { opacity: .55; }
+  .delete-turn:hover { opacity: 1 !important; color: #e05252; }
   .bubble img { display: block; max-width: 220px; border-radius: 10px; margin-top: 4px; }
   #attach-preview {
     display: none; align-items: center; gap: 8px; padding: 0 16px 8px;
@@ -176,15 +202,27 @@ loadTheme();
 
 const COLORS = ['#06b6d4', '#d946ef', '#22c55e', '#eab308', '#3b82f6'];
 let colorOf = {};
+let isF2F = false;
 let busy = false;
 let idleSeconds = 0;
 let idleTimer = null;
+// Regenerate targets only the very last reply, and only while it's still
+// the last thing that happened (Engine.can_regenerate() enforces this
+// server-side too) — lastAssistantRow is what gets removed from the DOM
+// right before the replacement streams in.
+let canRegenerate = false;
+let lastAssistantRow = null;
 
 const chat = document.getElementById('chat');
 const input = document.getElementById('input');
 const sendBtn = document.getElementById('send');
 const nudges = document.getElementById('nudges');
 const errorBanner = document.getElementById('error-banner');
+const regenerateBtn = document.createElement('button');
+regenerateBtn.textContent = '↻ regenerate';
+regenerateBtn.title = 'redo the last reply (same speaker)';
+regenerateBtn.disabled = true;
+nudges.appendChild(regenerateBtn);
 
 function showError(msg) {
   errorBanner.textContent = msg;
@@ -197,13 +235,139 @@ function setBusy(v) {
   sendBtn.disabled = v;
   input.disabled = v;
   [...nudges.children].forEach(b => b.disabled = v);
+  if (!v) regenerateBtn.disabled = !canRegenerate;
 }
 
 function bubbleDelay(text) {
   return Math.min(900, 250 + text.length / 220 * 1000);
 }
 
+// F2F messages run longer than a text, so its composer starts taller and
+// grows further before scrolling. Kept as one function so every resize site
+// agrees, rather than duplicating the two numbers per mode.
+function inputHeights() {
+  return isF2F ? { base: 90, max: 320 } : { base: 40, max: 140 };
+}
+
+// f2f's register allows *action beats* — italicize them for a screenplay
+// feel instead of showing raw asterisks. Text mode never emits these (the
+// register bans them), so this is a no-op there; leaving it unconditional
+// avoids a second render path for one regex.
+function setBubbleText(el, text) {
+  const parts = text.split(/(\*[^*\n]+\*)/g);
+  for (const part of parts) {
+    if (part.startsWith('*') && part.endsWith('*') && part.length > 2) {
+      const em = document.createElement('em');
+      em.textContent = part.slice(1, -1);
+      el.appendChild(em);
+    } else if (part) {
+      el.appendChild(document.createTextNode(part));
+    }
+  }
+}
+
+// F2F only: the reply renders as one screenplay block, so live deltas map
+// straight onto a single growing bubble — no bubble-boundary reconciliation
+// needed the way texting's multi-bubble split would require. `renderTurn`
+// finalizes (and clears) this once the authoritative final text arrives,
+// since streaming/truncation trimming can differ from the raw concatenation.
+let liveTurn = null;
+
+function renderStreamStart(ev) {
+  const row = document.createElement('div');
+  row.className = 'row';
+  const group = document.createElement('div');
+  group.className = 'bubble-group';
+  const label = document.createElement('div');
+  label.className = 'label';
+  label.style.color = colorOf[ev.speaker] || 'var(--text)';
+  label.textContent = ev.speaker;
+  group.appendChild(label);
+  row.appendChild(group);
+  chat.appendChild(row);
+
+  const el = document.createElement('div');
+  el.className = 'bubble';
+  el.style.borderLeftColor = colorOf[ev.speaker] || 'var(--text)';
+  group.appendChild(el);
+  chat.scrollTop = chat.scrollHeight;
+
+  liveTurn = { group, bubbleEl: el, speaker: ev.speaker, text: '' };
+  lastAssistantRow = row;
+}
+
+function renderStreamChunk(ev) {
+  if (!liveTurn) return;
+  liveTurn.text += ev.text;
+  liveTurn.bubbleEl.textContent = '';
+  setBubbleText(liveTurn.bubbleEl, liveTurn.text);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+// Removes that reply and everything generated after it (Engine.delete_from,
+// a true history mutation) — confirmed here client-side since it's
+// irreversible once the session autosaves. Simplest safe way to reflect an
+// arbitrary rewind is to just re-render the whole chat from a fresh /api/log
+// rather than trying to work out exactly which DOM nodes to remove.
+async function deleteFrom(turnIndex) {
+  if (busy) return;
+  if (!confirm('Delete this reply and everything after it? This cannot be undone.')) return;
+  setBusy(true);
+  try {
+    const fd = new FormData();
+    fd.append('turn_index', turnIndex);
+    const resp = await fetch('/api/delete', { method: 'POST', body: fd });
+    if (!resp.ok) {
+      const d = await resp.json().catch(() => ({}));
+      showError(d.error || `HTTP ${resp.status}`);
+    } else {
+      canRegenerate = false;
+      lastAssistantRow = null;
+      liveTurn = null;
+      chat.innerHTML = '';
+      await loadLog();
+    }
+  } catch (e) {
+    showError('connection error: ' + e.message);
+  }
+  setBusy(false);
+  resetIdleTimer();
+}
+
+function addDeleteControl(group, turnIndex) {
+  if (turnIndex == null) return;
+  const btn = document.createElement('button');
+  btn.className = 'delete-turn';
+  btn.textContent = '🗑 delete from here';
+  btn.title = 'delete this reply and everything after it';
+  btn.addEventListener('click', () => deleteFrom(turnIndex));
+  group.appendChild(btn);
+}
+
 async function renderTurn(ev) {
+  if (liveTurn && liveTurn.speaker === ev.speaker) {
+    const { group, bubbleEl } = liveTurn;
+    bubbleEl.textContent = '';
+    setBubbleText(bubbleEl, ev.bubbles[0] || '');
+    if (ev.tics && ev.tics.length) {
+      const w = document.createElement('div');
+      w.className = 'tics';
+      w.textContent = '⚠ ' + ev.tics.join(', ');
+      group.appendChild(w);
+    }
+    if (ev.truncated) {
+      const w = document.createElement('div');
+      w.className = 'tics';
+      w.textContent = '⚠ cut off at max_tokens, trimmed to last full sentence';
+      group.appendChild(w);
+    }
+    addDeleteControl(group, ev.turn_index);
+    liveTurn = null;
+    canRegenerate = true;
+    chat.scrollTop = chat.scrollHeight;
+    return;
+  }
+
   const row = document.createElement('div');
   row.className = 'row';
   const group = document.createElement('div');
@@ -221,7 +385,8 @@ async function renderTurn(ev) {
     await new Promise(r => setTimeout(r, bubbleDelay(bubble)));
     const el = document.createElement('div');
     el.className = 'bubble';
-    el.textContent = bubble;
+    if (isF2F) el.style.borderLeftColor = colorOf[ev.speaker] || 'var(--text)';
+    setBubbleText(el, bubble);
     group.appendChild(el);
     chat.scrollTop = chat.scrollHeight;
   }
@@ -231,6 +396,15 @@ async function renderTurn(ev) {
     w.textContent = '⚠ ' + ev.tics.join(', ');
     group.appendChild(w);
   }
+  if (ev.truncated) {
+    const w = document.createElement('div');
+    w.className = 'tics';
+    w.textContent = '⚠ cut off at max_tokens, trimmed to last full sentence';
+    group.appendChild(w);
+  }
+  addDeleteControl(group, ev.turn_index);
+  lastAssistantRow = row;
+  canRegenerate = true;
 }
 
 function renderUser(text, imageUrl) {
@@ -238,8 +412,13 @@ function renderUser(text, imageUrl) {
   row.className = 'row user';
   const group = document.createElement('div');
   group.className = 'bubble-group';
+  const lab = document.createElement('div');
+  lab.className = 'label';
+  lab.textContent = 'you';
+  group.appendChild(lab);
   const el = document.createElement('div');
   el.className = 'bubble';
+  if (isF2F) el.style.borderLeftColor = 'var(--accent)';
   if (text) el.appendChild(document.createTextNode(text));
   if (imageUrl) {
     const img = document.createElement('img');
@@ -308,6 +487,8 @@ async function sendTurn({ text, speaker, imageFile } = {}) {
     }
     await consumeSSE(resp, {
       user: ev => renderUser(ev.text, localImageUrl),
+      stream_start: ev => renderStreamStart(ev),
+      stream_chunk: ev => renderStreamChunk(ev),
       turn: ev => renderTurn(ev),
       state: ev => renderState(ev),
       state_error: ev => showError('state update failed: ' + ev.message),
@@ -320,6 +501,42 @@ async function sendTurn({ text, speaker, imageFile } = {}) {
   }
   resetIdleTimer();
 }
+
+async function regenerateTurn() {
+  if (busy || !canRegenerate) return;
+  const guidance = prompt('Optional guidance for the retry (10-20 words), or leave blank:') || '';
+  setBusy(true);
+  if (lastAssistantRow) { lastAssistantRow.remove(); lastAssistantRow = null; }
+  canRegenerate = false;
+  try {
+    const fd = new FormData();
+    fd.append('guidance', guidance);
+    const resp = await fetch('/api/regenerate', { method: 'POST', body: fd });
+    if (!resp.ok) {
+      const d = await resp.json().catch(() => ({}));
+      showError(d.error || `HTTP ${resp.status}`);
+      setBusy(false);
+      resetIdleTimer();
+      return;
+    }
+    await consumeSSE(resp, {
+      stream_start: ev => renderStreamStart(ev),
+      stream_chunk: ev => renderStreamChunk(ev),
+      regenerate: ev => renderTurn(ev),
+      turn: ev => renderTurn(ev),
+      state: ev => renderState(ev),
+      state_error: ev => showError('state update failed: ' + ev.message),
+      error: ev => showError(ev.message),
+      done: () => setBusy(false),
+    });
+  } catch (e) {
+    showError('connection error: ' + e.message);
+    setBusy(false);
+  }
+  resetIdleTimer();
+}
+
+regenerateBtn.addEventListener('click', regenerateTurn);
 
 /* ── Image attach ───────────────────────────────────────────────── */
 const attachBtn = document.getElementById('attach-btn');
@@ -359,6 +576,8 @@ async function fireIdleCheck() {
     const resp = await fetch('/api/idle', { method: 'POST' });
     if (resp.ok) {
       await consumeSSE(resp, {
+        stream_start: ev => renderStreamStart(ev),
+        stream_chunk: ev => renderStreamChunk(ev),
         turn: ev => renderTurn(ev),
         state: ev => renderState(ev),
         state_error: ev => showError('state update failed: ' + ev.message),
@@ -376,7 +595,7 @@ sendBtn.addEventListener('click', () => {
   if (!text && !pendingImage) return;
   const imageFile = pendingImage;
   input.value = '';
-  input.style.height = '40px';
+  input.style.height = inputHeights().base + 'px';
   pendingImage = null;
   attachInput.value = '';
   attachPreview.style.display = 'none';
@@ -387,12 +606,17 @@ input.addEventListener('keydown', e => {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendBtn.click(); }
 });
 input.addEventListener('input', () => {
-  input.style.height = '40px';
-  input.style.height = Math.min(140, input.scrollHeight) + 'px';
+  const { base, max } = inputHeights();
+  input.style.height = base + 'px';
+  input.style.height = Math.min(max, input.scrollHeight) + 'px';
 });
 
 async function init() {
   const cast = await (await fetch('/api/cast')).json();
+  isF2F = cast.mode === 'f2f';
+  document.body.classList.toggle('f2f', isF2F);
+  input.placeholder = isF2F ? 'Say something…' : 'Message the group…';
+  input.style.height = inputHeights().base + 'px';
   document.getElementById('title').textContent = cast.title;
   document.getElementById('meta').textContent =
     `${cast.characters.map(c => c.name).join(', ')} · ${cast.model} · reply≤${cast.reply_max_tokens}tok`;
@@ -408,12 +632,18 @@ async function init() {
     nudges.appendChild(b);
   });
 
+  await loadLog();
+  resetIdleTimer();
+}
+
+// Shared by init() and deleteFrom() (which re-renders the whole chat rather
+// than working out exactly which DOM nodes an arbitrary rewind touches).
+async function loadLog() {
   const log = await (await fetch('/api/log')).json();
   for (const e of log.entries) {
     if (e.role === 'user') {
       renderUser(e.text, e.image_path ? `/api/attachments/${e.image_path}` : null);
     } else {
-      const label = document.createElement('div');
       // replay history without the bubble stagger — it already happened
       const row = document.createElement('div');
       row.className = 'row';
@@ -428,15 +658,16 @@ async function init() {
       el.className = 'bubble';
       el.style.animation = 'none';
       el.style.opacity = '1';
-      el.textContent = e.text;
+      if (isF2F) el.style.borderLeftColor = colorOf[e.speaker] || 'var(--text)';
+      setBubbleText(el, e.text);
       group.appendChild(el);
+      addDeleteControl(group, e.turn_index);
       row.appendChild(group);
       chat.appendChild(row);
     }
   }
   chat.scrollTop = chat.scrollHeight;
   renderState(log.state);
-  resetIdleTimer();
 }
 
 init();

@@ -36,13 +36,59 @@ def _sse(event: dict) -> str:
     return f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
 
 
-def _turn_event(result: TurnResult, *, continuation: bool) -> dict:
+async def _stream_or_await(engine: Engine, run) -> AsyncIterator[dict]:
+    """Yields `stream_start`/`stream_chunk` SSE dicts live, then one final
+    `{"type": "stream_result", "result": TurnResult}` — F2F only, since it
+    renders as one screenplay block (register.f2f_block) that raw deltas map
+    straight onto. Texting mode just awaits `run()` as before and yields the
+    single final event, so its behavior is unchanged.
+
+    `run(on_chunk, on_speaker) -> Awaitable[TurnResult]` wraps whichever
+    Engine call the caller wants streamed (turn() or regenerate()) — same
+    shape as __main__.py's `_Run`, so both front ends share the idea even
+    though the code isn't shared.
+    """
+    if engine.scenario.mode != "f2f":
+        result = await run(lambda _: None, None)
+        yield {"type": "stream_result", "result": result}
+        return
+
+    queue: asyncio.Queue[dict] = asyncio.Queue()
+
+    def on_speaker(character) -> None:
+        queue.put_nowait({"type": "stream_start", "speaker": character.name})
+
+    def on_chunk(delta: str) -> None:
+        queue.put_nowait({"type": "stream_chunk", "text": delta})
+
+    async def _run() -> TurnResult:
+        try:
+            return await run(on_chunk, on_speaker)
+        finally:
+            await queue.put({"type": "_done"})
+
+    task = asyncio.create_task(_run())
+    while True:
+        event = await queue.get()
+        if event["type"] == "_done":
+            break
+        yield event
+    result = await task
+    yield {"type": "stream_result", "result": result}
+
+
+def _turn_event(engine: Engine, result: TurnResult, *, continuation: bool) -> dict:
     return {
         "type": "turn",
         "speaker": result.speaker.name,
         "bubbles": result.bubbles,
         "tics": result.tics,
+        "truncated": result.truncated,
         "continuation": continuation,
+        # For the delete control — addresses this exact reply later via
+        # Engine.delete_from(). Always set: _turn_event is only ever built
+        # right after a turn that produced this same result.
+        "turn_index": engine.last_turn_index(),
     }
 
 
@@ -64,20 +110,31 @@ def _stream(generate: AsyncIterator[str]) -> StreamingResponse:
 
 async def _run_continuations(
     engine: Engine, result: TurnResult, rng: random.Random
-) -> AsyncIterator[TurnResult]:
+) -> AsyncIterator[dict]:
     """Same decide()-driven chain as the terminal's `_continue` — kept out of
-    Engine, this is orchestration. Yields each continuation turn as it's
-    generated; the caller re-checks `engine.state_error` after each one."""
+    Engine, this is orchestration. Yields `_stream_or_await`'s event dicts
+    (stream_start/stream_chunk live for F2F, then stream_result) for each
+    continuation turn; the caller re-checks `engine.state_error` after each
+    stream_result."""
     depth = 0
     while True:
         cont = decide(engine.scenario, result, depth, engine.cfg, rng)
         if cont is None:
             return
         await asyncio.sleep(_CONTINUATION_PAUSE_SECONDS)
-        result = await engine.turn(
-            "", lambda _: None, force_speaker=cont.speaker, extra_directive=cont.directive
-        )
-        yield result
+        async for ev in _stream_or_await(
+            engine,
+            lambda on_chunk, on_speaker: engine.turn(
+                "",
+                on_chunk,
+                force_speaker=cont.speaker,
+                extra_directive=cont.directive,
+                on_speaker=on_speaker,
+            ),
+        ):
+            if ev["type"] == "stream_result":
+                result = ev["result"]
+            yield ev
         depth += 1
 
 
@@ -121,15 +178,26 @@ def create_app(engine: Engine, session: Session, save_path: Path) -> FastAPI:
             ],
             "reply_max_tokens": engine.policy.reply_max_tokens,
             "model": engine.cfg.model,
-            "idle_seconds": engine.cfg.idle_seconds,
+            "idle_seconds": (
+                engine.cfg.idle_seconds_f2f
+                if engine.scenario.mode == "f2f"
+                else engine.cfg.idle_seconds
+            ),
             "vision_capable": engine.policy.vision_capable,
+            "mode": engine.scenario.mode,
         })
 
     @app.get("/api/log")
     async def log() -> JSONResponse:
         return JSONResponse({
             "entries": [
-                {"role": e.role, "speaker": e.speaker, "text": e.text, "image_path": e.image_path}
+                {
+                    "role": e.role,
+                    "speaker": e.speaker,
+                    "text": e.text,
+                    "image_path": e.image_path,
+                    "turn_index": e.turn_index,
+                }
                 for e in transcript_entries(engine.history)
             ],
             "state": _state_payload(engine),
@@ -164,20 +232,36 @@ def create_app(engine: Engine, session: Session, save_path: Path) -> FastAPI:
                     image_bytes = await image.read() if image is not None else None
                     if stripped or image_bytes:
                         yield _sse({"type": "user", "text": stripped, "has_image": image_bytes is not None})
-                    result = await engine.turn(
-                        stripped, lambda _: None, force_speaker=speaker or None, image=image_bytes
-                    )
-                    save_session(engine, session, save_path)
-                    yield _sse(_turn_event(result, continuation=False))
-                    if engine.state_error:
-                        yield _sse({"type": "state_error", "message": engine.state_error})
 
-                    async for cont_result in _run_continuations(engine, result, rng):
-                        result = cont_result
-                        save_session(engine, session, save_path)
-                        yield _sse(_turn_event(result, continuation=True))
-                        if engine.state_error:
-                            yield _sse({"type": "state_error", "message": engine.state_error})
+                    result: TurnResult | None = None
+                    async for ev in _stream_or_await(
+                        engine,
+                        lambda on_chunk, on_speaker: engine.turn(
+                            stripped,
+                            on_chunk,
+                            force_speaker=speaker or None,
+                            image=image_bytes,
+                            on_speaker=on_speaker,
+                        ),
+                    ):
+                        if ev["type"] == "stream_result":
+                            result = ev["result"]
+                            save_session(engine, session, save_path)
+                            yield _sse(_turn_event(engine, result, continuation=False))
+                            if engine.state_error:
+                                yield _sse({"type": "state_error", "message": engine.state_error})
+                        else:
+                            yield _sse(ev)
+
+                    async for ev in _run_continuations(engine, result, rng):
+                        if ev["type"] == "stream_result":
+                            result = ev["result"]
+                            save_session(engine, session, save_path)
+                            yield _sse(_turn_event(engine, result, continuation=True))
+                            if engine.state_error:
+                                yield _sse({"type": "state_error", "message": engine.state_error})
+                        else:
+                            yield _sse(ev)
 
                     last["result"] = result
                     yield _sse({"type": "state", **_state_payload(engine)})
@@ -187,6 +271,75 @@ def create_app(engine: Engine, session: Session, save_path: Path) -> FastAPI:
                     yield _sse({"type": "done"})
 
         return _stream(generate())
+
+    @app.post("/api/regenerate", response_model=None)
+    async def regenerate(guidance: str = Form("")) -> StreamingResponse | JSONResponse:
+        """Redo the last reply, same speaker — only while it's still the
+        most recent thing that happened (Engine.can_regenerate()). A true
+        history mutation, unlike every other endpoint here — see
+        BACKLOG.md for why that's accepted for this one action."""
+        if lock.locked():
+            return JSONResponse({"error": "a turn is already in progress"}, status_code=429)
+        if not engine.can_regenerate():
+            return JSONResponse({"error": "nothing to regenerate"}, status_code=400)
+
+        async def generate() -> AsyncIterator[str]:
+            async with lock:
+                try:
+                    result: TurnResult | None = None
+                    async for ev in _stream_or_await(
+                        engine,
+                        lambda on_chunk, on_speaker: engine.regenerate(
+                            on_chunk, guidance=guidance.strip(), on_speaker=on_speaker
+                        ),
+                    ):
+                        if ev["type"] == "stream_result":
+                            result = ev["result"]
+                            save_session(engine, session, save_path)
+                            yield _sse({**_turn_event(engine, result, continuation=False), "type": "regenerate"})
+                            if engine.state_error:
+                                yield _sse({"type": "state_error", "message": engine.state_error})
+                        else:
+                            yield _sse(ev)
+
+                    async for ev in _run_continuations(engine, result, rng):
+                        if ev["type"] == "stream_result":
+                            result = ev["result"]
+                            save_session(engine, session, save_path)
+                            yield _sse(_turn_event(engine, result, continuation=True))
+                            if engine.state_error:
+                                yield _sse({"type": "state_error", "message": engine.state_error})
+                        else:
+                            yield _sse(ev)
+
+                    last["result"] = result
+                    yield _sse({"type": "state", **_state_payload(engine)})
+                except Exception as exc:
+                    yield _sse({"type": "error", "message": f"{type(exc).__name__}: {exc}"})
+                finally:
+                    yield _sse({"type": "done"})
+
+        return _stream(generate())
+
+    @app.post("/api/delete", response_model=None)
+    async def delete(turn_index: int = Form(...)) -> JSONResponse:
+        """Removes that reply and everything generated after it — a true
+        history mutation like /api/regenerate, and pays the same
+        cache-reprocess cost on the next request. No streaming: deleting
+        produces nothing new to generate. The client is expected to have
+        already confirmed with the user before this ever fires."""
+        if lock.locked():
+            return JSONResponse({"error": "a turn is already in progress"}, status_code=429)
+        try:
+            engine.delete_from(turn_index)
+        except ValueError as exc:
+            return JSONResponse({"error": str(exc)}, status_code=400)
+        save_session(engine, session, save_path)
+        # Rebuilding a TurnResult for whatever's now last isn't worth the
+        # bother — idle-continuation just stays quiet until the next real
+        # turn re-seeds it, same accepted-rough-edge shape as elsewhere here.
+        last["result"] = None
+        return JSONResponse({"ok": True, **_state_payload(engine)})
 
     @app.post("/api/idle", response_model=None)
     async def idle() -> StreamingResponse | JSONResponse:
@@ -204,11 +357,14 @@ def create_app(engine: Engine, session: Session, save_path: Path) -> FastAPI:
                     if result is None:
                         return
                     produced = False
-                    async for cont_result in _run_continuations(engine, result, rng):
+                    async for ev in _run_continuations(engine, result, rng):
+                        if ev["type"] != "stream_result":
+                            yield _sse(ev)
+                            continue
                         produced = True
-                        result = cont_result
+                        result = ev["result"]
                         save_session(engine, session, save_path)
-                        yield _sse(_turn_event(result, continuation=True))
+                        yield _sse(_turn_event(engine, result, continuation=True))
                         if engine.state_error:
                             yield _sse({"type": "state_error", "message": engine.state_error})
                     if produced:
