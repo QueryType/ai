@@ -45,11 +45,17 @@ class Config:
     target_reply_seconds: float
     continuation_max: int
     continuation_chance: float
+    f2f_continuation_max: int
+    f2f_continuation_chance: float
+    target_reply_seconds_f2f: float
     idle_seconds: float
+    idle_seconds_f2f: float
     vision_max_dimension: int
     request_timeout_seconds: float
     web_host: str
     web_port: int
+    autopilot_max_turns: int
+    autopilot_max_seconds: float
 
     @property
     def profile_path(self) -> Path:
@@ -71,9 +77,15 @@ def load_config() -> Config:
         target_reply_seconds=_float("CHAT_TARGET_REPLY_SECONDS", 2.5),
         continuation_max=_int("CHAT_CONTINUATION_MAX", 2),
         continuation_chance=_float("CHAT_CONTINUATION_CHANCE", 0.25),
+        f2f_continuation_max=_int("CHAT_F2F_CONTINUATION_MAX", 4),
+        f2f_continuation_chance=_float("CHAT_F2F_CONTINUATION_CHANCE", 0.35),
+        target_reply_seconds_f2f=_float("CHAT_TARGET_REPLY_SECONDS_F2F", 11.0),
         idle_seconds=_float("CHAT_IDLE_SECONDS", 45.0),
+        idle_seconds_f2f=_float("CHAT_IDLE_SECONDS_F2F", 120.0),
         vision_max_dimension=_int("CHAT_VISION_MAX_DIMENSION", 1024),
         request_timeout_seconds=_float("CHAT_REQUEST_TIMEOUT_SECONDS", 60.0),
         web_host=os.environ.get("CHAT_WEB_HOST", "127.0.0.1"),
         web_port=_int("CHAT_WEB_PORT", 8000),
+        autopilot_max_turns=_int("CHAT_AUTOPILOT_MAX_TURNS", 40),
+        autopilot_max_seconds=_float("CHAT_AUTOPILOT_MAX_SECONDS", 900.0),
     )
