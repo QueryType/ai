@@ -197,7 +197,9 @@ class Engine:
                 finish_reason = choice.finish_reason
 
         truncated = finish_reason == "length"
-        text = strip_speaker_prefix("".join(parts).strip(), speaker.name)
+        text = strip_speaker_prefix(
+            "".join(parts).strip(), [c.name for c in self.scenario.characters]
+        )
         if truncated:
             text = trim_incomplete_sentence(text)
         if text:

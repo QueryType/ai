@@ -56,4 +56,5 @@ async def generate_human_line(engine: Engine) -> str:
         temperature=engine.cfg.temperature,
     )
     text = (resp.choices[0].message.content or "").strip()
-    return strip_speaker_prefix(text, name).strip()
+    names = [name, *(c.name for c in engine.scenario.characters)]
+    return strip_speaker_prefix(text, names).strip()

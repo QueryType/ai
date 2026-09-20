@@ -5,6 +5,84 @@ session doesn't have to re-derive them. Each entry: the idea, the decision (if
 one was made), and current status. Newest on top. Promote an entry to its own
 `PLAN_*.md` (see `PLAN_CONTINUATIONS.md`) once it's actually being built.
 
+## Idea: show scene setting at session start — scoped, not built
+
+Raised: 2026-09-19, while live-testing autonomous mode with a new model.
+Today's banner (terminal) and header (web) show the title, character names,
+and model info, but never the scenario's own setting/premise text — you only
+see it by reading the `.md` file directly.
+
+**Scope, agreed but not yet built:**
+- `Scenario.setting` already exists (`cast.py`) and is already parsed for
+  every scenario — this is purely a display gap, no schema change.
+- Terminal (`ui/terminal.py`'s `banner()`): print the setting as a wrapped,
+  dim line between the title and the character list.
+- Web (`ui/web.py` + `index.html`): add `setting` to the `/api/cast`
+  payload; show it as a small collapsible section at the top of the sidebar
+  (`aside`), above "what the cast has picked up on you" — collapsible so it
+  doesn't eat space during a long session.
+- Deliberately showing the *scene*, not the *characters* — the character
+  roster is already visible (names in the header/meta line); this fills the
+  other gap, what the scene actually is.
+
+Status: **scoped, not built** — picked resume verification (see below) to
+do first instead.
+
+---
+
+## Bug: F2F/autonomous replies compounding a "Name: Name: ..." prefix chain — found and fixed 2026-09-19
+
+Found live: running `--autonomous` for 20 turns against a newly-tried model
+(`qwen3.6-35b-a3b`) produced replies that accumulated a growing chain of
+other characters' names at the start, worse each turn:
+
+```
+turn 7:  Priya: Dev: ...
+turn 9:  Priya: Meera: Dev: ...
+turn 11: Dev: Meera: Priya: Priya: ...
+turn 13: Priya: Meera: Dev: Priya: Priya: ...
+```
+
+**Root cause**, found by tracing the exact stored history, not guessing:
+`register.py`'s `strip_speaker_prefix(text, name)` only ever stripped the
+*current* speaker's own name (`^Priya:`). When a reply legitimately opened
+with a different character's name as a reply-quote convention the model
+invented on its own (e.g. Priya's reply starting `"Meera: Dev: ..."`), that
+never matched and passed straight through. Since history stores every reply
+as `"{speaker.name}: {text}"`, the stored line became
+`"Priya: Meera: Dev: ..."` — and the *next* turn, the model saw that exact
+shape in its own context as if it were the normal format here, and imitated
+it by extending the chain by one more name. Purely a feedback loop: nothing
+capped it, so it grew without bound the longer a session ran. The earlier
+F2F pronoun-attribution fix (`b0a2dde`) was a different, narrower case (a
+model *never* naming itself); this is the opposite failure — naming
+*everyone*, compounding.
+
+**Fixed**: `strip_speaker_prefix()` (`register.py`) now takes any known
+name or collection of names, not just one, and strips a whole leading chain
+of them (`^(?:\s*(?:Name1|Name2|...)\s*:\s*)+`) in one pass, still per-line
+(`MULTILINE`, catching a self-label restart mid-reply same as before). Call
+sites updated: `engine.py` now passes every character in the scenario
+(`self.scenario.characters`), not just the speaker; `human_agent.py` passes
+the human persona's name plus every character's name, for the same reason
+on the self-auto side. The colon requirement (`Name\s*:`) means ordinary
+prose naming a character — `"Dev leaned back..."`, `"Priya, are you
+kidding me?"` — is never touched; only the literal label-with-colon shape
+that only ever shows up as this artifact.
+
+**Verified**: a unit-level check against the exact chains from the live
+transcript (`"Meera: Dev: you restarted..."` →
+`"you restarted the redis cache..."`, `"Meera: Dev: Priya: Priya: oh..."` →
+clean) alongside safe non-matching prose left untouched. Re-ran the exact
+same scenario/model/turn-count (`autonomous_test`, `qwen3.6-35b-a3b`,
+`--max-turns 20`) that showed the bug — zero chains anywhere across 20 full
+turns, user-confirmed live. `python -m src.harness all` unchanged at
+99.4/98.7, no regression.
+
+Status: **built, verified live, not yet committed.**
+
+---
+
 ## Autonomous mode / Self-Auto mode — built 2026-09-19
 
 Raised: two related features, discussed together since they share almost
