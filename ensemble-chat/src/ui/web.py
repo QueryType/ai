@@ -173,6 +173,7 @@ def create_app(engine: Engine, session: Session, save_path: Path) -> FastAPI:
     async def cast() -> JSONResponse:
         return JSONResponse({
             "title": engine.scenario.title,
+            "setting": engine.scenario.setting,
             "characters": [
                 {"name": c.name, "weight": c.weight} for c in engine.scenario.characters
             ],

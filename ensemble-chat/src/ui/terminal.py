@@ -57,6 +57,8 @@ class Terminal:
         scenario, policy = self.engine.scenario, self.engine.policy
         names = ", ".join(c.name for c in scenario.characters)
         self.console.print(f"[bold]{scenario.title}[/bold]  ·  {names}", highlight=False)
+        if scenario.setting:
+            self.console.print(f"[dim italic]{scenario.setting}[/dim italic]", highlight=False)
         tuning = "probed" if policy.probed else "UNPROBED — run: python -m src.probe"
         self.console.print(
             f"[dim]{self.engine.cfg.model} · reply≤{policy.reply_max_tokens}tok · {tuning}[/dim]"
