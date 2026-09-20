@@ -7,8 +7,10 @@ from pathlib import Path
 
 from src.autopilot import run_autonomous, run_self_auto
 from src.bootstrap import build_engine, save_session
+from src.config import load_config
 from src.driver import continue_chain, play, raise_due_promises, regenerate_turn
 from src.engine import Engine, TurnResult
+from src.gpu_memory import ensure_gpu_memory_limit
 from src.session import Session
 from src.ui.terminal import Terminal
 
@@ -208,6 +210,7 @@ def main() -> None:
         raise SystemExit("--autonomous and --auto-human are mutually exclusive")
     if (args.autonomous or args.auto_human) and args.ui == "web":
         raise SystemExit("--autonomous/--auto-human are terminal-only for now")
+    ensure_gpu_memory_limit(load_config().gpu_memory_headroom_gb)
     try:
         if args.ui == "web":
             run_web(args.scenario, args.fresh, args.host, args.port)

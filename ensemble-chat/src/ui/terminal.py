@@ -88,6 +88,12 @@ class Terminal:
             self.console.print(
                 f"[dim red]{'':<{self.pad}}  ⚠ cut off at max_tokens, trimmed to last full sentence[/dim red]"
             )
+        if result.reasoning_tokens:
+            self.console.print(
+                f"[dim red]{'':<{self.pad}}  ⚠ reasoning mode is ON — "
+                f"{result.reasoning_tokens} tokens spent thinking before any reply text "
+                f"(server-side setting, not this app's)[/dim red]"
+            )
 
     async def show(self, result: TurnResult) -> None:
         color = self.colors.get(result.speaker.name, "white")

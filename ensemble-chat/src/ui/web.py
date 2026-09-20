@@ -84,6 +84,7 @@ def _turn_event(engine: Engine, result: TurnResult, *, continuation: bool) -> di
         "bubbles": result.bubbles,
         "tics": result.tics,
         "truncated": result.truncated,
+        "reasoning_tokens": result.reasoning_tokens,
         "continuation": continuation,
         # For the delete control — addresses this exact reply later via
         # Engine.delete_from(). Always set: _turn_event is only ever built

@@ -180,6 +180,7 @@ All of it lives in `.env` — copy `.env.example`.
 | `CHAT_TARGET_APPEND_MS` | latency budget the state-block size is derived from |
 | `CHAT_TARGET_REPLY_SECONDS` | latency budget the reply length is derived from |
 | `CHAT_REQUEST_TIMEOUT_SECONDS` | fail a stalled request loudly instead of hanging (default 60) |
+| `CHAT_PROBE_TIMEOUT_SECONDS` | separate, longer timeout for `src.probe` only — a first-ever probe of a model the server hasn't loaded yet pays for model load plus a full cold prefill, which can outlast the tight runtime timeout above (default 300) |
 | `CHAT_CONTINUATION_MAX` | how many characters can speak in a row before control returns to you (default 2, 0 disables) |
 | `CHAT_CONTINUATION_CHANCE` | base chance of a follow-up or a third party chiming in (default 0.25) |
 | `CHAT_F2F_CONTINUATION_MAX` | same as above, for `mode: f2f` scenarios (default 4) |
@@ -192,6 +193,7 @@ All of it lives in `.env` — copy `.env.example`.
 | `CHAT_VISION_MAX_DIMENSION` | longest edge an attached image is downscaled to before it's saved or sent (default 1024) |
 | `CHAT_AUTOPILOT_MAX_TURNS` | stop `--autonomous`/`--auto-human` after this many replies (default 40) |
 | `CHAT_AUTOPILOT_MAX_SECONDS` | stop `--autonomous`/`--auto-human` after this long, whichever hits first (default 900) |
+| `CHAT_GPU_MEMORY_HEADROOM_GB` | Apple Silicon only: at startup, if `iogpu.wired_limit_mb` leaves less than this much RAM for the OS, offer to raise it via `sudo sysctl` (default 10; resets every reboot, so this may prompt once per boot) |
 
 Change the model, re-run `src.probe`, and reply length, state-block size,
 history strategy and the background-task flag all re-derive from measurement.

@@ -52,10 +52,12 @@ class Config:
     idle_seconds_f2f: float
     vision_max_dimension: int
     request_timeout_seconds: float
+    probe_timeout_seconds: float
     web_host: str
     web_port: int
     autopilot_max_turns: int
     autopilot_max_seconds: float
+    gpu_memory_headroom_gb: float
 
     @property
     def profile_path(self) -> Path:
@@ -84,8 +86,10 @@ def load_config() -> Config:
         idle_seconds_f2f=_float("CHAT_IDLE_SECONDS_F2F", 120.0),
         vision_max_dimension=_int("CHAT_VISION_MAX_DIMENSION", 1024),
         request_timeout_seconds=_float("CHAT_REQUEST_TIMEOUT_SECONDS", 60.0),
+        probe_timeout_seconds=_float("CHAT_PROBE_TIMEOUT_SECONDS", 300.0),
         web_host=os.environ.get("CHAT_WEB_HOST", "127.0.0.1"),
         web_port=_int("CHAT_WEB_PORT", 8000),
         autopilot_max_turns=_int("CHAT_AUTOPILOT_MAX_TURNS", 40),
         autopilot_max_seconds=_float("CHAT_AUTOPILOT_MAX_SECONDS", 900.0),
+        gpu_memory_headroom_gb=_float("CHAT_GPU_MEMORY_HEADROOM_GB", 10.0),
     )

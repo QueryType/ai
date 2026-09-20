@@ -53,16 +53,18 @@ def trim_incomplete_sentence(text: str) -> str:
     Only meant to be called when the model was hard-stopped mid-generation
     (finish_reason == "length", see engine.py) — turns a garbled mid-word cut
     into a shorter but complete-sounding reply. Leaves text alone if it
-    already ends cleanly, or if trimming would erase everything.
+    already ends cleanly. If no sentence in the reply ever completed, there's
+    nothing sound to keep — drops it entirely rather than storing the raw
+    fragment, since history is append-only and can never be cleaned up later.
     """
     text = text.strip()
     if not text or _SENTENCE_END.search(text):
         return text
     parts = [p for p in _SENTENCE.split(text) if p.strip()]
     if len(parts) <= 1:
-        return text
+        return ""
     trimmed = " ".join(parts[:-1]).strip()
-    return trimmed if trimmed else text
+    return trimmed if trimmed else ""
 
 
 def find_tics(text: str) -> list[str]:

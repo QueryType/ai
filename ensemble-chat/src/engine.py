@@ -35,6 +35,7 @@ class TurnResult:
     bubbles: list[str]
     tics: list[str]
     truncated: bool = False
+    reasoning_tokens: int = 0
 
 
 @dataclass
@@ -177,6 +178,7 @@ class Engine:
 
         parts: list[str] = []
         finish_reason: str | None = None
+        reasoning_tokens = 0
         stream = await self.client.chat.completions.create(
             model=self.cfg.model,
             messages=[{"role": "system", "content": self.system_prompt}]
@@ -184,8 +186,11 @@ class Engine:
             max_tokens=self.policy.reply_max_tokens,
             temperature=self.cfg.temperature,
             stream=True,
+            stream_options={"include_usage": True},
         )
         async for chunk in stream:
+            if chunk.usage and chunk.usage.completion_tokens_details:
+                reasoning_tokens = chunk.usage.completion_tokens_details.reasoning_tokens or 0
             if not chunk.choices:
                 continue
             choice = chunk.choices[0]
@@ -229,6 +234,7 @@ class Engine:
             bubbles=bubbles,
             tics=find_tics(text),
             truncated=truncated,
+            reasoning_tokens=reasoning_tokens,
         )
 
     @property

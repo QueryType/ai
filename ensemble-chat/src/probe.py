@@ -146,7 +146,10 @@ async def _probe_slots(client: AsyncOpenAI, model: str) -> int:
 
 
 async def run_probe(cfg: Config) -> Profile:
-    client = get_client(cfg)
+    # A cold probe against a model the server hasn't loaded yet pays for both
+    # model load and a full uncached prefill — needs more room than the
+    # tight, fail-fast timeout runtime chat turns use (provider.py).
+    client = get_client(cfg, timeout=cfg.probe_timeout_seconds)
     structured = await _probe_structured(client, cfg.model)
     prefill, decode, speedup, tokens = await _probe_speed(client, cfg.model)
     slots = await _probe_slots(client, cfg.model)
