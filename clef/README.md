@@ -106,7 +106,25 @@ Consequences:
 
 ## Experiments
 
-`python systemone.py <name> [--url URL] [--url2 URL] [-n N]`
+`python systemone.py <name> [--url URL] [--url2 URL] [-n N] [--raw | -q]`
+
+Every call prints what was **sent** (state, each question with its type and criteria) and what was **received**
+(the answer, all probabilities sorted, confidence, latency, input tokens), followed by the experiment's summary:
+
+```
+┌─ #1 SENT  POST http://127.0.0.1:8081/v1/systemone
+│ state: The package arrived broken, I want my money back.
+│ r [noul]: Is a refund requested?
+├─ RECEIVED  17 ms  input_tokens=42  model=Laya-Q8_0.gguf
+│ r → P(true) = 0.9134
+└─
+```
+
+- `--raw`: the exact request and response JSON of every call instead.
+- `-q`: only the summary.
+
+This shows the API request, not the final prompt: the server renders the model's `systemone` chat template
+(and, for Laya, truncates and inserts `[MASK]` markers) before the forward pass, and the API doesn't return that prompt.
 
 | Name | Question it answers |
 |---|---|
