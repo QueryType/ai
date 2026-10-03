@@ -60,6 +60,11 @@ Pure Python, zero-dependency GPT that learns Devanagari character patterns from 
 ### [TTS Krutrim](./tts_krutrim)
 Web app using Krutrim's TTS API for text-to-speech. Built with Gradio, supporting English and Hindi with multiple speaker voices.
 
+## Local Inference Experiments
+
+### [clef](./clef)
+Experiments with llama.cpp's new decision models and `/v1/systemone` API (PR #29818). Typed questions (choice, score, yes/no) answered in one forward pass with no token generation. Compares Laya and lev on option-order bias, yes/no behaviour, paraphrase stability and prefix sharing, and documents an encoder crash with a workaround.
+
 ## Getting Started
 
 Each project contains its own README with setup and usage instructions. Most projects follow a simple pattern:
